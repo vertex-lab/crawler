@@ -39,9 +39,41 @@ func TestRandomWalks(t *testing.T) {
 		}
 	})
 
-	t.Run("negative GetWalksByNodeID", func(t *testing.T) {
+	t.Run("negative GetWalksByNodeID, nil rwm", func(t *testing.T) {
+
+		var random_walks_map *RandomWalksMap
+		got, err := random_walks_map.GetWalksByNodeID(1)
+
+		if !errors.Is(err, ErrNilRWMPointer) {
+			t.Errorf("GetWalksByNodeID(1): expected %v, got %v", ErrNilRWMPointer, err)
+		}
+
+		if got != nil {
+			t.Fatalf("GetWalksByNodeID(1): expected nil got %v", got)
+		}
+	})
+
+	t.Run("negative GetWalksByNodeID, empty rwm", func(t *testing.T) {
 
 		random_walks_map := NewRandomWalksMap()
+		got, err := random_walks_map.GetWalksByNodeID(1)
+
+		if !errors.Is(err, ErrEmptyRWM) {
+			t.Errorf("GetWalksByNodeID(1): expected %v, got %v", ErrEmptyRWM, err)
+		}
+
+		if got != nil {
+			t.Fatalf("GetWalksByNodeID(1): expected nil got %v", got)
+		}
+	})
+
+	t.Run("negative GetWalksByNodeID, node not found", func(t *testing.T) {
+
+		// create non empty rwm
+		random_walks_map := NewRandomWalksMap()
+		walk := RandomWalk{NodeIDs: []uint32{}}                // create empty walk
+		random_walks_map.NodeWalkMap[0] = []*RandomWalk{&walk} // add it to the rwm
+
 		got, err := random_walks_map.GetWalksByNodeID(1)
 
 		if !errors.Is(err, ErrNodeNotFound) {
@@ -73,17 +105,29 @@ func TestRandomWalks(t *testing.T) {
 			t.Errorf("AddWalk({1,2}): expected %v, got %v", &walk, got1)
 		}
 
-		t.Run("negative AddWalk nil walk", func(t *testing.T) {
+		t.Run("negative AddWalk, nil rwm", func(t *testing.T) {
+
+			var random_walks_map *RandomWalksMap // nil rwm
+			walk := RandomWalk{NodeIDs: []uint32{1, 2}}
+
+			err := random_walks_map.AddWalk(&walk)
+
+			if err != ErrNilRWMPointer {
+				t.Fatalf("AddWalk(nil): expected %v, got %v", ErrNilRWMPointer, err)
+			}
+		})
+
+		t.Run("negative AddWalk, nil walk", func(t *testing.T) {
 			random_walks_map := NewRandomWalksMap()
 
 			err := random_walks_map.AddWalk(nil)
 
-			if err != ErrNilPointer {
-				t.Fatalf("AddWalk(nil): expected %v, got %v", ErrNilPointer, err)
+			if err != ErrNilWalkPointer {
+				t.Fatalf("AddWalk(nil): expected %v, got %v", ErrNilWalkPointer, err)
 			}
 		})
 
-		t.Run("negative AddWalk empty walk", func(t *testing.T) {
+		t.Run("negative AddWalk, empty walk", func(t *testing.T) {
 			random_walks_map := NewRandomWalksMap()
 			empty_walk := RandomWalk{NodeIDs: []uint32{}}
 
