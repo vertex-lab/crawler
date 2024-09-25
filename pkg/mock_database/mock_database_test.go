@@ -14,25 +14,25 @@ func TestMockDatabase(t *testing.T) {
 
 		// initialize mock database
 		db := NewMockDatabase()
-		db.Nodes["A"] = &graph.Node{ID: "A", SuccessorsID: []string{"B"}}
-		db.Nodes["B"] = &graph.Node{ID: "B", SuccessorsID: []string{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
 
-		nodeA, err := db.FetchNodeByID("A")
+		nodeA, err := db.FetchNodeByID(0)
 
 		if err != nil {
-			t.Errorf("FetchNodeByID('A'): expected no error, got %v", err)
+			t.Errorf("FetchNodeByID(0): expected no error, got %v", err)
 		}
 
 		if nodeA == nil {
-			t.Fatalf("FetchNodeByID('A'): expected node ID 'A', got node = 'nil'")
+			t.Fatalf("FetchNodeByID(0): expected node ID 0, got node = 'nil'")
 		}
 
-		if nodeA.ID != "A" {
-			t.Errorf("FetchNodeByID('A'): expected node ID 'A', got %s", nodeA.ID)
+		if nodeA.ID != 0 {
+			t.Errorf("FetchNodeByID(0): expected node ID 0, got %d", nodeA.ID)
 		}
 
-		if !reflect.DeepEqual(nodeA.SuccessorsID, []string{"B"}) {
-			t.Errorf("FetchNodeByID('A'): expected successors {'B'}, got %s", nodeA.SuccessorsID)
+		if !reflect.DeepEqual(nodeA.SuccessorsID, []uint32{1}) {
+			t.Errorf("FetchNodeByID(0): expected successors {1}, got %d", nodeA.SuccessorsID)
 		}
 	})
 
@@ -41,14 +41,14 @@ func TestMockDatabase(t *testing.T) {
 		// initialize mock database
 		db := NewMockDatabase()
 
-		nodeA, err := db.FetchNodeByID("A")
+		nodeA, err := db.FetchNodeByID(0)
 
 		if !errors.Is(err, ErrNodeNotFound) {
-			t.Errorf("FetchNodeByID('A'): expected error %v, got %v", ErrNodeNotFound, err)
+			t.Errorf("FetchNodeByID(0): expected error %v, got %v", ErrNodeNotFound, err)
 		}
 
 		if nodeA != nil {
-			t.Errorf("FetchNodeByID('A'): expected nodeA = nil, got %v", nodeA)
+			t.Errorf("FetchNodeByID(0): expected nodeA = nil, got %v", nodeA)
 		}
 	})
 
@@ -56,18 +56,18 @@ func TestMockDatabase(t *testing.T) {
 
 		// initialize mock database
 		db := NewMockDatabase()
-		db.Nodes["A"] = &graph.Node{ID: "A", SuccessorsID: []string{"B", "C"}}
-		db.Nodes["B"] = &graph.Node{ID: "B", SuccessorsID: []string{}}
-		db.Nodes["C"] = &graph.Node{ID: "C", SuccessorsID: []string{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1, 2}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
+		db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{}}
 
-		successorsA, err := db.GetNodeSuccessorsID("A")
+		successorsA, err := db.GetNodeSuccessorsID(0)
 
 		if err != nil {
-			t.Errorf("GetNodeSuccessorsID('A'): expected no error, got %v", err)
+			t.Errorf("GetNodeSuccessorsID(0): expected no error, got %v", err)
 		}
 
-		if !reflect.DeepEqual(successorsA, []string{"B", "C"}) {
-			t.Errorf("GetNodeSuccessorsID('A'): expected successors {'B', 'C'}, got %s", successorsA)
+		if !reflect.DeepEqual(successorsA, []uint32{1, 2}) {
+			t.Errorf("GetNodeSuccessorsID(0): expected successors {1, 2}, got %v", successorsA)
 		}
 	})
 
@@ -76,14 +76,14 @@ func TestMockDatabase(t *testing.T) {
 		// initialize mock database
 		db := NewMockDatabase()
 
-		successorsA, err := db.GetNodeSuccessorsID("A")
+		successorsA, err := db.GetNodeSuccessorsID(0)
 
 		if !errors.Is(err, ErrNodeNotFound) {
-			t.Errorf("GetNodeSuccessorsID('A'): expected error %v, got %v", ErrNodeNotFound, err)
+			t.Errorf("GetNodeSuccessorsID(0): expected error %v, got %v", ErrNodeNotFound, err)
 		}
 
 		if successorsA != nil {
-			t.Errorf("GetNodeSuccessorsID('A'): expected successorsA = nil, got %v", successorsA)
+			t.Errorf("GetNodeSuccessorsID(0): expected successorsA = nil, got %v", successorsA)
 		}
 	})
 }

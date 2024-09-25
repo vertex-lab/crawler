@@ -1,6 +1,7 @@
 package graph
 
+// defines the basic structure of a node in the graph
 type Node struct {
-	ID           string   // unique identifier
-	SuccessorsID []string // List of nodes it follows
+	ID           uint32   // unique identifier
+	SuccessorsID []uint32 // List of nodes it follows
 }
