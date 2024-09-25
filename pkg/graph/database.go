@@ -4,5 +4,5 @@ package graph
 // the analytics engine without relaying on a specific database
 type Database interface {
 	FetchNodeByID(ID uint32) (*Node, error)
-	GetNodeSuccessorsID(ID uint32) ([]uint32, error)
+	GetNodeSuccessorIDs(ID uint32) ([]uint32, error)
 }

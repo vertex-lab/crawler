@@ -30,7 +30,7 @@ func (db *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
 }
 
 // GetNodeSuccessors returns the successors of a node from the mock database.
-func (db *MockDatabase) GetNodeSuccessorsID(id uint32) ([]uint32, error) {
+func (db *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
 	node, exists := db.Nodes[id]
 	if !exists {
 		return nil, ErrNodeNotFound

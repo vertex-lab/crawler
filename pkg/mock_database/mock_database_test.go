@@ -60,7 +60,7 @@ func TestMockDatabase(t *testing.T) {
 		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
 		db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{}}
 
-		successorsA, err := db.GetNodeSuccessorsID(0)
+		successorsA, err := db.GetNodeSuccessorIDs(0)
 
 		if err != nil {
 			t.Errorf("GetNodeSuccessorsID(0): expected no error, got %v", err)
@@ -76,7 +76,7 @@ func TestMockDatabase(t *testing.T) {
 		// initialize mock database
 		db := NewMockDatabase()
 
-		successorsA, err := db.GetNodeSuccessorsID(0)
+		successorsA, err := db.GetNodeSuccessorIDs(0)
 
 		if !errors.Is(err, ErrNodeNotFound) {
 			t.Errorf("GetNodeSuccessorsID(0): expected error %v, got %v", ErrNodeNotFound, err)
