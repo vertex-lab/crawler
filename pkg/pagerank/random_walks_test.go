@@ -9,6 +9,28 @@ import (
 // ------------------------------TESTS------------------------------
 func TestRandomWalks(t *testing.T) {
 
+	t.Run("test CheckEmpty, nil rwm", func(t *testing.T) {
+
+		var random_walks_map *RandomWalksMap
+		err := random_walks_map.CheckEmpty()
+
+		if !errors.Is(err, ErrNilRWMPointer) {
+			t.Errorf("CheckEmpty(): expected %v, got %v", ErrNilRWMPointer, err)
+		}
+
+	})
+
+	t.Run("test CheckEmpty, empty rwm", func(t *testing.T) {
+
+		random_walks_map := NewRandomWalksMap()
+		err := random_walks_map.CheckEmpty()
+
+		if !errors.Is(err, ErrEmptyRWM) {
+			t.Errorf("CheckEmpty(): expected %v, got %v", ErrEmptyRWM, err)
+		}
+
+	})
+
 	t.Run("positive GetWalksByNodeID", func(t *testing.T) {
 
 		random_walks_map := NewRandomWalksMap()

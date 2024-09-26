@@ -5,9 +5,10 @@ import "errors"
 // this abstracts the Database basic functions, so I can develop
 // the analytics engine without relaying on a specific database
 type Database interface {
+	CheckEmpty() error
 	FetchNodeByID(ID uint32) (*Node, error)
 	GetNodeSuccessorIDs(ID uint32) ([]uint32, error)
-	IsEmpty() (bool, error)
+	GetAllNodeIDs() ([]uint32, error)
 }
 
 //--------------------------ERROR-CODES--------------------------

@@ -16,18 +16,27 @@ func NewMockDatabase() *MockDatabase {
 	}
 }
 
-// FetchNodeByID retrieves a node by ID from the mock database.
-func (db *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
+// CheckEmpty returns an error if the db is nil or has no nodes
+func (db *MockDatabase) CheckEmpty() error {
 
 	// handle nil pointer
 	if db == nil {
-		return nil, graph.ErrNilDatabasePointer
+		return graph.ErrNilDatabasePointer
 	}
 
-	// handle empty database
-	is_empty, _ := db.IsEmpty()
-	if is_empty {
-		return nil, graph.ErrDatabaseIsEmpty
+	if len(db.Nodes) == 0 {
+		return graph.ErrDatabaseIsEmpty
+	}
+
+	return nil
+}
+
+// FetchNodeByID retrieves a node by ID from the mock database.
+func (db *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
+
+	err := db.CheckEmpty()
+	if err != nil {
+		return nil, err
 	}
 
 	node, exists := db.Nodes[id]
@@ -40,15 +49,9 @@ func (db *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
 // GetNodeSuccessors returns the successors of a node from the mock database.
 func (db *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
 
-	// handle nil pointer
-	if db == nil {
-		return nil, graph.ErrNilDatabasePointer
-	}
-
-	// handle empty database
-	is_empty, _ := db.IsEmpty()
-	if is_empty {
-		return nil, graph.ErrDatabaseIsEmpty
+	err := db.CheckEmpty()
+	if err != nil {
+		return nil, err
 	}
 
 	node, exists := db.Nodes[id]
@@ -58,13 +61,18 @@ func (db *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
 	return node.SuccessorsID, nil
 }
 
-// IsEmpty returns true if the MockDatabase has no Nodes, else false
-func (db *MockDatabase) IsEmpty() (bool, error) {
+func (db *MockDatabase) GetAllNodeIDs() ([]uint32, error) {
 
-	// handle nil pointer
-	if db == nil {
-		return true, graph.ErrNilDatabasePointer
+	err := db.CheckEmpty()
+	if err != nil {
+		return nil, err
 	}
 
-	return len(db.Nodes) == 0, nil
+	nodeIDs := make([]uint32, 0, len(db.Nodes))
+	for id := range db.Nodes {
+		nodeIDs = append(nodeIDs, id)
+	}
+
+	return nodeIDs, nil
+
 }

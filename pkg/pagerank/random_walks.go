@@ -34,17 +34,26 @@ func NewRandomWalksMap() *RandomWalksMap {
 	}
 }
 
+func (rwm *RandomWalksMap) CheckEmpty() error {
+
+	if rwm == nil {
+		return ErrNilRWMPointer
+	}
+
+	if len(rwm.NodeWalkMap) == 0 {
+		return ErrEmptyRWM
+	}
+
+	return nil
+}
+
 // GetWalksByNodeID; pass a node ID, returns all the RandomWalks that pass
 // through that node, as a slice []*RandomWalk
 func (rwm *RandomWalksMap) GetWalksByNodeID(nodeID uint32) ([]*RandomWalk, error) {
 
-	// if the rwm is a nil pointer
-	if rwm == nil {
-		return nil, ErrNilRWMPointer
-	}
-
-	if len(rwm.NodeWalkMap) == 0 {
-		return nil, ErrEmptyRWM
+	err := rwm.CheckEmpty()
+	if err != nil {
+		return nil, err
 	}
 
 	walks, exist := rwm.NodeWalkMap[nodeID]
