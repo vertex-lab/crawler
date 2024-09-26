@@ -51,13 +51,20 @@ func TestGenerateRandomWalks(t *testing.T) {
 		}
 	})
 
-	// t.Run("positive GenerateRandomWalks", func(t *testing.T) {
+	// t.Run("positive GenerateRandomWalks, deterministic", func(t *testing.T) {
 
 	// 	// generate new mock database with 3 dandling nodes
-	// 	db := NewMockDatabase()
+	// 	db := mock.NewMockDatabase()
+	// 	db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{}}
+	// 	db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
+	// 	db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{}}
+
+	// 	rand.Seed(42) // set a fixed seed for deterministic behavior in tests
 
 	// 	random_walks_map := NewRandomWalksMap()
-	// 	random_walks_map.GenerateRandomWalks(0.85, 1)
+	// 	random_walks_map.GenerateRandomWalks(db, 0.85, 1) // just do one walk
+
+	// 	for node := range db.Nodes
 
 	// })
 }
