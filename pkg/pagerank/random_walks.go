@@ -34,6 +34,7 @@ func NewRandomWalksMap() *RandomWalksMap {
 	}
 }
 
+// CheckEmpty returns an error if rwm is nil or empty. Otherwise it returns nil
 func (rwm *RandomWalksMap) CheckEmpty() error {
 
 	if rwm == nil {
@@ -64,6 +65,9 @@ func (rwm *RandomWalksMap) GetWalksByNodeID(nodeID uint32) ([]*RandomWalk, error
 	return walks, nil
 }
 
+// AddWalk; adds the pointer to the walk to the RandomWalksMap. This means that
+// for each node visited by the walk, the walk pointer will be added on
+// RandomWalksMap.NodeWalkMap(node)
 func (rwm *RandomWalksMap) AddWalk(walk *RandomWalk) error {
 
 	// if the rwm is a nil pointer
