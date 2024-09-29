@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/pippellia-btc/analytic_engine/pkg/graph"
 	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
@@ -165,7 +166,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 		}
 
 		randomWalksMap := NewRandomWalksMap()
-		err := randomWalksMap._generateRandomWalks(db, 0.85, 2, randomNumGen)
+		err := randomWalksMap.generateRandomWalks(db, 0.85, 2, randomNumGen)
 
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
@@ -203,20 +204,62 @@ func TestGenerateRandomWalks(t *testing.T) {
 	})
 }
 
+func TestGenerateWalk(t *testing.T) {
+
+	t.Run("negative generateWalk(), db doesn't find successors", func(t *testing.T) {
+
+		db := mock.NewMockDatabase()
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		walk, err := generateWalk(db, 0, 0.85, rng)
+
+		if err != graph.ErrDatabaseIsEmpty {
+			t.Errorf("generateWalk(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
+		}
+
+		if walk != nil {
+			t.Errorf("generateWalk(): expected nil, got %v", walk)
+		}
+	})
+
+	t.Run("positive generateWalk(), triangle", func(t *testing.T) {
+
+		db := mock.NewMockDatabase()
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{2}}
+		db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{0}}
+
+		rng := rand.New(rand.NewSource(420))
+
+		walk, err := generateWalk(db, 0, 0.85, rng)
+		expectedWalk := []uint32{0, 1}
+
+		if err != nil {
+			t.Errorf("generateWalk(): expected nil, got %v", err)
+		}
+
+		if !reflect.DeepEqual(walk, expectedWalk) {
+			t.Errorf("generateWalk(): expected %v, got %v", expectedWalk, walk)
+		}
+	})
+}
+
 func BenchmarkGenerateRandomWalks(b *testing.B) {
 
-	db := generateBigDB(200000)
+	db := generateBigDB(2000)
 	b.ResetTimer() // to exclude the time to set up
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < b.N; i++ {
 
 		rwm := NewRandomWalksMap()
-		err := rwm.GenerateRandomWalks(db, 0.85, 10)
+		err := rwm.GenerateRandomWalks(db, 0.85, 100)
 		if err != nil {
 			b.Fatalf("GenerateRandomWalks() failed: %v", err)
 		}
 	}
 }
+
+//-------------------------------HELPER-FUNCTIONS-------------------------------
 
 // generates a randomly generated database of a specified size where the number
 // of successors for each node is ~sqrt(size)

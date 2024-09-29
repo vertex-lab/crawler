@@ -36,14 +36,14 @@ NOTE
 
 	This function is computationally expensive and should be called only when
 	the RandomWalksMap is empty. During the normal execution of the program,
-	there should always be random walks, so we shouldn't re-do them from scratch,
+	there should always be random walks, so we should not re-do them from scratch,
 	but just update them when necessary (e.g. when there is a graph update).
 	checkInputs checks if the RandomWalksMap is empty.
 
 REFERENCES
 ----------
 
-	[1] B. Bahmani, A. Chowdhury, A. Goel, Fast Incremental and Personalized PageRank
+	[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 	link: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func (rwm *RandomWalksMap) GenerateRandomWalks(db graph.Database,
@@ -56,10 +56,10 @@ func (rwm *RandomWalksMap) GenerateRandomWalks(db graph.Database,
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return rwm._generateRandomWalks(db, alpha, walksPerNode, rng)
+	return rwm.generateRandomWalks(db, alpha, walksPerNode, rng)
 }
 
-func (rwm *RandomWalksMap) _generateRandomWalks(db graph.Database,
+func (rwm *RandomWalksMap) generateRandomWalks(db graph.Database,
 	alpha float32, walksPerNode uint16, rng *rand.Rand) error {
 
 	// get all the nodes ids to iterate over them
@@ -72,31 +72,9 @@ func (rwm *RandomWalksMap) _generateRandomWalks(db graph.Database,
 	for _, nodeID := range nodeIDs {
 		for i := uint16(0); i < walksPerNode; i++ {
 
-			walk := []uint32{nodeID}
-			currentNodeID := nodeID
-
-			for {
-				// stop with probability 1-alpha
-				if rng.Float32() > alpha {
-					break
-				}
-
-				// get the successors of the current node
-				successors, err := db.GetNodeSuccessorIDs(currentNodeID)
-				if err != nil {
-					return err
-				}
-
-				// if it is a dandling node, stop the walk
-				if len(successors) == 0 {
-					break
-				}
-
-				// randomly select the next node, and set is as the current one
-				random_index := rng.Intn(len(successors))
-				currentNodeID = successors[random_index]
-
-				walk = append(walk, currentNodeID)
+			walk, err := generateWalk(db, nodeID, alpha, rng)
+			if err != nil {
+				return err
 			}
 
 			// add the RandomWalk's pointer to the RandomWalksMap
@@ -105,7 +83,44 @@ func (rwm *RandomWalksMap) _generateRandomWalks(db graph.Database,
 		}
 	}
 
+	// TODO; store the rwn on an in-memory database (e.g. Redis)
 	return nil
+}
+
+// generateWalk; generate a single walk ([]uint32) from a specified starting node.
+// The function returns an error if the db cannot find the successors of a node
+func generateWalk(db graph.Database, startingNodeID uint32,
+	alpha float32, rng *rand.Rand) ([]uint32, error) {
+
+	walk := []uint32{startingNodeID}
+	currentNodeID := startingNodeID
+
+	for {
+		// stop with probability 1-alpha
+		if rng.Float32() > alpha {
+			break
+		}
+
+		// get the successors of the current node
+		successors, err := db.GetNodeSuccessorIDs(currentNodeID)
+		if err != nil {
+			return nil, err
+		}
+
+		// if it is a dandling node, stop the walk
+		succSize := len(successors)
+		if succSize == 0 {
+			break
+		}
+
+		// randomly select the next node, and set is as the current one
+		random_index := rng.Intn(succSize)
+		currentNodeID = successors[random_index]
+
+		walk = append(walk, currentNodeID)
+	}
+
+	return walk, nil
 }
 
 // checkInputs function is used in GenerateRandomWalks to check if the inputs
