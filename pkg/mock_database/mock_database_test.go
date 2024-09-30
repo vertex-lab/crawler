@@ -104,8 +104,8 @@ func TestMockDatabase(t *testing.T) {
 	t.Run("positive test FetchNodeByID", func(t *testing.T) {
 
 		db := NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1}}
-		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
 
 		node, err := db.FetchNodeByID(0)
 
@@ -121,15 +121,15 @@ func TestMockDatabase(t *testing.T) {
 			t.Errorf("FetchNodeByID(0): expected node ID 0, got %d", node.ID)
 		}
 
-		if !reflect.DeepEqual(node.SuccessorsID, []uint32{1}) {
-			t.Errorf("FetchNodeByID(0): expected successors {1}, got %d", node.SuccessorsID)
+		if !reflect.DeepEqual(node.SuccessorIDs, []uint32{1}) {
+			t.Errorf("FetchNodeByID(0): expected successors {1}, got %d", node.SuccessorIDs)
 		}
 	})
 
 	t.Run("negative test FetchNodeByID, node not in the db", func(t *testing.T) {
 
 		db := NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{0}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
 
 		node, err := db.FetchNodeByID(1)
 
@@ -146,9 +146,9 @@ func TestMockDatabase(t *testing.T) {
 
 		// initialize mock database
 		db := NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1, 2}}
-		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
-		db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 2}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
+		db.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{}}
 
 		successors, err := db.GetNodeSuccessorIDs(0)
 
@@ -165,7 +165,7 @@ func TestMockDatabase(t *testing.T) {
 
 		// initialize mock database
 		db := NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{0}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
 
 		successors, err := db.GetNodeSuccessorIDs(1)
 
@@ -181,7 +181,7 @@ func TestMockDatabase(t *testing.T) {
 	t.Run("positive test GetAllNodeIDs", func(t *testing.T) {
 
 		db := NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{0}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
 
 		node_ids, err := db.GetAllNodeIDs()
 

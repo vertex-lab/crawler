@@ -58,9 +58,10 @@ func (db *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
 	if !exists {
 		return nil, graph.ErrNodeNotFound
 	}
-	return node.SuccessorsID, nil
+	return node.SuccessorIDs, nil
 }
 
+// GetAllNodeIDs returns a slice with the ids of all nodes in the mock database
 func (db *MockDatabase) GetAllNodeIDs() ([]uint32, error) {
 
 	err := db.CheckEmpty()

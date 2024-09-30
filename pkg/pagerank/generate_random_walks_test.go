@@ -40,7 +40,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 	t.Run("negative GenerateRandomWalks, nil rwm", func(t *testing.T) {
 
 		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
 		var randomWalksMap *RandomWalksMap // nil rwm
 		err := randomWalksMap.GenerateRandomWalks(db)
@@ -53,7 +53,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 	t.Run("negative GenerateRandomWalks, non-empty rwm", func(t *testing.T) {
 
 		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
 		// non empty rwm
 		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
@@ -70,7 +70,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 	t.Run("positive GenerateRandomWalks, 1 dandling node", func(t *testing.T) {
 
 		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
 		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
 		err := randomWalksMap.GenerateRandomWalks(db)
@@ -112,9 +112,9 @@ func TestGenerateRandomWalks(t *testing.T) {
 		// not be problematic in production. Further investigation is needed.
 
 		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1, 2}}
-		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{}}
-		db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{0}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 2}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
+		db.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
 
 		// 	to get the same results
 		randomNumGen := rand.New(rand.NewSource(69))
@@ -186,9 +186,9 @@ func TestGenerateWalk(t *testing.T) {
 	t.Run("positive generateWalk(), triangle", func(t *testing.T) {
 
 		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorsID: []uint32{1}}
-		db.Nodes[1] = &graph.Node{ID: 1, SuccessorsID: []uint32{2}}
-		db.Nodes[2] = &graph.Node{ID: 2, SuccessorsID: []uint32{0}}
+		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		db.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
+		db.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
 
 		rng := rand.New(rand.NewSource(420))
 
@@ -237,7 +237,7 @@ func generateBigDB(size uint32) *mock.MockDatabase {
 			random_successors[j] = uint32(rand.Intn(int(size)))
 		}
 
-		db.Nodes[i] = &graph.Node{ID: i, SuccessorsID: random_successors}
+		db.Nodes[i] = &graph.Node{ID: i, SuccessorIDs: random_successors}
 	}
 
 	return db

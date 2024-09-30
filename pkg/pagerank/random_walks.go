@@ -12,6 +12,7 @@ var ErrEmptyRWM = errors.New("rwm is empty")
 
 var ErrNilWalkPointer = errors.New("nil walk pointer")
 var ErrEmptyWalk = errors.New("passed empty walk")
+var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the walk")
 
 var ErrNodeNotFound = errors.New("node not found")
 
@@ -138,6 +139,53 @@ func (rwm *RandomWalksMap) AddWalk(walk *RandomWalk) error {
 	// add it to the RandomWalksMap, under each node it passes through
 	for _, nodeID := range walk.NodeIDs {
 		rwm.NodeWalkMap[nodeID] = append(rwm.NodeWalkMap[nodeID], walk)
+	}
+
+	return nil
+}
+
+// PruneWalk; removes the pointer to walkToRemove from all nodes that are part of
+// walkToRemove.NodeIDs[index:]. The variable index is the position where we "cut"
+// or "prune" the walk.
+func (rwm *RandomWalksMap) PruneWalk(index int, walkToRemove *RandomWalk) error {
+
+	err := rwm.CheckEmpty()
+	if err != nil {
+		return err
+	}
+
+	// if the walkToRemove is a nil pointer
+	if walkToRemove == nil {
+		return ErrNilWalkPointer
+	}
+
+	// if the walkToRemove is empty
+	if len(walkToRemove.NodeIDs) == 0 {
+		return ErrEmptyWalk
+	}
+
+	if index >= len(walkToRemove.NodeIDs) {
+		return ErrInvalidWalkIndex
+	}
+
+	// iterate over the pruned nodes of the walkToRemove
+	for _, nodeID := range walkToRemove.NodeIDs[index:] {
+
+		nodeWalks, err := rwm.GetWalksByNodeID(nodeID)
+		if err != nil {
+			return err
+		}
+
+		// remove all the times the walkToRemove appears
+		newNodeWalks := []*RandomWalk{}
+		for _, walk := range nodeWalks {
+			if walk != walkToRemove {
+				newNodeWalks = append(newNodeWalks, walk)
+			}
+		}
+
+		// update the rwm
+		rwm.NodeWalkMap[nodeID] = newNodeWalks
 	}
 
 	return nil
