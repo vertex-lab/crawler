@@ -9,7 +9,7 @@ import (
 )
 
 /*
-GenerateRandomWalks generates `walk_per_node` random walks for each node in
+GenerateRandomWalks generates `walksPerNode` random walks for each node in
 the database using dampening factor `alpha`. The walks pointers are stored in
 the RandomWalksMap struct.
 
@@ -18,13 +18,6 @@ INPUTS
 
 	> db: graph.Database
 	The database where nodes are stored
-
-	> alpha: float32
-	The dampening factor, which is the probability of stopping at each step
-	of the random walk. Default is 0.85
-
-	> walksPerNode: uint16
-	The number of random walks to be performed for each node. Default is 10
 
 OUTPUT
 ------
@@ -46,21 +39,26 @@ REFERENCES
 	[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 	link: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
-func (rwm *RandomWalksMap) GenerateRandomWalks(db graph.Database,
-	alpha float32, walksPerNode uint16) error {
+func (rwm *RandomWalksMap) GenerateRandomWalks(db graph.Database) error {
+
+	const expectEmptyRWM = true
 
 	// checking all the inputs
-	err := checkInputs(rwm, db, alpha, walksPerNode)
+	err := checkInputs(rwm, db, expectEmptyRWM)
 	if err != nil {
 		return err
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return rwm.generateRandomWalks(db, alpha, walksPerNode, rng)
+	return rwm.generateRandomWalks(db, rng)
 }
 
 func (rwm *RandomWalksMap) generateRandomWalks(db graph.Database,
-	alpha float32, walksPerNode uint16, rng *rand.Rand) error {
+	rng *rand.Rand) error {
+
+	// unpack the parameters of the random walks
+	alpha := rwm.alpha
+	walksPerNode := rwm.walksPerNode
 
 	// get all the nodes ids to iterate over them
 	nodeIDs, err := db.GetAllNodeIDs()
@@ -78,8 +76,8 @@ func (rwm *RandomWalksMap) generateRandomWalks(db graph.Database,
 			}
 
 			// add the RandomWalk's pointer to the RandomWalksMap
-			random_walk := RandomWalk{NodeIDs: walk}
-			rwm.AddWalk(&random_walk)
+			randomWalk := RandomWalk{NodeIDs: walk}
+			rwm.AddWalk(&randomWalk)
 		}
 	}
 
@@ -114,8 +112,8 @@ func generateWalk(db graph.Database, startingNodeID uint32,
 		}
 
 		// randomly select the next node, and set is as the current one
-		random_index := rng.Intn(succSize)
-		currentNodeID = successors[random_index]
+		randomIndex := rng.Intn(succSize)
+		currentNodeID = successors[randomIndex]
 
 		walk = append(walk, currentNodeID)
 	}
@@ -123,10 +121,9 @@ func generateWalk(db graph.Database, startingNodeID uint32,
 	return walk, nil
 }
 
-// checkInputs function is used in GenerateRandomWalks to check if the inputs
-// are valid. If not, an appropriate error is returned
-func checkInputs(rwm *RandomWalksMap, db graph.Database,
-	alpha float32, walksPerNode uint16) error {
+// checkInputs function is used to check whether the inputs are valid.
+// If not, an appropriate error is returned
+func checkInputs(rwm *RandomWalksMap, db graph.Database, expectEmptyRWM bool) error {
 
 	// checks if db is nil or an empty database
 	err := db.CheckEmpty()
@@ -134,23 +131,45 @@ func checkInputs(rwm *RandomWalksMap, db graph.Database,
 		return err
 	}
 
-	// checks if rwm is nil
-	err = rwm.CheckEmpty()
-	if err == nil {
-		return ErrRWMIsNotEmpty
-	}
-
-	// checks if rwm is NOT Empty
-	if !errors.Is(err, ErrEmptyRWM) {
+	// checks if rwm is valid and whether it should be empty or not
+	err = checkRWMState(rwm, expectEmptyRWM)
+	if err != nil {
 		return err
 	}
 
-	if alpha <= 0 || alpha >= 1 {
+	if rwm.alpha <= 0 || rwm.alpha >= 1 {
 		return ErrInvalidAlpha
 	}
 
-	if walksPerNode <= 0 {
+	if rwm.walksPerNode <= 0 {
 		return ErrInvalidWalksPerNode
+	}
+
+	return nil
+}
+
+// checkRWMState checks if the rwm is empty or non-empty based on the requirement.
+func checkRWMState(rwm *RandomWalksMap, expectEmptyRWM bool) error {
+	err := rwm.CheckEmpty()
+
+	// if the rwm is nil, return the appropriate error
+	if errors.Is(err, ErrNilRWMPointer) {
+		return err
+	}
+
+	// When the rwm is empty but it shouldn't be
+	if errors.Is(err, ErrEmptyRWM) && !expectEmptyRWM {
+		return ErrEmptyRWM
+	}
+
+	// Handle the case when the RWM is not empty but it should be
+	if !errors.Is(err, ErrEmptyRWM) && expectEmptyRWM {
+		return ErrRWMIsNotEmpty
+	}
+
+	// If the error isn't related to being empty, return the original error
+	if err != nil && !errors.Is(err, ErrEmptyRWM) {
+		return err
 	}
 
 	return nil
@@ -159,5 +178,3 @@ func checkInputs(rwm *RandomWalksMap, db graph.Database,
 //--------------------------------- ERROR-CODES---------------------------------
 
 var ErrRWMIsNotEmpty = errors.New("the rwm is NOT empty")
-var ErrInvalidAlpha = errors.New("alpha should be a number between 0 and 1 (excluded)")
-var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zero")
