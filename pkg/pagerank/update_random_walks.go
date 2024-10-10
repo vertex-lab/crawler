@@ -10,7 +10,7 @@ import (
 
 /*
 UpdateRandomWalks updates the RandomWalksMap when a node's successors change from
-oldSuccessorIDs to SuccessorIDs.
+oldSuccessorIDs to currentSuccessorIDs.
 
 INPUTS
 ------
@@ -19,7 +19,7 @@ INPUTS
 	The database where nodes are stored
 
 	> nodeID: uint32
-	The ID of the node that changed his successors from oldSuccessorIDs to SuccessorIDs
+	The ID of the node that changed his successors from oldSuccessorIDs to currentSuccessorIDs
 
 	> oldSuccessorIDs: []uint32
 	The slice that contains the node IDs of the old successors of nodeID
@@ -36,7 +36,7 @@ REFERENCES
 ----------
 
 	[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
-	link: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
+	URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func (RWM *RandomWalksMap) UpdateRandomWalks(DB graph.Database,
 	nodeID uint32, oldSuccessorIDs []uint32) error {
@@ -63,26 +63,32 @@ func (RWM *RandomWalksMap) UpdateRandomWalks(DB graph.Database,
 func (RWM *RandomWalksMap) updateRandomWalks(DB graph.Database,
 	nodeID uint32, oldSuccessorIDs []uint32, rng *rand.Rand) error {
 
-	// fetch the current successors
-	SuccessorIDs, err := DB.GetNodeSuccessorIDs(nodeID)
+	// if nodeID isn't in RWM, create new walks from scratch
+	if _, exist := RWM.WalksByNode[nodeID]; !exist {
+		err := RWM.generateRandomWalks(DB, []uint32{nodeID}, rng)
+		return err
+	}
+
+	// if nodeID is in RWM, update the walks starting by fetching the current successors
+	currentSuccessorIDs, err := DB.GetNodeSuccessorIDs(nodeID)
 	if err != nil {
 		return err
 	}
 
 	// transform to Sets for more efficient operations and lookups
 	oldSuccessorSet := mapset.NewSet(oldSuccessorIDs...)
-	SuccessorSet := mapset.NewSet(SuccessorIDs...)
+	currentSuccessorSet := mapset.NewSet(currentSuccessorIDs...)
 
 	// compute the removed and added nodes
-	removedNodes := oldSuccessorSet.Difference(SuccessorSet)
-	addedNodes := SuccessorSet.Difference(oldSuccessorSet)
+	removedNodes := oldSuccessorSet.Difference(currentSuccessorSet)
+	addedNodes := currentSuccessorSet.Difference(oldSuccessorSet)
 
-	err = RWM.updateRemove(DB, nodeID, removedNodes, rng)
+	err = RWM.updateRemovedNodes(DB, nodeID, removedNodes, rng)
 	if err != nil {
 		return err
 	}
 
-	err = RWM.updateAdd(DB, nodeID, addedNodes, rng)
+	err = RWM.updateAddedNodes(DB, nodeID, addedNodes, rng)
 	if err != nil {
 		return err
 	}
@@ -91,10 +97,10 @@ func (RWM *RandomWalksMap) updateRandomWalks(DB graph.Database,
 }
 
 /*
-updateRemove is a method that updates the RWM by "pruning" the all the walks
+updateRemovedNodes is a method that updates the RWM by "pruning" all the walks
 that contain nodeID --> removedNode and by "grafting" them.
 
-The fundamentel data structure of this method is walksToRemoveByNode which is
+The fundamental data structure of this method is walksToRemoveByNode which is
 a map that associates each nodeID with a map of walk pointers and their respective counts.
 
 Let's see why this data structure is useful with an example:
@@ -116,7 +122,7 @@ Let's see why this data structure is useful with an example:
 
   - remove walkPointer2 two times from RWM.WalksByNode[5] (NOT three times!)
 */
-func (RWM *RandomWalksMap) updateRemove(DB graph.Database, nodeID uint32,
+func (RWM *RandomWalksMap) updateRemovedNodes(DB graph.Database, nodeID uint32,
 	removedNodes mapset.Set[uint32], rng *rand.Rand) error {
 
 	if removedNodes.Cardinality() == 0 {
@@ -197,7 +203,7 @@ func (RWM *RandomWalksMap) updateRemove(DB graph.Database, nodeID uint32,
 
 // method that updates the RWM by "pruning" some randomly selected walks and
 // by "grafting" them using the newly added nodes
-func (RWM *RandomWalksMap) updateAdd(DB graph.Database, nodeID uint32,
+func (RWM *RandomWalksMap) updateAddedNodes(DB graph.Database, nodeID uint32,
 	removedNodes mapset.Set[uint32], rng *rand.Rand) error {
 
 	return nil

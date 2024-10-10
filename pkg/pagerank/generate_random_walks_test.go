@@ -15,9 +15,9 @@ func TestGenerateRandomWalks(t *testing.T) {
 	t.Run("negative GenerateRandomWalks, nil DB", func(t *testing.T) {
 
 		var DB *mock.MockDatabase // nil DB
-		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksMap(0.85, 1)
 
-		err := randomWalksMap.GenerateRandomWalks(DB)
+		err := RWM.GenerateRandomWalks(DB)
 
 		if err != graph.ErrNilDatabasePointer {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
@@ -27,9 +27,9 @@ func TestGenerateRandomWalks(t *testing.T) {
 	t.Run("negative GenerateRandomWalks, empty DB", func(t *testing.T) {
 
 		DB := mock.NewMockDatabase() // empty DB
-		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksMap(0.85, 1)
 
-		err := randomWalksMap.GenerateRandomWalks(DB)
+		err := RWM.GenerateRandomWalks(DB)
 
 		if err != graph.ErrDatabaseIsEmpty {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
@@ -41,8 +41,8 @@ func TestGenerateRandomWalks(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		var randomWalksMap *RandomWalksMap // nil RWM
-		err := randomWalksMap.GenerateRandomWalks(DB)
+		var RWM *RandomWalksMap // nil RWM
+		err := RWM.GenerateRandomWalks(DB)
 
 		if err != ErrNilRWMPointer {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrNilRWMPointer, err)
@@ -55,14 +55,14 @@ func TestGenerateRandomWalks(t *testing.T) {
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
 		// non empty RWM
-		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksMap(0.85, 1)
 		walk := RandomWalk{NodeIDs: []uint32{0}}
-		randomWalksMap.AddWalk(&walk)
+		RWM.AddWalk(&walk)
 
-		err := randomWalksMap.GenerateRandomWalks(DB)
+		err := RWM.GenerateRandomWalks(DB)
 
-		if err != ErrRWMIsNotEmpty {
-			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrRWMIsNotEmpty, err)
+		if err != ErrNonEmptyRWM {
+			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrNonEmptyRWM, err)
 		}
 	})
 
@@ -71,20 +71,25 @@ func TestGenerateRandomWalks(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
-		err := randomWalksMap.GenerateRandomWalks(DB)
+		RWM, _ := NewRandomWalksMap(0.85, 1)
+		err := RWM.GenerateRandomWalks(DB)
 
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = randomWalksMap.CheckEmpty() // check before accessing RWM
+		// check before accessing RWM
+		empty, err := RWM.IsEmpty()
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
+		}
+
+		if empty {
+			t.Fatalf("GenerateRandomWalks(): expected false, got %v", empty)
 		}
 
 		// get the walks of node 0
-		walks, err_node := randomWalksMap.GetWalksByNodeID(0)
+		walks, err_node := RWM.GetWalksByNodeID(0)
 		if err_node != nil {
 			t.Errorf("GenerateRandomWalks() -> GetWalksByNodeID(0): expected nil, got %v", err_node)
 		}
@@ -138,19 +143,24 @@ func TestGenerateRandomWalks(t *testing.T) {
 			},
 		}
 
-		randomWalksMap, err := NewRandomWalksMap(0.85, 2)
+		RWM, err := NewRandomWalksMap(0.85, 2)
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = randomWalksMap.generateRandomWalks(DB, randomNumGen)
+		err = RWM.generateRandomWalks(DB, nil, randomNumGen)
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = randomWalksMap.CheckEmpty() // check before accessing RWM
+		// check before accessing RWM
+		empty, err := RWM.IsEmpty()
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
+		}
+
+		if empty {
+			t.Fatalf("GenerateRandomWalks(): expected false, got %v", empty)
 		}
 
 		nodeIDs, err := DB.GetAllNodeIDs()
@@ -162,7 +172,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 		for _, nodeID := range nodeIDs {
 
 			// get the walks of a node
-			walk_pointers, err := randomWalksMap.GetWalksByNodeID(nodeID)
+			walk_pointers, err := RWM.GetWalksByNodeID(nodeID)
 			if err != nil {
 				t.Fatalf("GenerateRandomWalks() -> GetWalksByNodeID(): expected nil, got %v", err)
 			}

@@ -87,14 +87,37 @@ func TestUpdateRandomWalks(t *testing.T) {
 		}
 	})
 
+	t.Run("positive UpdateRandomWalks, newly added nodeID", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		RWM, _ := NewRandomWalksMap(0.85, 1)
+		RWM.GenerateRandomWalks(DB)
+
+		// new node 1 is added
+		newNodeID := uint32(1)
+		DB.Nodes[newNodeID] = &graph.Node{ID: newNodeID, SuccessorIDs: []uint32{}}
+
+		err := RWM.UpdateRandomWalks(DB, newNodeID, []uint32{})
+
+		if err != nil {
+			t.Errorf("UpdateRandomWalks(): expected nil, got %v", err)
+		}
+
+		if _, err = RWM.GetWalksByNodeID(newNodeID); err != nil {
+			t.Errorf("UpdateRandomWalks(): expected nil, got %v", err)
+		}
+	})
+
 }
 
 func TestUpdateRemove(t *testing.T) {
 
-	t.Run("positive updateRemove, empty removedNodes", func(t *testing.T) {
+	t.Run("positive updateRemovedNodes, empty removedNodes", func(t *testing.T) {
 
 		nodeID := uint32(0)
-		removedNodes := mapset.NewSet[uint32]() // it shouldn't change anything
+		removedNodes := mapset.NewSet[uint32]() // empty set
 
 		RWM, _ := NewRandomWalksMap(0.85, 1)
 		randomWalk := RandomWalk{NodeIDs: []uint32{0, 1}}
@@ -104,89 +127,109 @@ func TestUpdateRemove(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-		err := RWM.updateRemove(DB, nodeID, removedNodes, rng)
+		err := RWM.updateRemovedNodes(DB, nodeID, removedNodes, rng)
 		if err != nil {
-			t.Errorf("updateRemove(): expected nil, got %v", err)
+			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
 		// get the walks of the node 0
 		walks, err := RWM.GetWalksByNodeID(0)
 		if err != nil {
-			t.Fatalf("updateRemove() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
 		}
 
+		// should be unchanged
 		if walks[0] != &randomWalk {
-			t.Errorf("updateRemove(): expected %v, got %v", &randomWalk, walks[0])
+			t.Errorf("updateRemovedNodes(): expected %v, got %v", &randomWalk, walks[0])
 		}
 
 		// get the walks of the node 1
 		walks, err = RWM.GetWalksByNodeID(1)
 		if err != nil {
-			t.Fatalf("updateRemove() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
 		}
 
+		// should be unchanged
 		if walks[0] != &randomWalk {
-			t.Errorf("updateRemove(): expected %v, got %v", &randomWalk, walks[0])
+			t.Errorf("updateRemovedNodes(): expected %v, got %v", &randomWalk, walks[0])
 		}
 
 	})
 
-	t.Run("positive updateRemove, one walk", func(t *testing.T) {
+	t.Run("positive updateRemovedNodes, multiple removals", func(t *testing.T) {
 
 		nodeID := uint32(0)
-		oldSuccessorIDs := []uint32{1, 2}
-		SuccessorIDs := []uint32{2}
+		oldSuccessorIDs := []uint32{1, 2, 3}
+		SuccessorIDs := []uint32{3}
 
 		// defining the sets
 		oldSuccessorSet := mapset.NewSet(oldSuccessorIDs...)
 		SuccessorSet := mapset.NewSet(SuccessorIDs...)
-		removedNodes := oldSuccessorSet.Difference(SuccessorSet) // = {1}
+		removedNodes := oldSuccessorSet.Difference(SuccessorSet) // = {1, 2}
 
-		RWM, err := NewRandomWalksMap(0.85, 1)
+		RWM, err := NewRandomWalksMap(0.85, 2)
 		if err != nil {
-			t.Errorf("updateRemove(): expected nil, got %v", err)
+			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
-		// the old walk in the RWM:   0 --> 1
-		randomWalk := RandomWalk{NodeIDs: []uint32{0, 1}}
-		RWM.WalksByNode[nodeID] = []*RandomWalk{&randomWalk}
-		RWM.WalksByNode[1] = []*RandomWalk{&randomWalk}
+		// the old walks in the RWM:   0 --> 1; 0 --> 2
+		randomWalk1 := RandomWalk{NodeIDs: []uint32{0, 1}}
+		randomWalk2 := RandomWalk{NodeIDs: []uint32{0, 2}}
+
+		RWM.WalksByNode[nodeID] = []*RandomWalk{&randomWalk1, &randomWalk2}
+		RWM.WalksByNode[1] = []*RandomWalk{&randomWalk1}
+		RWM.WalksByNode[2] = []*RandomWalk{&randomWalk2}
 
 		// the new database
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: SuccessorIDs}
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
 		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{}}
+		DB.Nodes[3] = &graph.Node{ID: 3, SuccessorIDs: []uint32{}}
 
 		rng := rand.New(rand.NewSource(69)) // for reproducibility
 
-		err = RWM.updateRemove(DB, nodeID, removedNodes, rng)
+		err = RWM.updateRemovedNodes(DB, nodeID, removedNodes, rng)
 		if err != nil {
-			t.Errorf("updateRemove(): expected nil, got %v", err)
+			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
 		// get the walks of the node 0
 		walks, err := RWM.GetWalksByNodeID(nodeID)
 		if err != nil {
-			t.Fatalf("updateRemove() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
 		}
 
-		// the new walk should be 0 --> 2 (the only possibility)
-		want := []uint32{0, 2}
+		for _, walk := range walks {
 
-		if !reflect.DeepEqual(walks[0].NodeIDs, want) {
-			t.Errorf("updateRemove() nodeID %d: expected %v, got %v", nodeID, want, walks[0].NodeIDs)
+			// the new walk should be 0 --> 3 (the only possibility)
+			want := []uint32{0, 3}
+
+			if !reflect.DeepEqual(walk.NodeIDs, want) {
+				t.Errorf("updateRemovedNodes() nodeID %d: expected %v, got %v", nodeID, want, walk.NodeIDs)
+			}
 		}
 
 		// get the walks of the node 1
 		walks, err = RWM.GetWalksByNodeID(1)
 		if err != nil {
-			t.Fatalf("updateRemove() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
 		}
 
 		// which should be empty
 		if len(walks) > 0 {
-			t.Errorf("updateRemove(): nodeID %d: expected %v, got %v", 1, []*RandomWalk{}, walks)
+			t.Errorf("updateRemovedNodes(): nodeID %d: expected %v, got %v", 1, []*RandomWalk{}, walks)
+		}
+
+		// get the walks of the node 2
+		walks, err = RWM.GetWalksByNodeID(2)
+		if err != nil {
+			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
+		}
+
+		// which should be empty
+		if len(walks) > 0 {
+			t.Errorf("updateRemovedNodes(): nodeID %d: expected %v, got %v", 1, []*RandomWalk{}, walks)
 		}
 
 	})
