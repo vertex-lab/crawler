@@ -16,15 +16,15 @@ func NewMockDatabase() *MockDatabase {
 	}
 }
 
-// CheckEmpty returns an error if the db is nil or has no nodes
-func (db *MockDatabase) CheckEmpty() error {
+// CheckEmpty returns an error if the DB is nil or has no nodes
+func (DB *MockDatabase) CheckEmpty() error {
 
 	// handle nil pointer
-	if db == nil {
+	if DB == nil {
 		return graph.ErrNilDatabasePointer
 	}
 
-	if len(db.Nodes) == 0 {
+	if len(DB.Nodes) == 0 {
 		return graph.ErrDatabaseIsEmpty
 	}
 
@@ -32,45 +32,45 @@ func (db *MockDatabase) CheckEmpty() error {
 }
 
 // FetchNodeByID retrieves a node by ID from the mock database.
-func (db *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
+func (DB *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
 
-	err := db.CheckEmpty()
+	err := DB.CheckEmpty()
 	if err != nil {
 		return nil, err
 	}
 
-	node, exists := db.Nodes[id]
+	node, exists := DB.Nodes[id]
 	if !exists {
-		return nil, graph.ErrNodeNotFound
+		return nil, graph.ErrNodeNotFoundDB
 	}
 	return node, nil
 }
 
 // GetNodeSuccessors returns the successors of a node from the mock database.
-func (db *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
+func (DB *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
 
-	err := db.CheckEmpty()
+	err := DB.CheckEmpty()
 	if err != nil {
 		return nil, err
 	}
 
-	node, exists := db.Nodes[id]
+	node, exists := DB.Nodes[id]
 	if !exists {
-		return nil, graph.ErrNodeNotFound
+		return nil, graph.ErrNodeNotFoundDB
 	}
 	return node.SuccessorIDs, nil
 }
 
 // GetAllNodeIDs returns a slice with the ids of all nodes in the mock database
-func (db *MockDatabase) GetAllNodeIDs() ([]uint32, error) {
+func (DB *MockDatabase) GetAllNodeIDs() ([]uint32, error) {
 
-	err := db.CheckEmpty()
+	err := DB.CheckEmpty()
 	if err != nil {
 		return nil, err
 	}
 
-	nodeIDs := make([]uint32, 0, len(db.Nodes))
-	for id := range db.Nodes {
+	nodeIDs := make([]uint32, 0, len(DB.Nodes))
+	for id := range DB.Nodes {
 		nodeIDs = append(nodeIDs, id)
 	}
 

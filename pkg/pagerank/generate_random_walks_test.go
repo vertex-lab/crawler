@@ -1,7 +1,6 @@
 package pagerank
 
 import (
-	"math"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -13,54 +12,54 @@ import (
 
 func TestGenerateRandomWalks(t *testing.T) {
 
-	t.Run("negative GenerateRandomWalks, nil db", func(t *testing.T) {
+	t.Run("negative GenerateRandomWalks, nil DB", func(t *testing.T) {
 
-		var db *mock.MockDatabase // nil db
+		var DB *mock.MockDatabase // nil DB
 		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
 
-		err := randomWalksMap.GenerateRandomWalks(db)
+		err := randomWalksMap.GenerateRandomWalks(DB)
 
 		if err != graph.ErrNilDatabasePointer {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
 		}
 	})
 
-	t.Run("negative GenerateRandomWalks, empty db", func(t *testing.T) {
+	t.Run("negative GenerateRandomWalks, empty DB", func(t *testing.T) {
 
-		db := mock.NewMockDatabase() // empty db
+		DB := mock.NewMockDatabase() // empty DB
 		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
 
-		err := randomWalksMap.GenerateRandomWalks(db)
+		err := randomWalksMap.GenerateRandomWalks(DB)
 
 		if err != graph.ErrDatabaseIsEmpty {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
 		}
 	})
 
-	t.Run("negative GenerateRandomWalks, nil rwm", func(t *testing.T) {
+	t.Run("negative GenerateRandomWalks, nil RWM", func(t *testing.T) {
 
-		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		var randomWalksMap *RandomWalksMap // nil rwm
-		err := randomWalksMap.GenerateRandomWalks(db)
+		var randomWalksMap *RandomWalksMap // nil RWM
+		err := randomWalksMap.GenerateRandomWalks(DB)
 
 		if err != ErrNilRWMPointer {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrNilRWMPointer, err)
 		}
 	})
 
-	t.Run("negative GenerateRandomWalks, non-empty rwm", func(t *testing.T) {
+	t.Run("negative GenerateRandomWalks, non-empty RWM", func(t *testing.T) {
 
-		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		// non empty rwm
+		// non empty RWM
 		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
 		walk := RandomWalk{NodeIDs: []uint32{0}}
 		randomWalksMap.AddWalk(&walk)
 
-		err := randomWalksMap.GenerateRandomWalks(db)
+		err := randomWalksMap.GenerateRandomWalks(DB)
 
 		if err != ErrRWMIsNotEmpty {
 			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrRWMIsNotEmpty, err)
@@ -69,17 +68,17 @@ func TestGenerateRandomWalks(t *testing.T) {
 
 	t.Run("positive GenerateRandomWalks, 1 dandling node", func(t *testing.T) {
 
-		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
 		randomWalksMap, _ := NewRandomWalksMap(0.85, 1)
-		err := randomWalksMap.GenerateRandomWalks(db)
+		err := randomWalksMap.GenerateRandomWalks(DB)
 
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = randomWalksMap.CheckEmpty() // check before accessing rwm
+		err = randomWalksMap.CheckEmpty() // check before accessing RWM
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
@@ -111,10 +110,10 @@ func TestGenerateRandomWalks(t *testing.T) {
 		// This means there is likely an issue with the random number generator, which should
 		// not be problematic in production. Further investigation is needed.
 
-		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 2}}
-		db.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
-		db.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 2}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
+		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
 
 		// 	to get the same results
 		randomNumGen := rand.New(rand.NewSource(69))
@@ -144,22 +143,22 @@ func TestGenerateRandomWalks(t *testing.T) {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = randomWalksMap.generateRandomWalks(db, randomNumGen)
+		err = randomWalksMap.generateRandomWalks(DB, randomNumGen)
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = randomWalksMap.CheckEmpty() // check before accessing rwm
+		err = randomWalksMap.CheckEmpty() // check before accessing RWM
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
 
-		nodeIDs, err := db.GetAllNodeIDs()
+		nodeIDs, err := DB.GetAllNodeIDs()
 		if err != nil {
 			t.Errorf("GenerateRandomWalks() -> GetAllNodeIDs(): expected nil, got %v", err)
 		}
 
-		// iterate over all nodes in the db
+		// iterate over all nodes in the DB
 		for _, nodeID := range nodeIDs {
 
 			// get the walks of a node
@@ -185,14 +184,14 @@ func TestGenerateWalk(t *testing.T) {
 
 	t.Run("positive generateWalk(), triangle", func(t *testing.T) {
 
-		db := mock.NewMockDatabase()
-		db.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
-		db.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
-		db.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
+		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
 
 		rng := rand.New(rand.NewSource(420))
 
-		walk, err := generateWalk(db, 0, 0.85, rng)
+		walk, err := generateWalk(DB, 0, 0.85, rng)
 		expectedWalk := []uint32{0, 1}
 
 		if err != nil {
@@ -207,13 +206,13 @@ func TestGenerateWalk(t *testing.T) {
 
 func BenchmarkGenerateRandomWalks(b *testing.B) {
 
-	db := generateBigDB(2000)
+	DB := generateDB(200, 100)
 	b.ResetTimer() // to exclude the time to set up
 
 	for i := 0; i < b.N; i++ {
 
-		rwm, _ := NewRandomWalksMap(0.85, 100)
-		err := rwm.GenerateRandomWalks(db)
+		RWM, _ := NewRandomWalksMap(0.85, 100)
+		err := RWM.GenerateRandomWalks(DB)
 		if err != nil {
 			b.Fatalf("GenerateRandomWalks() failed: %v", err)
 		}
@@ -222,25 +221,23 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 
 //-------------------------------HELPER-FUNCTIONS-------------------------------
 
-// generates a randomly generated database of a specified size where the number
-// of successors for each node is ~sqrt(size)
-func generateBigDB(size uint32) *mock.MockDatabase {
+// generates a randomly generated database of a specified number of nodes nodesNum
+// and number of successors per node successorsPerNode
+func generateDB(nodesNum uint32, successorsPerNode uint32) *mock.MockDatabase {
 
-	successorsPerNode := uint32(math.Round(math.Sqrt(float64(size))))
-
-	db := mock.NewMockDatabase()
-	for i := uint32(0); i < size; i++ {
+	DB := mock.NewMockDatabase()
+	for i := uint32(0); i < nodesNum; i++ {
 
 		// create random successors
 		random_successors := make([]uint32, successorsPerNode)
 		for j := uint32(0); j < successorsPerNode; j++ {
-			random_successors[j] = uint32(rand.Intn(int(size)))
+			random_successors[j] = uint32(rand.Intn(int(nodesNum)))
 		}
 
-		db.Nodes[i] = &graph.Node{ID: i, SuccessorIDs: random_successors}
+		DB.Nodes[i] = &graph.Node{ID: i, SuccessorIDs: random_successors}
 	}
 
-	return db
+	return DB
 }
 
 // dereferences the random walks and sorts them in lexicographic order

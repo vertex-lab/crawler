@@ -2,22 +2,6 @@ package pagerank
 
 import "errors"
 
-// ------------------------------ERROR-CODES------------------------------
-
-var ErrInvalidAlpha = errors.New("alpha should be a number between 0 and 1 (excluded)")
-var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zero")
-
-var ErrNilRWMPointer = errors.New("nil rwm pointer")
-var ErrEmptyRWM = errors.New("rwm is empty")
-
-var ErrNilWalkPointer = errors.New("nil walk pointer")
-var ErrEmptyWalk = errors.New("passed empty walk")
-var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the walk")
-
-var ErrNodeNotFound = errors.New("node not found")
-
-// -----------------------------------------------------------------------
-
 // Random walk structure; contains a slice of node IDs e.g. {1,2,6,77,2}
 type RandomWalk struct {
 	NodeIDs []uint32
@@ -29,7 +13,7 @@ RandomWalksMap structure; The fundamental structure of the pagerank package.
 FIELDS
 ------
 
-	> NodeWalkMap: map[uint32][]*RandomWalk
+	> WalksByNode: map[uint32][]*RandomWalk
 	Maps node ids to a slice that contains all random walks that passed through that node.
 	e.g. {0: { {0}, {2,3,4,0} } ...}; this means that the only walks that passed
 	through node_0 are {0} and {2,3,4,0}
@@ -45,12 +29,12 @@ NOTE
 ----
 
  1. The number of walksPerNode is not to be confused with the number of walks
-    associated with each node in the NodeWalkMap. In fact, the former will always
+    associated with each node in the WalksByNode. In fact, the former will always
     be smaller or equal to the latter.
 
  2. The pagerank of node_j will be approximated by
 
-    > pagerank(node_j) ~ len(NodeWalkMap[node_j]) / totalVisits;
+    > pagerank(node_j) ~ len(WalksByNode[node_j]) / totalVisits;
 
     totalVisits is the sum of the lenght of each walk, which is approximately
 
@@ -60,7 +44,7 @@ NOTE
     lenght of a walk.
 */
 type RandomWalksMap struct {
-	NodeWalkMap  map[uint32][]*RandomWalk
+	WalksByNode  map[uint32][]*RandomWalk
 	alpha        float32
 	walksPerNode uint16
 }
@@ -77,7 +61,7 @@ func NewRandomWalksMap(alpha float32, walksPerNode uint16) (*RandomWalksMap, err
 	}
 
 	RWM := &RandomWalksMap{
-		NodeWalkMap:  make(map[uint32][]*RandomWalk),
+		WalksByNode:  make(map[uint32][]*RandomWalk),
 		alpha:        alpha,
 		walksPerNode: walksPerNode,
 	}
@@ -85,14 +69,14 @@ func NewRandomWalksMap(alpha float32, walksPerNode uint16) (*RandomWalksMap, err
 	return RWM, nil
 }
 
-// CheckEmpty returns an error if rwm is nil or empty. Otherwise it returns nil
-func (rwm *RandomWalksMap) CheckEmpty() error {
+// CheckEmpty returns an error if RWM is nil or empty. Otherwise it returns nil
+func (RWM *RandomWalksMap) CheckEmpty() error {
 
-	if rwm == nil {
+	if RWM == nil {
 		return ErrNilRWMPointer
 	}
 
-	if len(rwm.NodeWalkMap) == 0 {
+	if len(RWM.WalksByNode) == 0 {
 		return ErrEmptyRWM
 	}
 
@@ -101,44 +85,39 @@ func (rwm *RandomWalksMap) CheckEmpty() error {
 
 // GetWalksByNodeID; pass a node ID, returns all the RandomWalks that pass
 // through that node, as a slice []*RandomWalk
-func (rwm *RandomWalksMap) GetWalksByNodeID(nodeID uint32) ([]*RandomWalk, error) {
+func (RWM *RandomWalksMap) GetWalksByNodeID(nodeID uint32) ([]*RandomWalk, error) {
 
-	err := rwm.CheckEmpty()
+	err := RWM.CheckEmpty()
 	if err != nil {
 		return nil, err
 	}
 
-	walks, exist := rwm.NodeWalkMap[nodeID]
+	walks, exist := RWM.WalksByNode[nodeID]
 
 	if !exist {
-		return nil, ErrNodeNotFound
+		return nil, ErrNodeNotFoundRWM
 	}
 	return walks, nil
 }
 
 // AddWalk; adds the pointer to the walk to the RandomWalksMap. This means that
 // for each node visited by the walk, the walk pointer will be added on
-// RandomWalksMap.NodeWalkMap(node)
-func (rwm *RandomWalksMap) AddWalk(walk *RandomWalk) error {
+// RandomWalksMap.WalksByNode(node)
+func (RWM *RandomWalksMap) AddWalk(walk *RandomWalk) error {
 
-	// if the rwm is a nil pointer
-	if rwm == nil {
+	// if the RWM is a nil pointer
+	if RWM == nil {
 		return ErrNilRWMPointer
 	}
 
-	// if the walk is a nil pointer
-	if walk == nil {
-		return ErrNilWalkPointer
-	}
-
-	// if the walk is empty
-	if len(walk.NodeIDs) == 0 {
-		return ErrEmptyWalk
+	err := checkWalk(walk)
+	if err != nil {
+		return err
 	}
 
 	// add it to the RandomWalksMap, under each node it passes through
 	for _, nodeID := range walk.NodeIDs {
-		rwm.NodeWalkMap[nodeID] = append(rwm.NodeWalkMap[nodeID], walk)
+		RWM.WalksByNode[nodeID] = append(RWM.WalksByNode[nodeID], walk)
 	}
 
 	return nil
@@ -147,21 +126,16 @@ func (rwm *RandomWalksMap) AddWalk(walk *RandomWalk) error {
 // PruneWalk; removes the pointer to walkToRemove from all nodes that are part of
 // walkToRemove.NodeIDs[index:]. The variable index is the position where we "cut"
 // or "prune" the walk.
-func (rwm *RandomWalksMap) PruneWalk(index int, walkToRemove *RandomWalk) error {
+func (RWM *RandomWalksMap) PruneWalk(index int, walkToRemove *RandomWalk) error {
 
-	err := rwm.CheckEmpty()
+	err := RWM.CheckEmpty()
 	if err != nil {
 		return err
 	}
 
-	// if the walkToRemove is a nil pointer
-	if walkToRemove == nil {
-		return ErrNilWalkPointer
-	}
-
-	// if the walkToRemove is empty
-	if len(walkToRemove.NodeIDs) == 0 {
-		return ErrEmptyWalk
+	err = checkWalk(walkToRemove)
+	if err != nil {
+		return err
 	}
 
 	if index >= len(walkToRemove.NodeIDs) {
@@ -171,7 +145,7 @@ func (rwm *RandomWalksMap) PruneWalk(index int, walkToRemove *RandomWalk) error 
 	// iterate over the pruned nodes of the walkToRemove
 	for _, nodeID := range walkToRemove.NodeIDs[index:] {
 
-		nodeWalks, err := rwm.GetWalksByNodeID(nodeID)
+		nodeWalks, err := RWM.GetWalksByNodeID(nodeID)
 		if err != nil {
 			return err
 		}
@@ -184,9 +158,40 @@ func (rwm *RandomWalksMap) PruneWalk(index int, walkToRemove *RandomWalk) error 
 			}
 		}
 
-		// update the rwm
-		rwm.NodeWalkMap[nodeID] = newNodeWalks
+		// update the RWM
+		RWM.WalksByNode[nodeID] = newNodeWalks
 	}
 
 	return nil
 }
+
+// helper function that returns the appropriate error if the walk pointer is nil
+// or if the walk is empty. Else returns nil
+func checkWalk(walk *RandomWalk) error {
+
+	// if the walk is a nil pointer
+	if walk == nil {
+		return ErrNilWalkPointer
+	}
+
+	// if the walk is empty
+	if len(walk.NodeIDs) == 0 {
+		return ErrEmptyWalk
+	}
+
+	return nil
+}
+
+// ------------------------------ERROR-CODES------------------------------
+
+var ErrInvalidAlpha = errors.New("alpha should be a number between 0 and 1 (excluded)")
+var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zero")
+
+var ErrNilRWMPointer = errors.New("nil RWM pointer")
+var ErrEmptyRWM = errors.New("RWM is empty")
+
+var ErrNilWalkPointer = errors.New("nil walk pointer")
+var ErrEmptyWalk = errors.New("passed empty walk")
+var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the walk")
+
+var ErrNodeNotFoundRWM = errors.New("node not found in the RWM")

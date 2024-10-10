@@ -25,4 +25,4 @@ type Database interface {
 
 var ErrNilDatabasePointer = errors.New("database pointer is nil")
 var ErrDatabaseIsEmpty = errors.New("database is empty")
-var ErrNodeNotFound = errors.New("node not found")
+var ErrNodeNotFoundDB = errors.New("node not found in the DB")
