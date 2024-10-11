@@ -105,7 +105,7 @@ func TestUpdateRandomWalks(t *testing.T) {
 			t.Errorf("UpdateRandomWalks(): expected nil, got %v", err)
 		}
 
-		if _, err = RWM.GetWalksByNodeID(newNodeID); err != nil {
+		if _, err = RWM.WalksByNodeID(newNodeID); err != nil {
 			t.Errorf("UpdateRandomWalks(): expected nil, got %v", err)
 		}
 	})
@@ -133,9 +133,9 @@ func TestUpdateRemove(t *testing.T) {
 		}
 
 		// get the walks of the node 0
-		walks, err := RWM.GetWalksByNodeID(0)
+		walks, err := RWM.WalksByNodeID(0)
 		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
 		}
 
 		// should be unchanged
@@ -144,9 +144,9 @@ func TestUpdateRemove(t *testing.T) {
 		}
 
 		// get the walks of the node 1
-		walks, err = RWM.GetWalksByNodeID(1)
+		walks, err = RWM.WalksByNodeID(1)
 		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
 		}
 
 		// should be unchanged
@@ -195,9 +195,9 @@ func TestUpdateRemove(t *testing.T) {
 		}
 
 		// get the walks of the node 0
-		walks, err := RWM.GetWalksByNodeID(nodeID)
+		walks, err := RWM.WalksByNodeID(nodeID)
 		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
 		}
 
 		for _, walk := range walks {
@@ -211,9 +211,9 @@ func TestUpdateRemove(t *testing.T) {
 		}
 
 		// get the walks of the node 1
-		walks, err = RWM.GetWalksByNodeID(1)
+		walks, err = RWM.WalksByNodeID(1)
 		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
 		}
 
 		// which should be empty
@@ -222,9 +222,9 @@ func TestUpdateRemove(t *testing.T) {
 		}
 
 		// get the walks of the node 2
-		walks, err = RWM.GetWalksByNodeID(2)
+		walks, err = RWM.WalksByNodeID(2)
 		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> GetWalksByNodeID(): expected nil, got %v", err)
+			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
 		}
 
 		// which should be empty

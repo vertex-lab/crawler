@@ -12,13 +12,13 @@ type Database interface {
 	CheckEmpty() error
 
 	// FetchNodeByID retrieves a node by ID from the db
-	FetchNodeByID(ID uint32) (*Node, error)
+	NodeByID(ID uint32) (*Node, error)
 
 	// GetNodesuccessorIDs returns a slice that contains the ids of all successors of a node
-	GetNodeSuccessorIDs(ID uint32) ([]uint32, error)
+	NodeSuccessorIDs(ID uint32) ([]uint32, error)
 
 	// GetAllNodeIDs returns a slice with the ids of all nodes in the db
-	GetAllNodeIDs() ([]uint32, error)
+	AllNodeIDs() ([]uint32, error)
 }
 
 //--------------------------ERROR-CODES--------------------------

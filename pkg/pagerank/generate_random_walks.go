@@ -29,8 +29,8 @@ NOTE
 	This function is computationally expensive and should be called only when
 	the RandomWalksMap is empty. During the normal execution of the program,
 	there should always be random walks, so we should not re-do them from scratch,
-	but just update them when necessary (e.g. when there is a graph update).
-	checkInputs checks if the RandomWalksMap is empty.
+	but just update them when necessary (e.g. when there is a graph update), using
+	the UpdateRandomWalks method.
 
 REFERENCES
 ----------
@@ -40,9 +40,8 @@ REFERENCES
 */
 func (RWM *RandomWalksMap) GenerateRandomWalks(DB graph.Database) error {
 
-	const expectEmptyRWM = true
-
 	// checking the inputs
+	const expectEmptyRWM = true
 	err := checkInputs(RWM, DB, expectEmptyRWM)
 	if err != nil {
 		return err
@@ -52,6 +51,13 @@ func (RWM *RandomWalksMap) GenerateRandomWalks(DB graph.Database) error {
 	return RWM.generateRandomWalks(DB, nil, rng)
 }
 
+/*
+generateRandomWalks implement the logic that generates walksPerNode random walks,
+starting from each node in the slice nodeIDs. These walks are then added to the
+RandomWalksMap struct.
+
+It accepts a random number generator for reproducibility in tests.
+*/
 func (RWM *RandomWalksMap) generateRandomWalks(DB graph.Database,
 	nodeIDs []uint32, rng *rand.Rand) error {
 
@@ -62,7 +68,7 @@ func (RWM *RandomWalksMap) generateRandomWalks(DB graph.Database,
 	// If no specific nodeIDs are provided, retrieve all nodes from the DB
 	if nodeIDs == nil {
 		var err error
-		nodeIDs, err = DB.GetAllNodeIDs()
+		nodeIDs, err = DB.AllNodeIDs()
 		if err != nil {
 			return err
 		}
@@ -93,7 +99,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 	alpha float32, rng *rand.Rand) ([]uint32, error) {
 
 	// check if startingNodeID is in the DB
-	if _, err := DB.FetchNodeByID(startingNodeID); err != nil {
+	if _, err := DB.NodeByID(startingNodeID); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +113,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 		}
 
 		// get the successorIDs of the current node
-		successorIDs, err := DB.GetNodeSuccessorIDs(currentNodeID)
+		successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
 		if err != nil {
 			return nil, err
 		}

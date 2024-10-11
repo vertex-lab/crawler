@@ -8,7 +8,7 @@ import (
 	"github.com/pippellia-btc/analytic_engine/pkg/graph"
 )
 
-func TestMockDatabase(t *testing.T) {
+func TestCheckEmpty(t *testing.T) {
 
 	t.Run("test CheckEmpty() nil DB", func(t *testing.T) {
 
@@ -29,6 +29,10 @@ func TestMockDatabase(t *testing.T) {
 			t.Errorf("CheckEmpty(): expected error %v, got %v", graph.ErrDatabaseIsEmpty, err)
 		}
 	})
+}
+
+func TestNilOrEmptyDB(t *testing.T) {
+
 	t.Run("negative tests with nil DB", func(t *testing.T) {
 		var nil_DB *MockDatabase // nil pointer
 
@@ -37,14 +41,14 @@ func TestMockDatabase(t *testing.T) {
 			call        func() (interface{}, error)
 			expectedNil interface{} // Expected nil value based on the method
 		}{
-			{"FetchNodeByID with nil DB", func() (interface{}, error) {
-				return nil_DB.FetchNodeByID(0)
+			{"NodeByID with nil DB", func() (interface{}, error) {
+				return nil_DB.NodeByID(0)
 			}, (*graph.Node)(nil)},
-			{"GetAllNodeIDs with nil DB", func() (interface{}, error) {
-				return nil_DB.GetAllNodeIDs()
+			{"AllNodeIDs with nil DB", func() (interface{}, error) {
+				return nil_DB.AllNodeIDs()
 			}, ([]uint32)(nil)},
-			{"GetNodeSuccessorIDs with nil DB", func() (interface{}, error) {
-				return nil_DB.GetNodeSuccessorIDs(0)
+			{"NodeSuccessorIDs with nil DB", func() (interface{}, error) {
+				return nil_DB.NodeSuccessorIDs(0)
 			}, ([]uint32)(nil)},
 		}
 
@@ -73,14 +77,14 @@ func TestMockDatabase(t *testing.T) {
 			call        func() (interface{}, error)
 			expectedNil interface{} // Expected nil value based on the method
 		}{
-			{"FetchNodeByID with nil DB", func() (interface{}, error) {
-				return empty_DB.FetchNodeByID(0)
+			{"NodeByID with nil DB", func() (interface{}, error) {
+				return empty_DB.NodeByID(0)
 			}, (*graph.Node)(nil)},
-			{"GetAllNodeIDs with nil DB", func() (interface{}, error) {
-				return empty_DB.GetAllNodeIDs()
+			{"AllNodeIDs with nil DB", func() (interface{}, error) {
+				return empty_DB.AllNodeIDs()
 			}, ([]uint32)(nil)},
-			{"GetNodeSuccessorIDs with nil DB", func() (interface{}, error) {
-				return empty_DB.GetNodeSuccessorIDs(0)
+			{"NodeSuccessorIDs with nil DB", func() (interface{}, error) {
+				return empty_DB.NodeSuccessorIDs(0)
 			}, ([]uint32)(nil)},
 		}
 
@@ -100,49 +104,72 @@ func TestMockDatabase(t *testing.T) {
 			})
 		}
 	})
+}
 
-	t.Run("positive test FetchNodeByID", func(t *testing.T) {
+func TestNodeByID(t *testing.T) {
+
+	t.Run("negative test NodeByID, node not in the DB", func(t *testing.T) {
+
+		DB := NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
+
+		node, err := DB.NodeByID(1)
+
+		if !errors.Is(err, graph.ErrNodeNotFoundDB) {
+			t.Errorf("NodeByID(0): expected error %v, got %v", graph.ErrNodeNotFoundDB, err)
+		}
+
+		if node != nil {
+			t.Errorf("NodeByID(0): expected nodeA = nil, got %v", node)
+		}
+	})
+
+	t.Run("positive test NodeByID", func(t *testing.T) {
 
 		DB := NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
 
-		node, err := DB.FetchNodeByID(0)
+		node, err := DB.NodeByID(0)
 
 		if err != nil {
-			t.Errorf("FetchNodeByID(0): expected no error, got %v", err)
+			t.Errorf("NodeByID(0): expected no error, got %v", err)
 		}
 
 		if node == nil {
-			t.Fatalf("FetchNodeByID(0): expected node ID 0, got node = 'nil'")
+			t.Fatalf("NodeByID(0): expected node ID 0, got node = 'nil'")
 		}
 
 		if node.ID != 0 {
-			t.Errorf("FetchNodeByID(0): expected node ID 0, got %d", node.ID)
+			t.Errorf("NodeByID(0): expected node ID 0, got %d", node.ID)
 		}
 
 		if !reflect.DeepEqual(node.SuccessorIDs, []uint32{1}) {
-			t.Errorf("FetchNodeByID(0): expected successors {1}, got %d", node.SuccessorIDs)
+			t.Errorf("NodeByID(0): expected successors {1}, got %d", node.SuccessorIDs)
 		}
 	})
+}
 
-	t.Run("negative test FetchNodeByID, node not in the DB", func(t *testing.T) {
+func TestNodeSuccessorIDs(t *testing.T) {
 
+	t.Run("negative test NodeSuccessorIDs, node not in DB", func(t *testing.T) {
+
+		// initialize mock database
 		DB := NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
 
-		node, err := DB.FetchNodeByID(1)
+		successors, err := DB.NodeSuccessorIDs(1)
 
 		if !errors.Is(err, graph.ErrNodeNotFoundDB) {
-			t.Errorf("FetchNodeByID(0): expected error %v, got %v", graph.ErrNodeNotFoundDB, err)
+			t.Errorf("NodeSuccessorIDs(0): expected error %v, got %v", graph.ErrNodeNotFoundDB, err)
 		}
 
-		if node != nil {
-			t.Errorf("FetchNodeByID(0): expected nodeA = nil, got %v", node)
+		if successors != nil {
+			t.Errorf("NodeSuccessorIDs(0): expected successorsA = nil, got %v", successors)
 		}
 	})
 
-	t.Run("positive GetNodeSuccessorIDs", func(t *testing.T) {
+	t.Run("positive NodeSuccessorIDs", func(t *testing.T) {
 
 		// initialize mock database
 		DB := NewMockDatabase()
@@ -150,47 +177,33 @@ func TestMockDatabase(t *testing.T) {
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
 		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{}}
 
-		successors, err := DB.GetNodeSuccessorIDs(0)
+		successors, err := DB.NodeSuccessorIDs(0)
 
 		if err != nil {
-			t.Errorf("GetNodeSuccessorIDs(0): expected no error, got %v", err)
+			t.Errorf("NodeSuccessorIDs(0): expected no error, got %v", err)
 		}
 
 		if !reflect.DeepEqual(successors, []uint32{1, 2}) {
-			t.Errorf("GetNodeSuccessorIDs(0): expected successors {1, 2}, got %v", successors)
+			t.Errorf("NodeSuccessorIDs(0): expected successors {1, 2}, got %v", successors)
 		}
 	})
+}
 
-	t.Run("negative test GetNodeSuccessorIDs, node not in DB", func(t *testing.T) {
+func TestAllNodeIDs(t *testing.T) {
 
-		// initialize mock database
-		DB := NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
-
-		successors, err := DB.GetNodeSuccessorIDs(1)
-
-		if !errors.Is(err, graph.ErrNodeNotFoundDB) {
-			t.Errorf("GetNodeSuccessorIDs(0): expected error %v, got %v", graph.ErrNodeNotFoundDB, err)
-		}
-
-		if successors != nil {
-			t.Errorf("GetNodeSuccessorIDs(0): expected successorsA = nil, got %v", successors)
-		}
-	})
-
-	t.Run("positive test GetAllNodeIDs", func(t *testing.T) {
+	t.Run("positive test AllNodeIDs", func(t *testing.T) {
 
 		DB := NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
 
-		node_ids, err := DB.GetAllNodeIDs()
+		node_ids, err := DB.AllNodeIDs()
 
 		if err != nil {
-			t.Errorf("GetAllNodeIDs(): expected err nil, got %v", err)
+			t.Errorf("AllNodeIDs(): expected err nil, got %v", err)
 		}
 
 		if !reflect.DeepEqual(node_ids, []uint32{0}) {
-			t.Errorf("GetAllNodeIDs(): expected %v, got %v", []uint32{0}, node_ids)
+			t.Errorf("AllNodeIDs(): expected %v, got %v", []uint32{0}, node_ids)
 		}
 	})
 }

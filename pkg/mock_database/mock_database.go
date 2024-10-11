@@ -31,8 +31,8 @@ func (DB *MockDatabase) CheckEmpty() error {
 	return nil
 }
 
-// FetchNodeByID retrieves a node by ID from the mock database.
-func (DB *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
+// NodeByID retrieves a node by ID from the mock database.
+func (DB *MockDatabase) NodeByID(id uint32) (*graph.Node, error) {
 
 	err := DB.CheckEmpty()
 	if err != nil {
@@ -47,7 +47,7 @@ func (DB *MockDatabase) FetchNodeByID(id uint32) (*graph.Node, error) {
 }
 
 // GetNodeSuccessors returns the successors of a node from the mock database.
-func (DB *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
+func (DB *MockDatabase) NodeSuccessorIDs(id uint32) ([]uint32, error) {
 
 	err := DB.CheckEmpty()
 	if err != nil {
@@ -61,8 +61,8 @@ func (DB *MockDatabase) GetNodeSuccessorIDs(id uint32) ([]uint32, error) {
 	return node.SuccessorIDs, nil
 }
 
-// GetAllNodeIDs returns a slice with the ids of all nodes in the mock database
-func (DB *MockDatabase) GetAllNodeIDs() ([]uint32, error) {
+// AllNodeIDs returns a slice with the ids of all nodes in the mock database
+func (DB *MockDatabase) AllNodeIDs() ([]uint32, error) {
 
 	err := DB.CheckEmpty()
 	if err != nil {

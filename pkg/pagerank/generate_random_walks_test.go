@@ -89,21 +89,21 @@ func TestGenerateRandomWalks(t *testing.T) {
 		}
 
 		// get the walks of node 0
-		walks, err_node := RWM.GetWalksByNodeID(0)
+		walks, err_node := RWM.WalksByNodeID(0)
 		if err_node != nil {
-			t.Errorf("GenerateRandomWalks() -> GetWalksByNodeID(0): expected nil, got %v", err_node)
+			t.Errorf("GenerateRandomWalks() -> WalksByNodeID(0): expected nil, got %v", err_node)
 		}
 
 		got := walks[0].NodeIDs
 		want := []uint32{0}
 
 		if len(got) != len(want) {
-			t.Errorf("GenerateRandomWalks() -> GetWalksByNodeID(0): expected %v, got %v", want, got)
+			t.Errorf("GenerateRandomWalks() -> WalksByNodeID(0): expected %v, got %v", want, got)
 		}
 
 		for i, nodeID := range got {
 			if nodeID != want[i] {
-				t.Fatalf("GenerateRandomWalks() -> GetWalksByNodeID(0): expected %v, got %v", want, got)
+				t.Fatalf("GenerateRandomWalks() -> WalksByNodeID(0): expected %v, got %v", want, got)
 			}
 		}
 	})
@@ -163,18 +163,18 @@ func TestGenerateRandomWalks(t *testing.T) {
 			t.Fatalf("GenerateRandomWalks(): expected false, got %v", empty)
 		}
 
-		nodeIDs, err := DB.GetAllNodeIDs()
+		nodeIDs, err := DB.AllNodeIDs()
 		if err != nil {
-			t.Errorf("GenerateRandomWalks() -> GetAllNodeIDs(): expected nil, got %v", err)
+			t.Errorf("GenerateRandomWalks() -> AllNodeIDs(): expected nil, got %v", err)
 		}
 
 		// iterate over all nodes in the DB
 		for _, nodeID := range nodeIDs {
 
 			// get the walks of a node
-			walk_pointers, err := RWM.GetWalksByNodeID(nodeID)
+			walk_pointers, err := RWM.WalksByNodeID(nodeID)
 			if err != nil {
-				t.Fatalf("GenerateRandomWalks() -> GetWalksByNodeID(): expected nil, got %v", err)
+				t.Fatalf("GenerateRandomWalks() -> WalksByNodeID(): expected nil, got %v", err)
 			}
 
 			// dereference walks and sort them in lexicographic order
@@ -216,7 +216,7 @@ func TestGenerateWalk(t *testing.T) {
 
 func BenchmarkGenerateRandomWalks(b *testing.B) {
 
-	DB := generateDB(200, 100)
+	DB := generateMockDB(200, 100)
 	b.ResetTimer() // to exclude the time to set up
 
 	for i := 0; i < b.N; i++ {
@@ -233,7 +233,7 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 
 // generates a randomly generated database of a specified number of nodes nodesNum
 // and number of successors per node successorsPerNode
-func generateDB(nodesNum uint32, successorsPerNode uint32) *mock.MockDatabase {
+func generateMockDB(nodesNum uint32, successorsPerNode uint32) *mock.MockDatabase {
 
 	DB := mock.NewMockDatabase()
 	for i := uint32(0); i < nodesNum; i++ {
