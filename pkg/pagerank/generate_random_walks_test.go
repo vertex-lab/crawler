@@ -241,7 +241,7 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 func sortWalks(walk_pointers []*RandomWalk) ([][]uint32, error) {
 
 	if len(walk_pointers) == 0 {
-		return nil, ErrEmptyWalk
+		return nil, ErrEmptyRandomWalk
 	}
 
 	// dereferencing the slice of pointers

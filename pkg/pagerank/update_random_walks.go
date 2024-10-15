@@ -106,77 +106,50 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 		return nil
 	}
 
-	// get all the walks that go through nodeID
-	walks, err := RWM.WalksByNodeID(nodeID)
+	walkSet, err := RWM.WalksByNodeID(nodeID)
 	if err != nil {
 		return err
 	}
 
 	// iterate over the walks
-	for walk := range walks.Iter() {
+	for walk := range walkSet.Iter() {
 
-		needUpdate, cutIndex := walkNeedsUpdate(walk, nodeID, removedNodes)
-		if !needUpdate {
+		update, cutIndex, err := walk.NeedsUpdate(nodeID, removedNodes)
+		if err != nil {
+			return err
+		}
+
+		// if it doesn't need update, skip
+		if !update {
 			continue
 		}
 
-		// iterate over the elements of each walk
-		for i := 0; i < len(walk.NodeIDs)-1; i++ {
+		// prune the walk
+		err = RWM.PruneWalk(walk, cutIndex)
+		if err != nil {
+			return err
+		}
 
-			// if it contains a hop (nodeID --> removedNode)
-			if walk.NodeIDs[i] == nodeID && removedNodes.ContainsOne(walk.NodeIDs[i+1]) {
+		/* generate a new walk starting from nodeID; This walk is guaranteed
+		to contain nodeID only in the first position, as walks can't
+		have cycles. This is REQUIRED to avoid potential deadlocks
+		(remember that we are accessing the WalkSet of nodeID, so we can't change it) */
+		newWalk, err := generateWalk(DB, nodeID, RWM.alpha, rng)
+		if err != nil {
+			return err
+		}
 
-				// remove walk pointer from RWM of the pruned nodes
-				for _, prunedNodeID := range walk.NodeIDs[i+1:] {
-					RWM.WalksByNode[prunedNodeID].Remove(walk)
-				}
+		// drop the fist element (nodeID) because it's already in the walk
+		newWalkSegment := newWalk[1:]
 
-				/* generate a new walk starting from nodeID; This walk is guaranteed
-				to contain nodeID only in the first position, as walks can't
-				have cycles. This is REQUIRED to avoid potential deadlocks
-				(remember that we are accessing the WalkSet of nodeID, so we can't change it) */
-				newWalk, err := generateWalk(DB, nodeID, RWM.alpha, rng)
-				if err != nil {
-					return err
-				}
-
-				// Discard the first element of the new walk to avoid duplication
-				newWalkSegment := newWalk[1:]
-
-				for _, graftedNode := range newWalkSegment {
-
-					if _, exists := RWM.WalksByNode[graftedNode]; !exists {
-						RWM.WalksByNode[graftedNode] = mapset.NewSet[*RandomWalk]() // Initialize the set if nil
-					}
-
-					RWM.WalksByNode[graftedNode].Add(walk)
-				}
-
-				// prune the walk and graft it
-				walk.NodeIDs = append(walk.NodeIDs[:i+1], newWalkSegment...)
-			}
+		// graft the walk with the new walk segment
+		err = RWM.GraftWalk(walk, newWalkSegment)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
-}
-
-func walkNeedsUpdate(walk *RandomWalk, nodeID uint32,
-	removedNodes mapset.Set[uint32]) (bool, int) {
-
-	// iterate over the elements of the walk
-	for i := 0; i < len(walk.NodeIDs)-1; i++ {
-
-		// if it contains a hop (nodeID --> removedNode)
-		if walk.NodeIDs[i] == nodeID && removedNodes.ContainsOne(walk.NodeIDs[i+1]) {
-
-			// it needs to be updated from (i+1)th element (included) onwards
-			cutIndex := i + 1
-			return true, cutIndex
-		}
-	}
-
-	return false, -1
 }
 
 // method that updates the RWM by "pruning" some randomly selected walks and

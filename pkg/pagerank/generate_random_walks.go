@@ -14,8 +14,7 @@ The function returns an error if the DB cannot find the successorIDs of a node.
 It's important to note that the walk breaks early when a cycle is encountered.
 This behaviour simplifies the data structure (now a walk visits a node only once)
 and helps with mitigating self-boosting spam networks. At the same time this doesn't
-influence much the ranking of normal users since a cycle occurance is very inprobable
-for those set of users.
+influence much the ranking of normal users since a cycle occurance is very inprobable.
 
 Read more here:
 */
@@ -54,7 +53,8 @@ walkGeneration:
 		currentNodeID = successorIDs[randomIndex]
 
 		/* if there is a cycle (node already visited), break the walk generation.
-		This operation is faster than using sets because walks are short (1/(1-alpha) on average) */
+		Traversing the slice is faster than using sets because walks are short
+		(1/(1-alpha) long on average). */
 		for _, prevNodeID := range walk {
 
 			if currentNodeID == prevNodeID {
@@ -102,7 +102,6 @@ REFERENCES
 */
 func (RWM *RandomWalksManager) GenerateRandomWalks(DB graph.Database) error {
 
-	// checking the inputs
 	const expectEmptyRWM = true
 	err := checkInputs(RWM, DB, expectEmptyRWM)
 	if err != nil {
@@ -114,7 +113,7 @@ func (RWM *RandomWalksManager) GenerateRandomWalks(DB graph.Database) error {
 }
 
 /*
-generateRandomWalks implement the logic that generates walksPerNode random walks,
+generateRandomWalks implement the logic that generates `walksPerNode“ random walks,
 starting from each node in the slice nodeIDs. These walks are then added to the
 RandomWalksManager struct.
 
@@ -165,7 +164,7 @@ func checkInputs(RWM *RandomWalksManager, DB graph.Database, expectEmptyRWM bool
 		return err
 	}
 
-	// checks if RWM is valid and whether it should be empty or not
+	// checks if RWM is not nil and whether it should be empty or not
 	err = RWM.CheckState(expectEmptyRWM)
 	if err != nil {
 		return err

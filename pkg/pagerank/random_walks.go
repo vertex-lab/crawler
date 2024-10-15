@@ -12,6 +12,49 @@ type RandomWalk struct {
 	NodeIDs []uint32
 }
 
+// CheckEmpty returns whether RandomWalk is empty
+func (rw *RandomWalk) CheckEmpty() error {
+
+	if rw == nil {
+		return ErrNilRandomWalkPointer
+	}
+
+	if len(rw.NodeIDs) == 0 {
+		return ErrEmptyRandomWalk
+	}
+
+	return nil
+}
+
+/*
+NeedsUpdate returns whether the RandomWalk needs to be updated, and the index
+where to implement the update (pruning and grafting).
+
+This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes
+*/
+func (rw *RandomWalk) NeedsUpdate(nodeID uint32,
+	removedNodes mapset.Set[uint32]) (bool, int, error) {
+
+	err := rw.CheckEmpty()
+	if err != nil {
+		return true, -1, err
+	}
+
+	// iterate over the elements of the walk
+	for i := 0; i < len(rw.NodeIDs)-1; i++ {
+
+		// if it contains a hop (nodeID --> removedNode)
+		if rw.NodeIDs[i] == nodeID && removedNodes.ContainsOne(rw.NodeIDs[i+1]) {
+
+			// it needs to be updated from (i+1)th element (included) onwards
+			cutIndex := i + 1
+			return true, cutIndex, nil
+		}
+	}
+
+	return false, -1, nil
+}
+
 // WalkSet; a set of pointers to RandomWalks.
 type WalkSet mapset.Set[*RandomWalk]
 
@@ -127,7 +170,7 @@ func (RWM *RandomWalksManager) AddWalk(walk *RandomWalk) error {
 		return ErrNilRWMPointer
 	}
 
-	err := checkWalk(walk)
+	err := walk.CheckEmpty()
 	if err != nil {
 		return err
 	}
@@ -157,7 +200,7 @@ func (RWM *RandomWalksManager) PruneWalk(walk *RandomWalk, cutIndex int) error {
 		return err
 	}
 
-	err = checkWalk(walk)
+	err = walk.CheckEmpty()
 	if err != nil {
 		return err
 	}
@@ -178,9 +221,14 @@ func (RWM *RandomWalksManager) PruneWalk(walk *RandomWalk, cutIndex int) error {
 	return nil
 }
 
-// GraftWalk; extend the walk with the new walk segment, and add the walk pointer to
-// the WalkSet of each node in the new walk segment
+// GraftWalk; graft (extend) the walk with the new walkSegment, and add the walk
+// pointer to the WalkSet of each node in the new walkSegment
 func (RWM *RandomWalksManager) GraftWalk(walk *RandomWalk, walkSegment []uint32) error {
+
+	// If there isn't anything to graft
+	if len(walkSegment) == 0 {
+		return nil
+	}
 
 	const expectEmptyRWM = false
 	err := RWM.CheckState(expectEmptyRWM)
@@ -188,7 +236,7 @@ func (RWM *RandomWalksManager) GraftWalk(walk *RandomWalk, walkSegment []uint32)
 		return err
 	}
 
-	err = checkWalk(walk)
+	err = walk.CheckEmpty()
 	if err != nil {
 		return err
 	}
@@ -210,24 +258,11 @@ func (RWM *RandomWalksManager) GraftWalk(walk *RandomWalk, walkSegment []uint32)
 	return nil
 }
 
-// helper function that returns the appropriate error if the walk pointer is nil
-// or if the walk is empty. Else returns nil
-func checkWalk(walk *RandomWalk) error {
-
-	// if the walk is a nil pointer
-	if walk == nil {
-		return ErrNilWalkPointer
-	}
-
-	// if the walk is empty
-	if len(walk.NodeIDs) == 0 {
-		return ErrEmptyWalk
-	}
-
-	return nil
-}
-
 //---------------------------------ERROR-CODES---------------------------------
+
+var ErrNilRandomWalkPointer = errors.New("nil RandomWalk pointer")
+var ErrEmptyRandomWalk = errors.New("RandomWalk is empty")
+var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the walk")
 
 var ErrInvalidAlpha = errors.New("alpha should be a number between 0 and 1 (excluded)")
 var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zero")
@@ -235,9 +270,5 @@ var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zer
 var ErrNilRWMPointer = errors.New("nil RWM pointer")
 var ErrEmptyRWM = errors.New("RWM is empty")
 var ErrNonEmptyRWM = errors.New("the RWM is NOT empty")
-
-var ErrNilWalkPointer = errors.New("nil walk pointer")
-var ErrEmptyWalk = errors.New("passed empty walk")
-var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the walk")
 
 var ErrNodeNotFoundRWM = errors.New("nodeID not found in the RWM")
