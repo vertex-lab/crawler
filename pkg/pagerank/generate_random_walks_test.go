@@ -10,12 +10,36 @@ import (
 	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
 )
 
+func TestGenerateWalk(t *testing.T) {
+
+	t.Run("positive generateWalk(), triangle", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
+		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
+
+		rng := rand.New(rand.NewSource(42))
+
+		walk, err := generateWalk(DB, 0, 0.85, rng)
+		expectedWalk := []uint32{0, 1, 2}
+
+		if err != nil {
+			t.Errorf("generateWalk(): expected nil, got %v", err)
+		}
+
+		if !reflect.DeepEqual(walk, expectedWalk) {
+			t.Errorf("generateWalk(): expected %v, got %v", expectedWalk, walk)
+		}
+	})
+}
+
 func TestGenerateRandomWalks(t *testing.T) {
 
 	t.Run("negative GenerateRandomWalks, nil DB", func(t *testing.T) {
 
 		var DB *mock.MockDatabase // nil DB
-		RWM, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksManager(0.85, 1)
 
 		err := RWM.GenerateRandomWalks(DB)
 
@@ -27,7 +51,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 	t.Run("negative GenerateRandomWalks, empty DB", func(t *testing.T) {
 
 		DB := mock.NewMockDatabase() // empty DB
-		RWM, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksManager(0.85, 1)
 
 		err := RWM.GenerateRandomWalks(DB)
 
@@ -41,7 +65,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		var RWM *RandomWalksMap // nil RWM
+		var RWM *RandomWalksManager // nil RWM
 		err := RWM.GenerateRandomWalks(DB)
 
 		if err != ErrNilRWMPointer {
@@ -55,7 +79,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
 		// non empty RWM
-		RWM, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksManager(0.85, 1)
 		walk := RandomWalk{NodeIDs: []uint32{0}}
 		RWM.AddWalk(&walk)
 
@@ -71,7 +95,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		RWM, _ := NewRandomWalksMap(0.85, 1)
+		RWM, _ := NewRandomWalksManager(0.85, 1)
 		err := RWM.GenerateRandomWalks(DB)
 
 		if err != nil {
@@ -94,18 +118,13 @@ func TestGenerateRandomWalks(t *testing.T) {
 			t.Errorf("GenerateRandomWalks() -> WalksByNodeID(0): expected nil, got %v", err_node)
 		}
 
-		got := walks[0].NodeIDs
+		got := walks.ToSlice()[0].NodeIDs
 		want := []uint32{0}
 
-		if len(got) != len(want) {
+		if len(got) != len(want) || got[0] != want[0] {
 			t.Errorf("GenerateRandomWalks() -> WalksByNodeID(0): expected %v, got %v", want, got)
 		}
 
-		for i, nodeID := range got {
-			if nodeID != want[i] {
-				t.Fatalf("GenerateRandomWalks() -> WalksByNodeID(0): expected %v, got %v", want, got)
-			}
-		}
 	})
 
 	t.Run("positive GenerateRandomWalks, multiple nodes and walks", func(t *testing.T) {
@@ -143,7 +162,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 			},
 		}
 
-		RWM, err := NewRandomWalksMap(0.85, 2)
+		RWM, err := NewRandomWalksManager(0.85, 2)
 		if err != nil {
 			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
 		}
@@ -178,7 +197,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks, err := sortWalks(walk_pointers)
+			walks, err := sortWalks(walk_pointers.ToSlice())
 			if err != nil {
 				t.Errorf("GenerateRandomWalks(): expected nil, got %v", err)
 			}
@@ -190,38 +209,25 @@ func TestGenerateRandomWalks(t *testing.T) {
 	})
 }
 
-func TestGenerateWalk(t *testing.T) {
+func BenchmarkGenerateWalk(b *testing.B) {
 
-	t.Run("positive generateWalk(), triangle", func(t *testing.T) {
+	DB := mock.GenerateMockDB(10000, 100)
+	rng := rand.New(rand.NewSource(69))
+	b.ResetTimer()
 
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
-		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
-		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
-
-		rng := rand.New(rand.NewSource(420))
-
-		walk, err := generateWalk(DB, 0, 0.85, rng)
-		expectedWalk := []uint32{0, 1}
-
-		if err != nil {
-			t.Errorf("generateWalk(): expected nil, got %v", err)
-		}
-
-		if !reflect.DeepEqual(walk, expectedWalk) {
-			t.Errorf("generateWalk(): expected %v, got %v", expectedWalk, walk)
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		generateWalk(DB, 0, 0.85, rng)
+	}
 }
 
 func BenchmarkGenerateRandomWalks(b *testing.B) {
 
-	DB := generateMockDB(200, 100)
+	DB := mock.GenerateMockDB(200000, 100)
 	b.ResetTimer() // to exclude the time to set up
 
 	for i := 0; i < b.N; i++ {
 
-		RWM, _ := NewRandomWalksMap(0.85, 100)
+		RWM, _ := NewRandomWalksManager(0.85, 10)
 		err := RWM.GenerateRandomWalks(DB)
 		if err != nil {
 			b.Fatalf("GenerateRandomWalks() failed: %v", err)
@@ -229,26 +235,7 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 	}
 }
 
-//-------------------------------HELPER-FUNCTIONS-------------------------------
-
-// generates a randomly generated database of a specified number of nodes nodesNum
-// and number of successors per node successorsPerNode
-func generateMockDB(nodesNum uint32, successorsPerNode uint32) *mock.MockDatabase {
-
-	DB := mock.NewMockDatabase()
-	for i := uint32(0); i < nodesNum; i++ {
-
-		// create random successors
-		random_successors := make([]uint32, successorsPerNode)
-		for j := uint32(0); j < successorsPerNode; j++ {
-			random_successors[j] = uint32(rand.Intn(int(nodesNum)))
-		}
-
-		DB.Nodes[i] = &graph.Node{ID: i, SuccessorIDs: random_successors}
-	}
-
-	return DB
-}
+//--------------------------------HELPER-FUNCTION-------------------------------
 
 // dereferences the random walks and sorts them in lexicographic order
 func sortWalks(walk_pointers []*RandomWalk) ([][]uint32, error) {

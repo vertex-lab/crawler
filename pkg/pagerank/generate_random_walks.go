@@ -10,7 +10,7 @@ import (
 /*
 GenerateRandomWalks generates `walksPerNode` random walks for each node in
 the database using dampening factor `alpha`. The walks pointers are stored in
-the RandomWalksMap struct.
+the RandomWalksManager struct.
 
 INPUTS
 ------
@@ -21,13 +21,13 @@ INPUTS
 OUTPUT
 ------
 
-	> error: look at checkInputs() to read all the errors
+	> error: look at checkInputs() to view all the errors codes
 
 NOTE
 ----
 
 	This function is computationally expensive and should be called only when
-	the RandomWalksMap is empty. During the normal execution of the program,
+	the RandomWalksManager is empty. During the normal execution of the program,
 	there should always be random walks, so we should not re-do them from scratch,
 	but just update them when necessary (e.g. when there is a graph update), using
 	the UpdateRandomWalks method.
@@ -38,7 +38,7 @@ REFERENCES
 	[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 	URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
-func (RWM *RandomWalksMap) GenerateRandomWalks(DB graph.Database) error {
+func (RWM *RandomWalksManager) GenerateRandomWalks(DB graph.Database) error {
 
 	// checking the inputs
 	const expectEmptyRWM = true
@@ -54,16 +54,12 @@ func (RWM *RandomWalksMap) GenerateRandomWalks(DB graph.Database) error {
 /*
 generateRandomWalks implement the logic that generates walksPerNode random walks,
 starting from each node in the slice nodeIDs. These walks are then added to the
-RandomWalksMap struct.
+RandomWalksManager struct.
 
 It accepts a random number generator for reproducibility in tests.
 */
-func (RWM *RandomWalksMap) generateRandomWalks(DB graph.Database,
+func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 	nodeIDs []uint32, rng *rand.Rand) error {
-
-	// unpack the parameters of the random walks
-	alpha := RWM.alpha
-	walksPerNode := RWM.walksPerNode
 
 	// If no specific nodeIDs are provided, retrieve all nodes from the DB
 	if nodeIDs == nil {
@@ -74,6 +70,10 @@ func (RWM *RandomWalksMap) generateRandomWalks(DB graph.Database,
 		}
 	}
 
+	// unpack the parameters
+	alpha := RWM.alpha
+	walksPerNode := RWM.walksPerNode
+
 	// for each node, perform `walksPerNode` random walks
 	for _, nodeID := range nodeIDs {
 		for i := uint16(0); i < walksPerNode; i++ {
@@ -83,18 +83,28 @@ func (RWM *RandomWalksMap) generateRandomWalks(DB graph.Database,
 				return err
 			}
 
-			// add the RandomWalk's pointer to the RandomWalksMap
+			// add the RandomWalk's pointer to the RandomWalksManager
 			randomWalk := RandomWalk{NodeIDs: walk}
 			RWM.AddWalk(&randomWalk)
 		}
 	}
 
-	// TODO; store the rwn on an in-memory database (e.g. Redis)
+	// TODO; store the RWM on an in-memory database (e.g. Redis)
 	return nil
 }
 
-// generateWalk; generate a single walk ([]uint32) from a specified starting node.
-// The function returns an error if the DB cannot find the successorIDs of a node
+/*
+generateWalk; generates a single walk ([]uint32) from a specified starting node.
+The function returns an error if the DB cannot find the successorIDs of a node.
+
+It's important to note that the walk breaks early when a cycle is encountered.
+This behaviour simplifies the data structure (now a walk visits a node only once)
+and helps with mitigating self-boosting spam networks. At the same time this doesn't
+influence much the ranking of normal users since a cycle occurance is very unprobable
+for those set of users.
+
+Read more here:
+*/
 func generateWalk(DB graph.Database, startingNodeID uint32,
 	alpha float32, rng *rand.Rand) ([]uint32, error) {
 
@@ -103,13 +113,14 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 		return nil, err
 	}
 
-	walk := []uint32{startingNodeID}
 	currentNodeID := startingNodeID
+	walk := []uint32{currentNodeID}
 
+walkGeneration:
 	for {
 		// stop with probability 1-alpha
 		if rng.Float32() > alpha {
-			break
+			break walkGeneration
 		}
 
 		// get the successorIDs of the current node
@@ -121,13 +132,23 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 		// if it is a dandling node, stop the walk
 		succLenght := len(successorIDs)
 		if succLenght == 0 {
-			break
+			break walkGeneration
 		}
 
 		// randomly select the next node, and set is as the current one
 		randomIndex := rng.Intn(succLenght)
 		currentNodeID = successorIDs[randomIndex]
 
+		// if there is a cycle (node already visited), break the walk generation.
+		// This operation is faster than using sets because walks are short
+		for _, prevNodeID := range walk {
+
+			if currentNodeID == prevNodeID {
+				break walkGeneration
+			}
+		}
+
+		// else, add to the walk
 		walk = append(walk, currentNodeID)
 	}
 
@@ -136,7 +157,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 
 // checkInputs function is used to check whether the inputs are valid.
 // If not, an appropriate error is returned
-func checkInputs(RWM *RandomWalksMap, DB graph.Database, expectEmptyRWM bool) error {
+func checkInputs(RWM *RandomWalksManager, DB graph.Database, expectEmptyRWM bool) error {
 
 	// checks if DB is nil or an empty database
 	err := DB.CheckEmpty()

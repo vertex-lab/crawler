@@ -9,7 +9,7 @@ import (
 )
 
 /*
-UpdateRandomWalks updates the RandomWalksMap when a node's successors change from
+UpdateRandomWalks updates the RandomWalksManager when a node's successors change from
 oldSuccessorIDs to currentSuccessorIDs.
 
 INPUTS
@@ -38,7 +38,7 @@ REFERENCES
 	[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 	URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
-func (RWM *RandomWalksMap) UpdateRandomWalks(DB graph.Database,
+func (RWM *RandomWalksManager) UpdateRandomWalks(DB graph.Database,
 	nodeID uint32, oldSuccessorIDs []uint32) error {
 
 	// checking the inputs
@@ -59,16 +59,16 @@ func (RWM *RandomWalksMap) UpdateRandomWalks(DB graph.Database,
 
 // Implements the logic of updating the random walks. It accepts a random number
 // generator for reproducibility in tests.
-func (RWM *RandomWalksMap) updateRandomWalks(DB graph.Database,
+func (RWM *RandomWalksManager) updateRandomWalks(DB graph.Database,
 	nodeID uint32, oldSuccessorIDs []uint32, rng *rand.Rand) error {
 
-	// if nodeID isn't in RWM, generate new walks from scratch
+	// if nodeID isn't in the RWM, generate new walks from scratch
 	if _, exist := RWM.WalksByNode[nodeID]; !exist {
 		err := RWM.generateRandomWalks(DB, []uint32{nodeID}, rng)
 		return err
 	}
 
-	// if nodeID is in RWM, update the walks, starting by fetching the current successors
+	// if nodeID is in the RWM, update the walks, starting by fetching the current successors
 	currentSuccessorIDs, err := DB.NodeSuccessorIDs(nodeID)
 	if err != nil {
 		return err
@@ -98,18 +98,13 @@ func (RWM *RandomWalksMap) updateRandomWalks(DB graph.Database,
 /*
 updateRemovedNodes is a method that updates the RWM by "pruning" and "grafting"
 all the walks that contain the hop (nodeID --> removedNode).
-At the end, these changes are incorporated into the RandomWalksMap (RWM)
-
-The fundamental data structure of this method is walksToRemoveByNode (WTR)
 */
-func (RWM *RandomWalksMap) updateRemovedNodes(DB graph.Database, nodeID uint32,
+func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint32,
 	removedNodes mapset.Set[uint32], rng *rand.Rand) error {
 
 	if removedNodes.Cardinality() == 0 {
 		return nil
 	}
-
-	WTR := NewWalksToRemoveByNode(removedNodes)
 
 	// get all the walks that go through nodeID
 	walks, err := RWM.WalksByNodeID(nodeID)
@@ -118,7 +113,7 @@ func (RWM *RandomWalksMap) updateRemovedNodes(DB graph.Database, nodeID uint32,
 	}
 
 	// iterate over the walks
-	for _, walk := range walks {
+	for walk := range walks.Iter() {
 
 		// iterate over the elements of each walk
 		for i := 0; i < len(walk.NodeIDs)-1; i++ {
@@ -126,73 +121,62 @@ func (RWM *RandomWalksMap) updateRemovedNodes(DB graph.Database, nodeID uint32,
 			// if it contains a hop (nodeID --> removedNode)
 			if walk.NodeIDs[i] == nodeID && removedNodes.ContainsOne(walk.NodeIDs[i+1]) {
 
-				// record the removal of the walks in the WRT
-				WTR.recordWalkRemoval(walk, i+1)
+				// remove walk pointer from RWM of the pruned nodes
+				for _, prunedNodeID := range walk.NodeIDs[i+1:] {
+					RWM.WalksByNode[prunedNodeID].Remove(walk)
+				}
 
-				// graft walk
-				newWalkSegment, err := generateWalk(DB, nodeID, RWM.alpha, rng)
+				/* generate a new walk starting from nodeID; This walk is guaranteed
+				to contain nodeID only in the first position, as walks can't
+				have cycles. This is REQUIRED to avoid potential deadlocks
+				(remember that we are accessing the WalkSet of nodeID, so we can't change it) */
+				newWalk, err := generateWalk(DB, nodeID, RWM.alpha, rng)
 				if err != nil {
 					return err
 				}
 
+				// Discard the first element of the new walk to avoid duplication
+				newWalkSegment := newWalk[1:]
+
 				for _, graftedNode := range newWalkSegment {
-					RWM.WalksByNode[graftedNode] = append(RWM.WalksByNode[graftedNode], walk)
+
+					if _, exists := RWM.WalksByNode[graftedNode]; !exists {
+						RWM.WalksByNode[graftedNode] = mapset.NewSet[*RandomWalk]() // Initialize the set if nil
+					}
+
+					RWM.WalksByNode[graftedNode].Add(walk)
 				}
 
 				// prune the walk and graft it
-				walk.NodeIDs = append(walk.NodeIDs[:i], newWalkSegment...)
+				walk.NodeIDs = append(walk.NodeIDs[:i+1], newWalkSegment...)
 			}
 		}
 	}
 
-	// remove all walks the correct number of times as specified in the WTR
-	err = RWM.RemoveWalks(WTR)
-	if err != nil {
-		return err
+	return nil
+}
+
+func walkNeedsUpdate(walk *RandomWalk, nodeID uint32,
+	removedNodes mapset.Set[uint32]) (bool, int) {
+
+	// iterate over the elements of the walk
+	for i := 0; i < len(walk.NodeIDs)-1; i++ {
+
+		// if it contains a hop (nodeID --> removedNode)
+		if walk.NodeIDs[i] == nodeID && removedNodes.ContainsOne(walk.NodeIDs[i+1]) {
+
+			// prune the walk from the (i+1)th element (included) onwards
+			cutIndex := i + 1
+			return true, cutIndex
+		}
 	}
 
-	return nil
+	return false, -1
 }
-
-func pruneAndGraftRandomWalk(DB graph.Database, startingNodeID uint32,
-	index int, alpha float32, rng *rand.Rand) error {
-
-	return nil
-}
-
-// func pruneAndGraftRandomWalk(DB graph.Database, nodeID uint32, walk *RandomWalk,
-// 	removedNodes mapset.Set[uint32], rng *rand.Rand) {
-
-// 	// iterate over the elements of the walk
-// 	for i := 0; i < len(walk.NodeIDs)-1; i++ {
-
-// 		// if it contains nodeID --> removedNode
-// 		if walk.NodeIDs[i] == nodeID && removedNodes.ContainsOne(walk.NodeIDs[i+1]) {
-
-// 			// graft walk
-// 			newWalkSegment, err := generateWalk(DB, nodeID, RWM.alpha, rng)
-// 			if err != nil {
-// 				return err
-// 			}
-
-// 			for _, graftedNode := range newWalkSegment {
-// 				RWM.WalksByNode[graftedNode] = append(RWM.WalksByNode[graftedNode], walk)
-// 			}
-
-// 			// adds this walk to each of the pruned nodes, and increase the counter
-// 			for _, prunedNode := range walk.NodeIDs[i+1:] {
-// 				walksToRemoveByNode[prunedNode][walk]++
-// 			}
-
-// 			// prune the walk and graft it
-// 			walk.NodeIDs = append(walk.NodeIDs[:i], newWalkSegment...)
-// 		}
-// 	}
-// }
 
 // method that updates the RWM by "pruning" some randomly selected walks and
 // by "grafting" them using the newly added nodes
-func (RWM *RandomWalksMap) updateAddedNodes(DB graph.Database, nodeID uint32,
+func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32,
 	removedNodes mapset.Set[uint32], rng *rand.Rand) error {
 
 	return nil

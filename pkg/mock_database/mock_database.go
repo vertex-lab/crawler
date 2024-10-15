@@ -1,6 +1,8 @@
 package mock
 
 import (
+	"math/rand"
+
 	"github.com/pippellia-btc/analytic_engine/pkg/graph"
 )
 
@@ -76,4 +78,23 @@ func (DB *MockDatabase) AllNodeIDs() ([]uint32, error) {
 
 	return nodeIDs, nil
 
+}
+
+// Helper function that generates a random database of a specified number of nodes
+// and successors per node
+func GenerateMockDB(nodesNum uint32, successorsPerNode uint32) *MockDatabase {
+
+	DB := NewMockDatabase()
+	for i := uint32(0); i < nodesNum; i++ {
+
+		// create random successors
+		random_successors := make([]uint32, successorsPerNode)
+		for j := uint32(0); j < successorsPerNode; j++ {
+			random_successors[j] = uint32(rand.Intn(int(nodesNum)))
+		}
+
+		DB.Nodes[i] = &graph.Node{ID: i, SuccessorIDs: random_successors}
+	}
+
+	return DB
 }
