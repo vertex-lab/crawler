@@ -115,6 +115,11 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 	// iterate over the walks
 	for walk := range walks.Iter() {
 
+		needUpdate, cutIndex := walkNeedsUpdate(walk, nodeID, removedNodes)
+		if !needUpdate {
+			continue
+		}
+
 		// iterate over the elements of each walk
 		for i := 0; i < len(walk.NodeIDs)-1; i++ {
 
@@ -165,7 +170,7 @@ func walkNeedsUpdate(walk *RandomWalk, nodeID uint32,
 		// if it contains a hop (nodeID --> removedNode)
 		if walk.NodeIDs[i] == nodeID && removedNodes.ContainsOne(walk.NodeIDs[i+1]) {
 
-			// prune the walk from the (i+1)th element (included) onwards
+			// it needs to be updated from (i+1)th element (included) onwards
 			cutIndex := i + 1
 			return true, cutIndex
 		}

@@ -2,6 +2,7 @@ package pagerank
 
 import (
 	"errors"
+	"slices"
 
 	mapset "github.com/deckarep/golang-set/v2"
 )
@@ -11,12 +12,8 @@ type RandomWalk struct {
 	NodeIDs []uint32
 }
 
-/*
-WalksSet; a set of pointers to RandomWalks.
-In the RandomWalksManager structure, each node is mapped to its set of incident walks.
-A walk is said to be incidental to a node if that walk passes through that node.
-*/
-type WalksSet mapset.Set[*RandomWalk]
+// WalkSet; a set of pointers to RandomWalks.
+type WalkSet mapset.Set[*RandomWalk]
 
 /*
 RandomWalksManager structure; The fundamental structure of the pagerank package.
@@ -24,9 +21,9 @@ RandomWalksManager structure; The fundamental structure of the pagerank package.
 FIELDS
 ------
 
-	> WalksByNode: map[uint32] WalksSet
+	> WalksByNode: map[uint32] WalkSet
 	Associate a node ID to the set of walks that pass through tat node. Each walk
-	is uniquly added to a node set because we break the walk when a cycle is encountered.
+	is uniquely added to a node set because we break the walk when a cycle is encountered.
 	e.g. {0: { {0}, {2,3,4,0} } ...}; this means that the only walks that passed
 	through node_0 are {0} and {2,3,4,0}
 
@@ -45,7 +42,7 @@ NOTE
     be smaller or equal to the latter.
 */
 type RandomWalksManager struct {
-	WalksByNode  map[uint32]WalksSet
+	WalksByNode  map[uint32]WalkSet
 	alpha        float32
 	walksPerNode uint16
 }
@@ -62,7 +59,7 @@ func NewRandomWalksManager(alpha float32, walksPerNode uint16) (*RandomWalksMana
 	}
 
 	RWM := &RandomWalksManager{
-		WalksByNode:  make(map[uint32]WalksSet),
+		WalksByNode:  make(map[uint32]WalkSet),
 		alpha:        alpha,
 		walksPerNode: walksPerNode,
 	}
@@ -84,7 +81,7 @@ func (RWM *RandomWalksManager) IsEmpty() (bool, error) {
 	return false, nil
 }
 
-// CheckState checks whether the RWM is empty or non-empty and returns
+// CheckState checks whether the RWM is nil, empty or non-empty and returns
 // an appropriate error based on the requirement
 func (RWM *RandomWalksManager) CheckState(expectEmptyRWM bool) error {
 
@@ -104,8 +101,8 @@ func (RWM *RandomWalksManager) CheckState(expectEmptyRWM bool) error {
 }
 
 // WalksByNodeID; pass a node ID, returns all the RandomWalks that pass
-// through that node, as a WalksSet
-func (RWM *RandomWalksManager) WalksByNodeID(nodeID uint32) (WalksSet, error) {
+// through that node, as a WalkSet
+func (RWM *RandomWalksManager) WalksByNodeID(nodeID uint32) (WalkSet, error) {
 
 	const expectEmptyRWM = false
 	err := RWM.CheckState(expectEmptyRWM)
@@ -121,12 +118,11 @@ func (RWM *RandomWalksManager) WalksByNodeID(nodeID uint32) (WalksSet, error) {
 	return walkSet, nil
 }
 
-// AddWalk; adds the pointer to the walk to the RandomWalksManager. This means that
-// for each node visited by the walk, the walk pointer will be added on
-// RandomWalksManager.WalksByNode[node]
+// AddWalk; adds the walk pointer to the WalkSet of each node in the walk.
+// This means that for each node visited by the walk, the walk pointer will be
+// added to its WalkSet
 func (RWM *RandomWalksManager) AddWalk(walk *RandomWalk) error {
 
-	// if the RWM is a nil pointer
 	if RWM == nil {
 		return ErrNilRWMPointer
 	}
@@ -136,10 +132,10 @@ func (RWM *RandomWalksManager) AddWalk(walk *RandomWalk) error {
 		return err
 	}
 
-	// add it to the RandomWalksManager, under each node it passes through
+	// add the pointer to the WalkSet of each node
 	for _, nodeID := range walk.NodeIDs {
 
-		// Initialize the set for the nodeID if it doesn't exist
+		// Initialize the WalkSet for nodeID if it doesn't exist
 		if _, exists := RWM.WalksByNode[nodeID]; !exists {
 			RWM.WalksByNode[nodeID] = mapset.NewSet[*RandomWalk]()
 		}
@@ -150,50 +146,69 @@ func (RWM *RandomWalksManager) AddWalk(walk *RandomWalk) error {
 	return nil
 }
 
-// // RemoveWalks removes all walks the correct number of times as specified
-// // in the WalksToRemoveByNode in one Go!
-// func (RWM *RandomWalksManager) RemoveWalks(WTR *WalksToRemoveByNode) error {
+// PruneWalk; removes the walk pointer from each node in the walk after cutIndex.
+// This means that for each prunedNode in walk[cutIndex:], the walk pointer will
+// be removed from its WalkSet
+func (RWM *RandomWalksManager) PruneWalk(walk *RandomWalk, cutIndex int) error {
 
-// 	// RWM should NOT be empty or nil
-// 	const expectEmptyRWM = false
-// 	err := RWM.CheckState(expectEmptyRWM)
-// 	if err != nil {
-// 		return err
-// 	}
+	const expectEmptyRWM = false
+	err := RWM.CheckState(expectEmptyRWM)
+	if err != nil {
+		return err
+	}
 
-// 	// WRT should NOT be nil
-// 	if WTR == nil {
-// 		return ErrNilWTRPointer
-// 	}
+	err = checkWalk(walk)
+	if err != nil {
+		return err
+	}
 
-// 	for nodeID, walksToRemove := range WTR.removals {
+	// the cut must decrease the lenght of the walk, or it's pointless
+	if cutIndex < 0 || cutIndex >= len(walk.NodeIDs) {
+		return ErrInvalidWalkIndex
+	}
 
-// 		// get the current walks of a nodeID
-// 		currentWalks, err := RWM.WalksByNodeID(nodeID)
-// 		if err != nil {
-// 			return err
-// 		}
+	// remove the pointer from the WalkSet of each node
+	for _, prunedNodeID := range walk.NodeIDs[cutIndex:] {
+		RWM.WalksByNode[prunedNodeID].Remove(walk)
+	}
 
-// 		// remove all the walks that need to be removed, the correct number of times
-// 		newWalks := []*RandomWalk{}
-// 		for _, walk := range currentWalks {
+	// prune the walk
+	walk.NodeIDs = slices.Delete(walk.NodeIDs, cutIndex, len(walk.NodeIDs))
 
-// 			if walksToRemove[walk] > 0 {
-// 				// don't add it, which counts as if it was removed once
-// 				walksToRemove[walk]--
+	return nil
+}
 
-// 			} else {
-// 				// add it
-// 				newWalks = append(newWalks, walk)
-// 			}
-// 		}
+// GraftWalk; extend the walk with the new walk segment, and add the walk pointer to
+// the WalkSet of each node in the new walk segment
+func (RWM *RandomWalksManager) GraftWalk(walk *RandomWalk, walkSegment []uint32) error {
 
-// 		// change the RWM
-// 		RWM.WalksByNode[nodeID] = newWalks
-// 	}
+	const expectEmptyRWM = false
+	err := RWM.CheckState(expectEmptyRWM)
+	if err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	err = checkWalk(walk)
+	if err != nil {
+		return err
+	}
+
+	// add the pointer to the WalkSet of each node
+	for _, nodeID := range walkSegment {
+
+		// Initialize the WalkSet for nodeID if it doesn't exist
+		if _, exists := RWM.WalksByNode[nodeID]; !exists {
+			RWM.WalksByNode[nodeID] = mapset.NewSet[*RandomWalk]()
+		}
+
+		RWM.WalksByNode[nodeID].Add(walk)
+	}
+
+	// graft the walk
+	walk.NodeIDs = append(walk.NodeIDs, walkSegment...)
+
+	return nil
+}
 
 // helper function that returns the appropriate error if the walk pointer is nil
 // or if the walk is empty. Else returns nil

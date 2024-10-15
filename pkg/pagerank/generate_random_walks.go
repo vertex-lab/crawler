@@ -8,6 +8,68 @@ import (
 )
 
 /*
+generateWalk; generates a single walk ([]uint32) from a specified starting node.
+The function returns an error if the DB cannot find the successorIDs of a node.
+
+It's important to note that the walk breaks early when a cycle is encountered.
+This behaviour simplifies the data structure (now a walk visits a node only once)
+and helps with mitigating self-boosting spam networks. At the same time this doesn't
+influence much the ranking of normal users since a cycle occurance is very inprobable
+for those set of users.
+
+Read more here:
+*/
+func generateWalk(DB graph.Database, startingNodeID uint32,
+	alpha float32, rng *rand.Rand) ([]uint32, error) {
+
+	// check if startingNodeID is in the DB
+	if _, err := DB.NodeByID(startingNodeID); err != nil {
+		return nil, err
+	}
+
+	currentNodeID := startingNodeID
+	walk := []uint32{currentNodeID}
+
+walkGeneration:
+	for {
+		// stop with probability 1-alpha
+		if rng.Float32() > alpha {
+			break walkGeneration
+		}
+
+		// get the successorIDs of the current node
+		successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
+		if err != nil {
+			return nil, err
+		}
+
+		// if it is a dandling node, stop the walk
+		succLenght := len(successorIDs)
+		if succLenght == 0 {
+			break walkGeneration
+		}
+
+		// randomly select the next node, and set is as the current one
+		randomIndex := rng.Intn(succLenght)
+		currentNodeID = successorIDs[randomIndex]
+
+		/* if there is a cycle (node already visited), break the walk generation.
+		This operation is faster than using sets because walks are short (1/(1-alpha) on average) */
+		for _, prevNodeID := range walk {
+
+			if currentNodeID == prevNodeID {
+				break walkGeneration
+			}
+		}
+
+		// else, add to the walk
+		walk = append(walk, currentNodeID)
+	}
+
+	return walk, nil
+}
+
+/*
 GenerateRandomWalks generates `walksPerNode` random walks for each node in
 the database using dampening factor `alpha`. The walks pointers are stored in
 the RandomWalksManager struct.
@@ -91,68 +153,6 @@ func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 
 	// TODO; store the RWM on an in-memory database (e.g. Redis)
 	return nil
-}
-
-/*
-generateWalk; generates a single walk ([]uint32) from a specified starting node.
-The function returns an error if the DB cannot find the successorIDs of a node.
-
-It's important to note that the walk breaks early when a cycle is encountered.
-This behaviour simplifies the data structure (now a walk visits a node only once)
-and helps with mitigating self-boosting spam networks. At the same time this doesn't
-influence much the ranking of normal users since a cycle occurance is very unprobable
-for those set of users.
-
-Read more here:
-*/
-func generateWalk(DB graph.Database, startingNodeID uint32,
-	alpha float32, rng *rand.Rand) ([]uint32, error) {
-
-	// check if startingNodeID is in the DB
-	if _, err := DB.NodeByID(startingNodeID); err != nil {
-		return nil, err
-	}
-
-	currentNodeID := startingNodeID
-	walk := []uint32{currentNodeID}
-
-walkGeneration:
-	for {
-		// stop with probability 1-alpha
-		if rng.Float32() > alpha {
-			break walkGeneration
-		}
-
-		// get the successorIDs of the current node
-		successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		// if it is a dandling node, stop the walk
-		succLenght := len(successorIDs)
-		if succLenght == 0 {
-			break walkGeneration
-		}
-
-		// randomly select the next node, and set is as the current one
-		randomIndex := rng.Intn(succLenght)
-		currentNodeID = successorIDs[randomIndex]
-
-		// if there is a cycle (node already visited), break the walk generation.
-		// This operation is faster than using sets because walks are short
-		for _, prevNodeID := range walk {
-
-			if currentNodeID == prevNodeID {
-				break walkGeneration
-			}
-		}
-
-		// else, add to the walk
-		walk = append(walk, currentNodeID)
-	}
-
-	return walk, nil
 }
 
 // checkInputs function is used to check whether the inputs are valid.

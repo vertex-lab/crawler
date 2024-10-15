@@ -304,146 +304,224 @@ func TestAddWalk(t *testing.T) {
 
 }
 
-/*
-func TestRemoveWalks(t *testing.T) {
-	t.Run("negative RemoveWalks, nil RWM", func(t *testing.T) {
+func TestGraftWalk(t *testing.T) {
+	t.Run("negative GraftWalk, nil RWM", func(t *testing.T) {
 
 		var RWM *RandomWalksManager // nil RWM
-		WTR := NewWalksToRemoveByNode(mapset.NewSet[uint32]())
 
-		err := RWM.RemoveWalks(WTR)
+		walk := RandomWalk{NodeIDs: []uint32{0}}
+		newNodeIDs := []uint32{1, 2}
+
+		err := RWM.GraftWalk(&walk, newNodeIDs)
 
 		if err != ErrNilRWMPointer {
-			t.Fatalf("RemoveWalks(): expected %v, got %v", ErrNilRWMPointer, err)
+			t.Fatalf("GraftWalk(nil): expected %v, got %v", ErrNilRWMPointer, err)
 		}
 	})
 
-	t.Run("negative RemoveWalks, empty RWM", func(t *testing.T) {
+	t.Run("negative GraftWalk, empty RWM", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
-		WTR := NewWalksToRemoveByNode(mapset.NewSet[uint32]())
+		RWM, _ := NewRandomWalksManager(0.85, 1)
 
-		err := RWM.RemoveWalks(WTR)
+		walk := RandomWalk{NodeIDs: []uint32{0}}
+		newNodeIDs := []uint32{1, 2}
+
+		err := RWM.GraftWalk(&walk, newNodeIDs)
 
 		if err != ErrEmptyRWM {
-			t.Fatalf("RemoveWalks(): expected %v, got %v", ErrEmptyRWM, err)
+			t.Fatalf("GraftWalk(nil): expected %v, got %v", ErrEmptyRWM, err)
 		}
 	})
 
-	t.Run("negative RemoveWalks, nil WTR", func(t *testing.T) {
-
+	t.Run("negative GraftWalk, nil walk", func(t *testing.T) {
 		RWM, _ := NewRandomWalksManager(0.85, 1)
-		RWM.WalksByNode[0] = []*RandomWalk{{NodeIDs: []uint32{0, 1}}}
+		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
 
-		var WTR *WalksToRemoveByNode // nil WTR
-		err := RWM.RemoveWalks(WTR)
+		err := RWM.GraftWalk(nil, []uint32{0}) // nil walk
 
-		if err != ErrNilWTRPointer {
-			t.Fatalf("RemoveWalks(): expected %v, got %v", ErrNilWTRPointer, err)
+		if err != ErrNilWalkPointer {
+			t.Fatalf("GraftWalk(nil): expected %v, got %v", ErrNilWalkPointer, err)
 		}
 	})
 
-	t.Run("positive RemoveWalks", func(t *testing.T) {
+	t.Run("negative GraftWalk, empty walk", func(t *testing.T) {
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
+
+		emptyWalk := RandomWalk{NodeIDs: []uint32{}} // empty walk
+		err := RWM.GraftWalk(&emptyWalk, []uint32{0})
+
+		if err != ErrEmptyWalk {
+			t.Fatalf("GraftWalk({}}): expected %v, got %v", ErrEmptyWalk, err)
+		}
+	})
+
+	t.Run("positive GraftWalk", func(t *testing.T) {
 
 		RWM, _ := NewRandomWalksManager(0.85, 1)
-		walk := &RandomWalk{NodeIDs: []uint32{0, 1, 2, 3}}
+		walk := &RandomWalk{NodeIDs: []uint32{0}}
 		RWM.AddWalk(walk)
 
-		WTR := NewWalksToRemoveByNode(mapset.NewSet[uint32](0))
-		WTR.recordWalkRemoval(walk, 1) // should remove the walk from 1,2,3
-		err := RWM.RemoveWalks(WTR)
+		nodeIDs := []uint32{1, 2}
+		RWM.GraftWalk(walk, nodeIDs)
 
-		if err != nil {
-			t.Fatalf("RemoveWalks(): expected nil, got %v", err)
+		walkSet1, _ := RWM.WalksByNodeID(1)
+		if !walkSet1.ContainsOne(walk) {
+			t.Errorf("GraftWalk(): expected {%v}, got %v", walk, walkSet1)
 		}
 
-		// check if the walk is present under node 0
-		walks, err := RWM.WalksByNodeID(0)
-		if err != nil {
-			t.Fatalf("RemoveWalks() --> WalksByNodeID(0): expected nil, got %v", err)
+		walkSet2, _ := RWM.WalksByNodeID(2)
+		if !walkSet2.ContainsOne(walk) {
+			t.Errorf("GraftWalk(): expected {%v}, got %v", walk, walkSet1)
 		}
 
-		if walks[0] != walk {
-			t.Errorf("RemoveWalks(): expected %v, got %v", walk, walks[0])
+		if !reflect.DeepEqual(walk.NodeIDs, []uint32{0, 1, 2}) {
+			t.Errorf("GraftWalk(): expected %v, got %v", []uint32{0, 1, 2}, walk.NodeIDs)
 		}
+	})
 
-		// check if the walk is NOT present under node 1,2,3
-		for _, nodeID := range walk.NodeIDs[1:] {
+}
 
-			walks, err := RWM.WalksByNodeID(nodeID)
-			if err != nil {
-				t.Fatalf("RemoveWalks() --> WalksByNodeID(%d): expected nil, got %v", nodeID, err)
-			}
+func TestPruneWalk(t *testing.T) {
+	t.Run("negative PruneWalk, nil RWM", func(t *testing.T) {
 
-			if len(walks) != 0 {
-				t.Errorf("RemoveWalks(): expected empty list, got %v", walks)
+		var RWM *RandomWalksManager // nil RWM
+		walk := RandomWalk{NodeIDs: []uint32{1, 2}}
+
+		err := RWM.PruneWalk(&walk, 0)
+
+		if err != ErrNilRWMPointer {
+			t.Fatalf("PruneWalk(nil): expected %v, got %v", ErrNilRWMPointer, err)
+		}
+	})
+
+	t.Run("negative PruneWalk, empty RWM", func(t *testing.T) {
+		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
+
+		err := RWM.PruneWalk(&RandomWalk{NodeIDs: []uint32{1, 2}}, 0)
+
+		if err != ErrEmptyRWM {
+			t.Fatalf("PruneWalk(nil): expected %v, got %v", ErrEmptyRWM, err)
+		}
+	})
+
+	t.Run("negative PruneWalk, nil walk", func(t *testing.T) {
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
+
+		err := RWM.PruneWalk(nil, 0) // nil walk
+
+		if err != ErrNilWalkPointer {
+			t.Fatalf("PruneWalk(nil): expected %v, got %v", ErrNilWalkPointer, err)
+		}
+	})
+
+	t.Run("negative PruneWalk, empty walk", func(t *testing.T) {
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
+
+		emptyWalk := RandomWalk{NodeIDs: []uint32{}} // empty walk
+		err := RWM.PruneWalk(&emptyWalk, 0)
+
+		if err != ErrEmptyWalk {
+			t.Fatalf("PruneWalk({}}): expected %v, got %v", ErrEmptyWalk, err)
+		}
+	})
+
+	t.Run("negative PruneWalk, invalid cutIndex", func(t *testing.T) {
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		walk := RandomWalk{NodeIDs: []uint32{1, 2}}
+		RWM.AddWalk(&walk)
+
+		invalidCutIndexes := []int{-1, -20, 50, 2}
+
+		for _, invalidCutIndex := range invalidCutIndexes {
+
+			err := RWM.PruneWalk(&walk, invalidCutIndex)
+			if err != ErrInvalidWalkIndex {
+				t.Errorf("PruneWalk({}}): expected %v, got %v", ErrInvalidWalkIndex, err)
 			}
 		}
 	})
+
+	t.Run("positive PruneWalk", func(t *testing.T) {
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		walk := RandomWalk{NodeIDs: []uint32{5, 7}}
+		RWM.AddWalk(&walk)
+
+		// should remove the walk from the WalkSet of node 7 but not node 5
+		RWM.PruneWalk(&walk, 1)
+
+		walkSet5, _ := RWM.WalksByNodeID(5)
+		if !walkSet5.ContainsOne(&walk) {
+			t.Errorf("PruneWalk() node5: expected %v, got %v", &walk, walkSet5)
+		}
+
+		walkSet7, _ := RWM.WalksByNodeID(7)
+		if walkSet7.ContainsOne(&walk) {
+			t.Errorf("PruneWalk() node7: expected {}, got %v", walkSet7)
+		}
+	})
+
 }
-*/
 
 // ------------------------------BENCHMARKS------------------------------
 
 func BenchmarkAddWalk(b *testing.B) {
-	RWM, _ := NewRandomWalksManager(0.85, 1)
+	RWM, err := NewRandomWalksManager(0.85, 1)
+	if err != nil {
+		b.Fatalf("BenchmarkAddWalk(): failed to initialize RWM: %v", err)
+	}
 
-	// Pre-create a RandomWalk
-	nodeIDS := []uint32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
-	walk := RandomWalk{NodeIDs: nodeIDS}
+	// setup the walks
+	walkPointers := []*RandomWalk{}
+	for i := uint32(0); i < uint32(b.N); i++ {
+
+		// simple walk pattern
+		nodeIDs := []uint32{i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8, i + 9, i + 10}
+		walk := &RandomWalk{NodeIDs: nodeIDs}
+		walkPointers = append(walkPointers, walk)
+	}
+
+	b.ResetTimer()
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		RWM.AddWalk(&walk)
-	}
-}
+		err := RWM.AddWalk(walkPointers[i])
 
-/*
-func BenchmarkRemoveWalks(b *testing.B) {
-
-	// variables of the benchmark
-	numNodes := uint32(200000)
-	numSuccessorsPerNode := uint32(100)
-
-	// initialization of structures
-	DB := generateMockDB(numNodes, numSuccessorsPerNode)
-	RWM, _ := NewRandomWalksManager(0.85, 10)
-	RWM.GenerateRandomWalks(DB)
-
-	nodesSet := mapset.NewSet[uint32]()
-	for i := uint32(0); i < uint32(numNodes); i++ {
-		nodesSet.Add(i)
-	}
-
-	b.ResetTimer()
-
-	WTR := NewWalksToRemoveByNode(nodesSet)
-
-	// include in WTR all the walks in RWM, so everything will be removed
-	for node, walks := range RWM.WalksByNode {
-		for _, walk := range walks {
-			WTR.removals[node][walk] = 1
+		if err != nil {
+			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
 		}
 	}
-
-	err := RWM.RemoveWalks(WTR)
-	if err != nil {
-		b.Errorf("RemoveWalks(): Error occurred: %v", err)
-	}
 }
 
-func BenchmarkToSlice(b *testing.B) {
-	size := 1000000
-	set := mapset.NewSet[int]()
+func BenchmarkPruneWalk(b *testing.B) {
+	RWM, err := NewRandomWalksManager(0.85, 1)
+	if err != nil {
+		b.Fatalf("Failed to initialize RandomWalksManager: %v", err)
+	}
 
-	for i := 0; i < size; i++ {
-		set.Add(i)
+	// setup the walks and RWM
+	walkPointers := []*RandomWalk{}
+	for i := uint32(0); i < uint32(b.N); i++ {
+
+		// simple walk pattern
+		nodeIDs := []uint32{i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7, i + 8, i + 9, i + 10}
+		walk := &RandomWalk{NodeIDs: nodeIDs}
+
+		walkPointers = append(walkPointers, walk)
+		RWM.AddWalk(walk)
 	}
 
 	b.ResetTimer()
 
+	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		set.ToSlice()
+		RWM.PruneWalk(walkPointers[i], 0)
+
+		if err != nil {
+			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
+		}
 	}
 }
-*/
