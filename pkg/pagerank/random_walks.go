@@ -30,10 +30,12 @@ func (rw *RandomWalk) CheckEmpty() error {
 NeedsUpdate returns whether the RandomWalk needs to be updated, and the index
 where to implement the update (pruning and grafting).
 
-This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes
+This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes.
+The average lenght of removedNodes is supposed to be quite small, meaning that sets are less
+performing.
 */
 func (rw *RandomWalk) NeedsUpdate(nodeID uint32,
-	removedNodes mapset.Set[uint32]) (bool, int, error) {
+	removedNodes []uint32) (bool, int, error) {
 
 	err := rw.CheckEmpty()
 	if err != nil {
@@ -44,7 +46,7 @@ func (rw *RandomWalk) NeedsUpdate(nodeID uint32,
 	for i := 0; i < len(rw.NodeIDs)-1; i++ {
 
 		// if it contains a hop (nodeID --> removedNode)
-		if rw.NodeIDs[i] == nodeID && removedNodes.ContainsOne(rw.NodeIDs[i+1]) {
+		if rw.NodeIDs[i] == nodeID && slices.Contains(removedNodes, rw.NodeIDs[i+1]) {
 
 			// it needs to be updated from (i+1)th element (included) onwards
 			cutIndex := i + 1

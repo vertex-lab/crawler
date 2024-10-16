@@ -191,13 +191,13 @@ func TestGenerateRandomWalks(t *testing.T) {
 		for _, nodeID := range nodeIDs {
 
 			// get the walks of a node
-			walk_pointers, err := RWM.WalksByNodeID(nodeID)
+			walkSet, err := RWM.WalksByNodeID(nodeID)
 			if err != nil {
 				t.Fatalf("GenerateRandomWalks() -> WalksByNodeID(): expected nil, got %v", err)
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks, err := sortWalks(walk_pointers.ToSlice())
+			walks, err := sortWalks(walkSet)
 			if err != nil {
 				t.Errorf("GenerateRandomWalks(): expected nil, got %v", err)
 			}
@@ -238,16 +238,18 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 //--------------------------------HELPER-FUNCTION-------------------------------
 
 // dereferences the random walks and sorts them in lexicographic order
-func sortWalks(walk_pointers []*RandomWalk) ([][]uint32, error) {
+func sortWalks(walkSet WalkSet) ([][]uint32, error) {
 
-	if len(walk_pointers) == 0 {
+	walkPointers := walkSet.ToSlice()
+
+	if len(walkPointers) == 0 {
 		return nil, ErrEmptyRandomWalk
 	}
 
 	// dereferencing the slice of pointers
 	walks := [][]uint32{}
 
-	for _, walk_pointer := range walk_pointers {
+	for _, walk_pointer := range walkPointers {
 		walks = append(walks, walk_pointer.NodeIDs)
 	}
 

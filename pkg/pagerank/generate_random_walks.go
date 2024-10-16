@@ -2,6 +2,7 @@ package pagerank
 
 import (
 	"math/rand"
+	"slices"
 	"time"
 
 	"github.com/pippellia-btc/analytic_engine/pkg/graph"
@@ -29,14 +30,14 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 	currentNodeID := startingNodeID
 	walk := []uint32{currentNodeID}
 
-walkGeneration:
 	for {
 		// stop with probability 1-alpha
 		if rng.Float32() > alpha {
-			break walkGeneration
+			break
 		}
 
 		// get the successorIDs of the current node
+		// TODO; This can be improved by fetching directly a random successor
 		successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
 		if err != nil {
 			return nil, err
@@ -45,7 +46,7 @@ walkGeneration:
 		// if it is a dandling node, stop the walk
 		succLenght := len(successorIDs)
 		if succLenght == 0 {
-			break walkGeneration
+			break
 		}
 
 		// randomly select the next node, and set is as the current one
@@ -55,11 +56,8 @@ walkGeneration:
 		/* if there is a cycle (node already visited), break the walk generation.
 		Traversing the slice is faster than using sets because walks are short
 		(1/(1-alpha) long on average). */
-		for _, prevNodeID := range walk {
-
-			if currentNodeID == prevNodeID {
-				break walkGeneration
-			}
+		if slices.Contains(walk, currentNodeID) {
+			break
 		}
 
 		// else, add to the walk
@@ -150,7 +148,6 @@ func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 		}
 	}
 
-	// TODO; store the RWM on an in-memory database (e.g. Redis)
 	return nil
 }
 

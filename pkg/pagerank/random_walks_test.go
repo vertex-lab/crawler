@@ -49,7 +49,7 @@ func TestNeedsUpdate(t *testing.T) {
 
 		nodeID := uint32(0)
 		var randomWalk *RandomWalk // nil rw
-		removedNodes := mapset.NewSet[uint32](5)
+		removedNodes := []uint32{1}
 
 		_, _, err := randomWalk.NeedsUpdate(nodeID, removedNodes)
 		if err != ErrNilRandomWalkPointer {
@@ -62,7 +62,7 @@ func TestNeedsUpdate(t *testing.T) {
 
 		nodeID := uint32(0)
 		randomWalk := &RandomWalk{NodeIDs: []uint32{}} // empty rw
-		removedNodes := mapset.NewSet[uint32](5)
+		removedNodes := []uint32{5}
 
 		_, _, err := randomWalk.NeedsUpdate(nodeID, removedNodes)
 		if err != ErrEmptyRandomWalk {
@@ -75,7 +75,7 @@ func TestNeedsUpdate(t *testing.T) {
 
 		nodeID := uint32(0)
 		randomWalk := &RandomWalk{NodeIDs: []uint32{0, 1, 2, 3}}
-		removedNodes := mapset.NewSet[uint32](5)
+		removedNodes := []uint32{5}
 
 		update, cutIndex, err := randomWalk.NeedsUpdate(nodeID, removedNodes)
 		if err != nil {
@@ -96,7 +96,7 @@ func TestNeedsUpdate(t *testing.T) {
 
 		nodeID := uint32(0)
 		randomWalk := &RandomWalk{NodeIDs: []uint32{0, 1, 2, 3, 0, 5}}
-		removedNodes := mapset.NewSet[uint32](5)
+		removedNodes := []uint32{5}
 
 		update, cutIndex, err := randomWalk.NeedsUpdate(nodeID, removedNodes)
 		if err != nil {
@@ -576,6 +576,24 @@ func TestGraftWalk(t *testing.T) {
 }
 
 // ------------------------------BENCHMARKS------------------------------
+
+func BenchmarkNeedsUpdate(b *testing.B) {
+
+	rw := &RandomWalk{NodeIDs: []uint32{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}}
+	nodeID := uint32(2)
+
+	// setup unusually big removedNodes
+	removedNodes := make([]uint32, 101)
+	for i := uint32(0); i < 100; i++ {
+		removedNodes = append(removedNodes, 100-i)
+	}
+	removedNodes = append(removedNodes, 1) // worst case scenario
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rw.NeedsUpdate(nodeID, removedNodes)
+	}
+}
 
 func BenchmarkAddWalk(b *testing.B) {
 	RWM, err := NewRandomWalksManager(0.85, 1)
