@@ -12,20 +12,20 @@ import (
 
 func TestCheckEmpty(t *testing.T) {
 
-	t.Run("negative CheckEmpty, nil rw", func(t *testing.T) {
+	t.Run("negative CheckEmpty, nil rWalk", func(t *testing.T) {
 
-		var rw *RandomWalk // nil rw
-		err := rw.CheckEmpty()
+		var rWalk *RandomWalk // nil rWalk
+		err := rWalk.CheckEmpty()
 
 		if !errors.Is(err, ErrNilRandomWalkPointer) {
 			t.Errorf("CheckEmpty(): expected %v, got %v", ErrNilRWMPointer, err)
 		}
 	})
 
-	t.Run("negative CheckEmpty, empty rw", func(t *testing.T) {
+	t.Run("negative CheckEmpty, empty rWalk", func(t *testing.T) {
 
-		rw := &RandomWalk{NodeIDs: []uint32{}}
-		err := rw.CheckEmpty()
+		rWalk := &RandomWalk{NodeIDs: []uint32{}}
+		err := rWalk.CheckEmpty()
 
 		if !errors.Is(err, ErrEmptyRandomWalk) {
 			t.Fatalf("CheckEmpty(): expected %v, got %v", ErrEmptyRandomWalk, err)
@@ -34,8 +34,8 @@ func TestCheckEmpty(t *testing.T) {
 
 	t.Run("positive CheckEmpty", func(t *testing.T) {
 
-		rw := &RandomWalk{NodeIDs: []uint32{0}}
-		err := rw.CheckEmpty()
+		rWalk := &RandomWalk{NodeIDs: []uint32{0}}
+		err := rWalk.CheckEmpty()
 
 		if err != nil {
 			t.Errorf("CheckEmpty(): expected nil, got %v", err)
@@ -45,10 +45,10 @@ func TestCheckEmpty(t *testing.T) {
 
 func TestNeedsUpdate(t *testing.T) {
 
-	t.Run("NeedsUpdate, nil rw", func(t *testing.T) {
+	t.Run("NeedsUpdate, nil rWalk", func(t *testing.T) {
 
 		nodeID := uint32(0)
-		var randomWalk *RandomWalk // nil rw
+		var randomWalk *RandomWalk // nil rWalk
 		removedNodes := []uint32{1}
 
 		_, _, err := randomWalk.NeedsUpdate(nodeID, removedNodes)
@@ -58,10 +58,10 @@ func TestNeedsUpdate(t *testing.T) {
 
 	})
 
-	t.Run("NeedsUpdate, empty rw", func(t *testing.T) {
+	t.Run("NeedsUpdate, empty rWalk", func(t *testing.T) {
 
 		nodeID := uint32(0)
-		randomWalk := &RandomWalk{NodeIDs: []uint32{}} // empty rw
+		randomWalk := &RandomWalk{NodeIDs: []uint32{}} // empty rWalk
 		removedNodes := []uint32{5}
 
 		_, _, err := randomWalk.NeedsUpdate(nodeID, removedNodes)
@@ -173,11 +173,7 @@ func TestIsEmpty(t *testing.T) {
 	t.Run("negative IsEmpty, nil RWM", func(t *testing.T) {
 
 		var RWM *RandomWalksManager // nil RWM
-		empty, err := RWM.IsEmpty()
-
-		if !errors.Is(err, ErrNilRWMPointer) {
-			t.Errorf("IsEmpty(): expected %v, got %v", ErrNilRWMPointer, err)
-		}
+		empty := RWM.IsEmpty()
 
 		if empty != true {
 			t.Errorf("IsEmpty(): expected %v, got %v", true, empty)
@@ -187,11 +183,7 @@ func TestIsEmpty(t *testing.T) {
 	t.Run("IsEmpty, empty RWM", func(t *testing.T) {
 
 		RWM, _ := NewRandomWalksManager(0.85, 1)
-		empty, err := RWM.IsEmpty()
-
-		if err != nil {
-			t.Fatalf("IsEmpty(): expected nil, got %v", err)
-		}
+		empty := RWM.IsEmpty()
 
 		if empty != true {
 			t.Errorf("IsEmpty(): expected %v, got %v", true, empty)
@@ -204,11 +196,7 @@ func TestIsEmpty(t *testing.T) {
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1, 2}})
 		RWM.WalksByNode[1] = walkSet
 
-		empty, err := RWM.IsEmpty()
-
-		if err != nil {
-			t.Errorf("IsEmpty(): expected nil, got %v", err)
-		}
+		empty := RWM.IsEmpty()
 
 		if empty != false {
 			t.Errorf("IsEmpty(): expected %v, got %v", false, empty)
@@ -455,7 +443,7 @@ func TestPruneWalk(t *testing.T) {
 		walk := RandomWalk{NodeIDs: []uint32{1, 2}}
 		RWM.AddWalk(&walk)
 
-		invalidCutIndexes := []int{-1, -20, 50, 2}
+		invalidCutIndexes := []int{-1, -20, 50, 3}
 
 		for _, invalidCutIndex := range invalidCutIndexes {
 
@@ -579,7 +567,7 @@ func TestGraftWalk(t *testing.T) {
 
 func BenchmarkNeedsUpdate(b *testing.B) {
 
-	rw := &RandomWalk{NodeIDs: []uint32{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}}
+	rWalk := &RandomWalk{NodeIDs: []uint32{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}}
 	nodeID := uint32(2)
 
 	// setup unusually big removedNodes
@@ -591,7 +579,7 @@ func BenchmarkNeedsUpdate(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rw.NeedsUpdate(nodeID, removedNodes)
+		rWalk.NeedsUpdate(nodeID, removedNodes)
 	}
 }
 

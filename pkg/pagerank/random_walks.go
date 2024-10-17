@@ -12,14 +12,14 @@ type RandomWalk struct {
 	NodeIDs []uint32
 }
 
-// CheckEmpty returns whether RandomWalk is empty
-func (rw *RandomWalk) CheckEmpty() error {
+// CheckEmpty returns the appropriate error is the RandomWalk is empty or nil
+func (rWalk *RandomWalk) CheckEmpty() error {
 
-	if rw == nil {
+	if rWalk == nil {
 		return ErrNilRandomWalkPointer
 	}
 
-	if len(rw.NodeIDs) == 0 {
+	if len(rWalk.NodeIDs) == 0 {
 		return ErrEmptyRandomWalk
 	}
 
@@ -34,19 +34,19 @@ This happens if the walk contains an invalid hop nodeID --> removedNode in remov
 The average lenght of removedNodes is supposed to be quite small, meaning that sets are less
 performing.
 */
-func (rw *RandomWalk) NeedsUpdate(nodeID uint32,
+func (rWalk *RandomWalk) NeedsUpdate(nodeID uint32,
 	removedNodes []uint32) (bool, int, error) {
 
-	err := rw.CheckEmpty()
+	err := rWalk.CheckEmpty()
 	if err != nil {
 		return true, -1, err
 	}
 
 	// iterate over the elements of the walk
-	for i := 0; i < len(rw.NodeIDs)-1; i++ {
+	for i := 0; i < len(rWalk.NodeIDs)-1; i++ {
 
 		// if it contains a hop (nodeID --> removedNode)
-		if rw.NodeIDs[i] == nodeID && slices.Contains(removedNodes, rw.NodeIDs[i+1]) {
+		if rWalk.NodeIDs[i] == nodeID && slices.Contains(removedNodes, rWalk.NodeIDs[i+1]) {
 
 			// it needs to be updated from (i+1)th element (included) onwards
 			cutIndex := i + 1
@@ -112,18 +112,9 @@ func NewRandomWalksManager(alpha float32, walksPerNode uint16) (*RandomWalksMana
 	return RWM, nil
 }
 
-// IsEmpty returns whether RWM is empty
-func (RWM *RandomWalksManager) IsEmpty() (bool, error) {
-
-	if RWM == nil {
-		return true, ErrNilRWMPointer
-	}
-
-	if len(RWM.WalksByNode) == 0 {
-		return true, nil
-	}
-
-	return false, nil
+// IsEmpty returns whether RWM is empty (ignores errors)
+func (RWM *RandomWalksManager) IsEmpty() bool {
+	return RWM == nil || len(RWM.WalksByNode) == 0
 }
 
 // CheckState checks whether the RWM is nil, empty or non-empty and returns
@@ -207,8 +198,7 @@ func (RWM *RandomWalksManager) PruneWalk(walk *RandomWalk, cutIndex int) error {
 		return err
 	}
 
-	// the cut must decrease the lenght of the walk, or it's pointless
-	if cutIndex < 0 || cutIndex >= len(walk.NodeIDs) {
+	if cutIndex < 0 || cutIndex > len(walk.NodeIDs) {
 		return ErrInvalidWalkIndex
 	}
 

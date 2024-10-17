@@ -9,15 +9,20 @@ import (
 )
 
 /*
-generateWalk; generates a single walk ([]uint32) from a specified starting node.
+generates a single walk []uint32 from a specified starting node.
 The function returns an error if the DB cannot find the successorIDs of a node.
 
 It's important to note that the walk breaks early when a cycle is encountered.
-This behaviour simplifies the data structure (now a walk visits a node only once)
-and helps with mitigating self-boosting spam networks. At the same time this doesn't
-influence much the ranking of normal users since a cycle occurance is very inprobable.
+This behaviour simplifies the data structure (now a walk visits a node only once,
+so we can use Sets) and helps with mitigating self-boosting spam networks.
 
-Read more here:
+At the same time this doesn't influence much the ranking of normal users
+since a cycle occurance is very inprobable.
+
+# REFERENCES
+
+[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
+URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func generateWalk(DB graph.Database, startingNodeID uint32,
 	alpha float32, rng *rand.Rand) ([]uint32, error) {
@@ -37,7 +42,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 		}
 
 		// get the successorIDs of the current node
-		// TODO; This can be improved by fetching directly a random successor
+		// This can be improved by fetching directly a random successor
 		successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
 		if err != nil {
 			return nil, err
@@ -53,14 +58,12 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 		randomIndex := rng.Intn(succLenght)
 		currentNodeID = successorIDs[randomIndex]
 
-		/* if there is a cycle (node already visited), break the walk generation.
-		Traversing the slice is faster than using sets because walks are short
-		(1/(1-alpha) long on average). */
+		// if there is a cycle, break the walk generation
 		if slices.Contains(walk, currentNodeID) {
 			break
 		}
 
-		// else, add to the walk
+		// else, append to the walk
 		walk = append(walk, currentNodeID)
 	}
 
@@ -68,66 +71,13 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 }
 
 /*
-GenerateRandomWalks generates `walksPerNode` random walks for each node in
-the database using dampening factor `alpha`. The walks pointers are stored in
-the RandomWalksManager struct.
-
-INPUTS
-------
-
-	> DB: graph.Database
-	The database where nodes are stored
-
-OUTPUT
-------
-
-	> error: look at checkInputs() to view all the errors codes
-
-NOTE
-----
-
-	This function is computationally expensive and should be called only when
-	the RandomWalksManager is empty. During the normal execution of the program,
-	there should always be random walks, so we should not re-do them from scratch,
-	but just update them when necessary (e.g. when there is a graph update), using
-	the UpdateRandomWalks method.
-
-REFERENCES
-----------
-
-	[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
-	URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
-*/
-func (RWM *RandomWalksManager) GenerateRandomWalks(DB graph.Database) error {
-
-	const expectEmptyRWM = true
-	err := checkInputs(RWM, DB, expectEmptyRWM)
-	if err != nil {
-		return err
-	}
-
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return RWM.generateRandomWalks(DB, nil, rng)
-}
-
-/*
-generateRandomWalks implement the logic that generates `walksPerNode“ random walks,
-starting from each node in the slice nodeIDs. These walks are then added to the
-RandomWalksManager struct.
+generateRandomWalks implement the logic that generates `walksPerNode` random walks,
+starting from each node in the slice nodeIDs. The walk pointers are added to the RandomWalksManager.
 
 It accepts a random number generator for reproducibility in tests.
 */
 func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 	nodeIDs []uint32, rng *rand.Rand) error {
-
-	// If no specific nodeIDs are provided, retrieve all nodes from the DB
-	if nodeIDs == nil {
-		var err error
-		nodeIDs, err = DB.AllNodeIDs()
-		if err != nil {
-			return err
-		}
-	}
 
 	// unpack the parameters
 	alpha := RWM.alpha
@@ -142,13 +92,66 @@ func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 				return err
 			}
 
-			// add the RandomWalk's pointer to the RandomWalksManager
-			randomWalk := RandomWalk{NodeIDs: walk}
-			RWM.AddWalk(&randomWalk)
+			// add the RandomWalk's pointer to the RWM
+			rWalk := RandomWalk{NodeIDs: walk}
+			RWM.AddWalk(&rWalk)
 		}
 	}
 
 	return nil
+}
+
+/*
+generates `walksPerNode` random walks for a single node using dampening
+factor `alpha`. The walk pointers are added to the RandomWalksManager.
+*/
+func (RWM *RandomWalksManager) Generate(DB graph.Database, nodeID uint32) error {
+
+	// checking the inputs
+	const expectEmptyRWM = false
+	err := checkInputs(RWM, DB, expectEmptyRWM)
+	if err != nil {
+		return err
+	}
+
+	// if nodeID is already in the RWM, exit
+	if _, exist := RWM.WalksByNode[nodeID]; exist {
+		return nil
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	err = RWM.generateRandomWalks(DB, []uint32{nodeID}, rng)
+
+	return err
+}
+
+/*
+generates `walksPerNode` random walks for ALL nodes in the database using dampening
+factor `alpha`. The walk pointers are added to the RandomWalksManager.
+
+NOTE:
+
+This function is computationally expensive and should be called only when
+the RandomWalksManager is empty. During the normal execution of the program,
+there should always be random walks, so we should not re-do them from scratch,
+but just update them when necessary (e.g. when there is a graph update), using
+the Update() method.
+*/
+func (RWM *RandomWalksManager) GenerateAll(DB graph.Database) error {
+
+	const expectEmptyRWM = true
+	err := checkInputs(RWM, DB, expectEmptyRWM)
+	if err != nil {
+		return err
+	}
+
+	nodeIDs, err := DB.AllNodeIDs()
+	if err != nil {
+		return err
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return RWM.generateRandomWalks(DB, nodeIDs, rng)
 }
 
 // checkInputs function is used to check whether the inputs are valid.

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pippellia-btc/analytic_engine/pkg/graph"
 	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
 )
@@ -36,111 +37,52 @@ func TestGenerateWalk(t *testing.T) {
 
 func TestGenerateRandomWalks(t *testing.T) {
 
-	t.Run("negative GenerateRandomWalks, nil DB", func(t *testing.T) {
+	t.Run("positive generateRandomWalks(), single node", func(t *testing.T) {
 
-		var DB *mock.MockDatabase // nil DB
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-
-		err := RWM.GenerateRandomWalks(DB)
-
-		if err != graph.ErrNilDatabasePointer {
-			t.Errorf("GenerateRandomWalks(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
-		}
-	})
-
-	t.Run("negative GenerateRandomWalks, empty DB", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase() // empty DB
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-
-		err := RWM.GenerateRandomWalks(DB)
-
-		if err != graph.ErrDatabaseIsEmpty {
-			t.Errorf("GenerateRandomWalks(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
-		}
-	})
-
-	t.Run("negative GenerateRandomWalks, nil RWM", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		var RWM *RandomWalksManager // nil RWM
-		err := RWM.GenerateRandomWalks(DB)
-
-		if err != ErrNilRWMPointer {
-			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrNilRWMPointer, err)
-		}
-	})
-
-	t.Run("negative GenerateRandomWalks, non-empty RWM", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		// non empty RWM
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		walk := RandomWalk{NodeIDs: []uint32{0}}
-		RWM.AddWalk(&walk)
-
-		err := RWM.GenerateRandomWalks(DB)
-
-		if err != ErrNonEmptyRWM {
-			t.Errorf("GenerateRandomWalks(): expected %v, got %v", ErrNonEmptyRWM, err)
-		}
-	})
-
-	t.Run("positive GenerateRandomWalks, 1 dandling node", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		err := RWM.GenerateRandomWalks(DB)
-
+		RWM, err := NewRandomWalksManager(0.85, 2)
 		if err != nil {
-			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
+			t.Fatalf("generateRandomWalks(): expected nil, got %v", err)
 		}
 
-		// check before accessing RWM
-		empty, err := RWM.IsEmpty()
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
+		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
+
+		// for reproducibility
+		rng := rand.New(rand.NewSource(42))
+		expectedWalk := []uint32{0, 1, 2}
+
+		err = RWM.generateRandomWalks(DB, []uint32{0}, rng)
 		if err != nil {
-			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
+			t.Fatalf("generateRandomWalks(): expected nil, got %v", err)
 		}
 
-		if empty {
-			t.Fatalf("GenerateRandomWalks(): expected false, got %v", empty)
+		nodeIDs, _ := DB.AllNodeIDs()
+		for _, nodeID := range nodeIDs {
+
+			walkSet, err := RWM.WalksByNodeID(nodeID)
+			if err != nil {
+				t.Errorf("generateRandomWalks(): expected nil, got %v", err)
+			}
+
+			for walk := range walkSet.Iter() {
+				if !reflect.DeepEqual(walk.NodeIDs, expectedWalk) {
+					t.Errorf("generateRandomWalks(): expected %v, got %v", expectedWalk, walk)
+				}
+			}
 		}
-
-		// get the walks of node 0
-		walks, err_node := RWM.WalksByNodeID(0)
-		if err_node != nil {
-			t.Errorf("GenerateRandomWalks() -> WalksByNodeID(0): expected nil, got %v", err_node)
-		}
-
-		got := walks.ToSlice()[0].NodeIDs
-		want := []uint32{0}
-
-		if len(got) != len(want) || got[0] != want[0] {
-			t.Errorf("GenerateRandomWalks() -> WalksByNodeID(0): expected %v, got %v", want, got)
-		}
-
 	})
 
-	t.Run("positive GenerateRandomWalks, multiple nodes and walks", func(t *testing.T) {
-
-		// There is something strange in this test. Roughly 85% of the times, this test passes.
-		// However, ~15% of the times, it returns completely valid but unexpected walks.
-		// This means there is likely an issue with the random number generator, which should
-		// not be problematic in production. Further investigation is needed.
+	t.Run("positive generateRandomWalks(), multiple nodes", func(t *testing.T) {
 
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 2}}
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
 		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
 
-		// 	to get the same results
-		randomNumGen := rand.New(rand.NewSource(69))
+		// for reproducibility
+		rng := rand.New(rand.NewSource(69))
 		expectedWalks := map[uint32][][]uint32{
 			0: {
 				{0, 1},
@@ -164,49 +106,198 @@ func TestGenerateRandomWalks(t *testing.T) {
 
 		RWM, err := NewRandomWalksManager(0.85, 2)
 		if err != nil {
-			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
+			t.Fatalf("generateRandomWalks(): expected nil, got %v", err)
 		}
 
-		err = RWM.generateRandomWalks(DB, nil, randomNumGen)
+		err = RWM.generateRandomWalks(DB, []uint32{0, 1, 2}, rng)
 		if err != nil {
-			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
+			t.Fatalf("generateRandomWalks(): expected nil, got %v", err)
 		}
 
-		// check before accessing RWM
-		empty, err := RWM.IsEmpty()
-		if err != nil {
-			t.Fatalf("GenerateRandomWalks(): expected nil, got %v", err)
-		}
-
-		if empty {
-			t.Fatalf("GenerateRandomWalks(): expected false, got %v", empty)
-		}
-
-		nodeIDs, err := DB.AllNodeIDs()
-		if err != nil {
-			t.Errorf("GenerateRandomWalks() -> AllNodeIDs(): expected nil, got %v", err)
-		}
-
-		// iterate over all nodes in the DB
+		nodeIDs, _ := DB.AllNodeIDs()
 		for _, nodeID := range nodeIDs {
 
-			// get the walks of a node
 			walkSet, err := RWM.WalksByNodeID(nodeID)
 			if err != nil {
-				t.Fatalf("GenerateRandomWalks() -> WalksByNodeID(): expected nil, got %v", err)
+				t.Fatalf("generateRandomWalks() -> WalksByNodeID(): expected nil, got %v", err)
 			}
 
 			// dereference walks and sort them in lexicographic order
 			walks, err := sortWalks(walkSet)
 			if err != nil {
-				t.Errorf("GenerateRandomWalks(): expected nil, got %v", err)
+				t.Errorf("generateRandomWalks(): expected nil, got %v", err)
 			}
 
 			if !reflect.DeepEqual(walks, expectedWalks[nodeID]) {
-				t.Errorf("GenerateRandomWalks() nodeID = %d: expected %v, got %v", nodeID, expectedWalks[nodeID], walks)
+				t.Errorf("generateRandomWalks() nodeID = %d: expected %v, got %v", nodeID, expectedWalks[nodeID], walks)
 			}
 		}
 	})
+}
+
+func TestGenerate(t *testing.T) {
+
+	t.Run("negative Generate, nil DB", func(t *testing.T) {
+
+		var DB *mock.MockDatabase //	nil DB
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		rWalk := RandomWalk{NodeIDs: []uint32{0}}
+		RWM.AddWalk(&rWalk)
+
+		err := RWM.Generate(DB, 0)
+
+		if err != graph.ErrNilDatabasePointer {
+			t.Errorf("Generate(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
+		}
+	})
+
+	t.Run("negative Generate, empty DB", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase() // empty DB
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		rWalk := RandomWalk{NodeIDs: []uint32{0}}
+		RWM.AddWalk(&rWalk)
+
+		err := RWM.Generate(DB, 0)
+
+		if err != graph.ErrDatabaseIsEmpty {
+			t.Errorf("Generate(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
+		}
+	})
+
+	t.Run("negative Generate, nil RWM", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		var RWM *RandomWalksManager // nil RWM
+		err := RWM.Generate(DB, 0)
+
+		if err != ErrNilRWMPointer {
+			t.Errorf("Generate(): expected %v, got %v", ErrNilRWMPointer, err)
+		}
+	})
+
+	t.Run("negative Generate, empty RWM", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
+		err := RWM.Generate(DB, 0)
+
+		if err != ErrEmptyRWM {
+			t.Errorf("Generate(): expected %v, got %v", ErrEmptyRWM, err)
+		}
+	})
+
+	t.Run("negative Generate, nodeID not in DB", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0}})
+		RWM.WalksByNode[0] = walkSet
+
+		invalidNodeID := uint32(999) // invalid nodeID
+		err := RWM.Generate(DB, invalidNodeID)
+
+		if err != graph.ErrNodeNotFoundDB {
+			t.Errorf("Generate(): expected %v, got %v", graph.ErrNodeNotFoundDB, err)
+		}
+	})
+
+	t.Run("positive Generate", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0}})
+		RWM.WalksByNode[0] = walkSet
+
+		// new node1 is added to the DB
+		newNodeID := uint32(1)
+		DB.Nodes[newNodeID] = &graph.Node{ID: newNodeID, SuccessorIDs: []uint32{}}
+
+		err := RWM.Generate(DB, newNodeID)
+		if err != nil {
+			t.Errorf("Generate(): expected nil, got %v", err)
+		}
+
+		walkSet, err = RWM.WalksByNodeID(newNodeID)
+		if err != nil {
+			t.Errorf("Generate(): expected nil, got %v", err)
+		}
+
+		want := []uint32{1}
+		for rWalk := range walkSet.Iter() {
+
+			if !reflect.DeepEqual(rWalk.NodeIDs, want) {
+				t.Errorf("Generate(): expected %v, got %v", want, walkSet)
+			}
+		}
+	})
+}
+
+func TestGenerateAll(t *testing.T) {
+
+	t.Run("negative GenerateAll, nil DB", func(t *testing.T) {
+
+		var DB *mock.MockDatabase // nil DB
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+
+		err := RWM.GenerateAll(DB)
+
+		if err != graph.ErrNilDatabasePointer {
+			t.Errorf("GenerateAll(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
+		}
+	})
+
+	t.Run("negative GenerateAll, empty DB", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase() // empty DB
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+
+		err := RWM.GenerateAll(DB)
+
+		if err != graph.ErrDatabaseIsEmpty {
+			t.Errorf("GenerateAll(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
+		}
+	})
+
+	t.Run("negative GenerateAll, nil RWM", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		var RWM *RandomWalksManager // nil RWM
+		err := RWM.GenerateAll(DB)
+
+		if err != ErrNilRWMPointer {
+			t.Errorf("GenerateAll(): expected %v, got %v", ErrNilRWMPointer, err)
+		}
+	})
+
+	t.Run("negative GenerateAll, non-empty RWM", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		// non empty RWM
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		rWalk := RandomWalk{NodeIDs: []uint32{0}}
+		RWM.AddWalk(&rWalk)
+
+		err := RWM.GenerateAll(DB)
+		if err != ErrNonEmptyRWM {
+			t.Errorf("GenerateAll(): expected %v, got %v", ErrNonEmptyRWM, err)
+		}
+	})
+
 }
 
 func BenchmarkGenerateWalk(b *testing.B) {
@@ -220,17 +311,17 @@ func BenchmarkGenerateWalk(b *testing.B) {
 	}
 }
 
-func BenchmarkGenerateRandomWalks(b *testing.B) {
+func BenchmarkGenerateAll(b *testing.B) {
 
-	DB := mock.GenerateMockDB(200000, 100)
+	DB := mock.GenerateMockDB(2000, 100)
 	b.ResetTimer() // to exclude the time to set up
 
 	for i := 0; i < b.N; i++ {
 
 		RWM, _ := NewRandomWalksManager(0.85, 10)
-		err := RWM.GenerateRandomWalks(DB)
+		err := RWM.GenerateAll(DB)
 		if err != nil {
-			b.Fatalf("GenerateRandomWalks() failed: %v", err)
+			b.Fatalf("GenerateAll() failed: %v", err)
 		}
 	}
 }

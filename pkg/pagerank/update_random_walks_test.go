@@ -11,186 +11,6 @@ import (
 	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
 )
 
-func TestUpdateNewNode(t *testing.T) {
-
-	t.Run("negative UpdateNewNode, nil DB", func(t *testing.T) {
-
-		var DB *mock.MockDatabase //	nil DB
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		walk := RandomWalk{NodeIDs: []uint32{0}}
-		RWM.AddWalk(&walk)
-
-		err := RWM.UpdateNewNode(DB, 0)
-
-		if err != graph.ErrNilDatabasePointer {
-			t.Errorf("UpdateNewNode(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
-		}
-	})
-
-	t.Run("negative UpdateNewNode, empty DB", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase() // empty DB
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		walk := RandomWalk{NodeIDs: []uint32{0}}
-		RWM.AddWalk(&walk)
-
-		err := RWM.UpdateNewNode(DB, 0)
-
-		if err != graph.ErrDatabaseIsEmpty {
-			t.Errorf("UpdateNewNode(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
-		}
-	})
-
-	t.Run("negative UpdateNewNode, nil RWM", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		var RWM *RandomWalksManager // nil RWM
-		err := RWM.UpdateNewNode(DB, 0)
-
-		if err != ErrNilRWMPointer {
-			t.Errorf("UpdateNewNode(): expected %v, got %v", ErrNilRWMPointer, err)
-		}
-	})
-
-	t.Run("negative UpdateNewNode, empty RWM", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
-		err := RWM.UpdateNewNode(DB, 0)
-
-		if err != ErrEmptyRWM {
-			t.Errorf("UpdateNewNode(): expected %v, got %v", ErrEmptyRWM, err)
-		}
-	})
-
-	t.Run("negative UpdateNewNode, nodeID not in DB", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		RWM.GenerateRandomWalks(DB)
-
-		invalidNodeID := uint32(999) // invalid nodeID
-		err := RWM.UpdateNewNode(DB, invalidNodeID)
-
-		if err != graph.ErrNodeNotFoundDB {
-			t.Errorf("UpdateNewNode(): expected %v, got %v", graph.ErrNodeNotFoundDB, err)
-		}
-	})
-
-	t.Run("positive UpdateNewNode", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		RWM, _ := NewRandomWalksManager(0.85, 3)
-		RWM.GenerateRandomWalks(DB)
-
-		newNodeID := uint32(1) // new node1 is added to the DB
-		DB.Nodes[newNodeID] = &graph.Node{ID: newNodeID, SuccessorIDs: []uint32{}}
-
-		err := RWM.UpdateNewNode(DB, newNodeID)
-		if err != nil {
-			t.Errorf("UpdateNewNode(): expected nil, got %v", err)
-		}
-
-		walkSet, err := RWM.WalksByNodeID(newNodeID)
-		if err != nil {
-			t.Errorf("UpdateNewNode(): expected nil, got %v", err)
-		}
-
-		want := []uint32{1}
-		for walk := range walkSet.Iter() {
-
-			if !reflect.DeepEqual(walk.NodeIDs, want) {
-				t.Fatalf("UpdateNewNode(): expected %v, got %v", want, walkSet)
-			}
-		}
-	})
-}
-
-func TestUpdateRandomWalks(t *testing.T) {
-
-	t.Run("negative UpdateRandomWalks, nil DB", func(t *testing.T) {
-
-		var DB *mock.MockDatabase //	nil DB
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		walk := RandomWalk{NodeIDs: []uint32{0}}
-		RWM.AddWalk(&walk)
-
-		err := RWM.UpdateRandomWalks(DB, 0, []uint32{}, []uint32{})
-
-		if err != graph.ErrNilDatabasePointer {
-			t.Errorf("UpdateRandomWalks(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
-		}
-	})
-
-	t.Run("negative UpdateRandomWalks, empty DB", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase() // empty DB
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		walk := RandomWalk{NodeIDs: []uint32{0}}
-		RWM.AddWalk(&walk)
-
-		err := RWM.UpdateRandomWalks(DB, 0, []uint32{}, []uint32{})
-
-		if err != graph.ErrDatabaseIsEmpty {
-			t.Errorf("UpdateRandomWalks(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
-		}
-	})
-
-	t.Run("negative UpdateRandomWalks, nil RWM", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		var RWM *RandomWalksManager // nil RWM
-		err := RWM.UpdateRandomWalks(DB, 0, []uint32{}, []uint32{})
-
-		if err != ErrNilRWMPointer {
-			t.Errorf("UpdateRandomWalks(): expected %v, got %v", ErrNilRWMPointer, err)
-		}
-	})
-
-	t.Run("negative UpdateRandomWalks, empty RWM", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
-		err := RWM.UpdateRandomWalks(DB, 0, []uint32{}, []uint32{})
-
-		if err != ErrEmptyRWM {
-			t.Errorf("UpdateRandomWalks(): expected %v, got %v", ErrEmptyRWM, err)
-		}
-	})
-
-	t.Run("negative UpdateRandomWalks, nodeID not in DB", func(t *testing.T) {
-
-		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-
-		RWM, _ := NewRandomWalksManager(0.85, 1)
-		RWM.GenerateRandomWalks(DB)
-
-		invalidNodeID := uint32(999) // invalid nodeID
-		err := RWM.UpdateRandomWalks(DB, invalidNodeID, []uint32{}, []uint32{})
-
-		if err != graph.ErrNodeNotFoundDB {
-			t.Errorf("UpdateRandomWalks(): expected %v, got %v", graph.ErrNodeNotFoundDB, err)
-		}
-	})
-}
-
 func TestUpdateRemovedNodes(t *testing.T) {
 
 	t.Run("positive updateRemovedNodes, empty removedIDs", func(t *testing.T) {
@@ -214,38 +34,35 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
-		// get the walkSet of node0
-		walkSet0, err := RWM.WalksByNodeID(0)
-		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
+		nodeIDs, _ := DB.AllNodeIDs()
+		for _, nodeID := range nodeIDs {
 
-		// should be unchanged
-		if !walkSet0.Equal(walkSet) {
-			t.Errorf("updateRemovedNodes(): expected %v, got %v", walkSet, walkSet0)
-		}
+			newWalkSet, err := RWM.WalksByNodeID(nodeID)
+			if err != nil {
+				t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
+			}
 
-		// get the walkSet of node1
-		walkSet1, err := RWM.WalksByNodeID(1)
-		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
-
-		// should be unchanged
-		if !walkSet1.Equal(walkSet) {
-			t.Errorf("updateRemovedNodes(): expected %v, got %v", walkSet, walkSet1)
+			// should be unchanged
+			if !newWalkSet.Equal(walkSet) {
+				t.Errorf("updateRemovedNodes(): expected %v, got %v", newWalkSet, walkSet)
+			}
 		}
 	})
 
 	t.Run("positive updateRemovedNodes, multiple removals", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 2)
+		RWM, _ := NewRandomWalksManager(0.85, 1)
 
-		// the old walks in the RWM:   0 --> 1; 0 --> 2
-		randomWalk1 := &RandomWalk{NodeIDs: []uint32{0, 1}}
-		randomWalk2 := &RandomWalk{NodeIDs: []uint32{0, 2}}
-		RWM.AddWalk(randomWalk1)
-		RWM.AddWalk(randomWalk2)
+		rWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1}}    // will be updated
+		rWalk3 := &RandomWalk{NodeIDs: []uint32{3, 0, 2}} // will be updated
+
+		rWalk1 := &RandomWalk{NodeIDs: []uint32{1}}
+		rWalk2 := &RandomWalk{NodeIDs: []uint32{2}}
+
+		RWM.AddWalk(rWalk0)
+		RWM.AddWalk(rWalk1)
+		RWM.AddWalk(rWalk2)
+		RWM.AddWalk(rWalk3)
 
 		nodeID := uint32(0)
 		newSuccessorIDs := []uint32{3}
@@ -254,53 +71,50 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		// the new database
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: newSuccessorIDs}
-		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{0}}
 		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{}}
 		DB.Nodes[3] = &graph.Node{ID: 3, SuccessorIDs: []uint32{0}}
 
-		rng := rand.New(rand.NewSource(69)) // for reproducibility
+		rng := rand.New(rand.NewSource(5)) // for reproducibility
+		expectedWalks := map[uint32][][]uint32{
+			0: {
+				{0, 3},
+				{3, 0},
+			},
+			1: {
+				{1},
+			},
+			2: {
+				{2},
+			},
+			3: {
+				{0, 3},
+				{3, 0},
+			},
+		}
 
 		err := RWM.updateRemovedNodes(DB, nodeID, removedIDs, rng)
 		if err != nil {
 			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
-		// get the walks of the node 0
-		walkSet0, err := RWM.WalksByNodeID(nodeID)
-		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
+		nodeIDs, _ := DB.AllNodeIDs()
+		for _, nodeID := range nodeIDs {
 
-		for walk := range walkSet0.Iter() {
-
-			// the new walk should be 0 --> 3 (the only possibility)
-			want := []uint32{0, 3}
-
-			if !reflect.DeepEqual(walk.NodeIDs, want) {
-				t.Errorf("updateRemovedNodes() nodeID %d: expected %v, got %v", nodeID, want, walk.NodeIDs)
+			walkSet, err := RWM.WalksByNodeID(nodeID)
+			if err != nil {
+				t.Fatalf("updateRemovedNodes() -> WalksByNodeID(%d): expected nil, got %v", nodeID, err)
 			}
-		}
 
-		// get the walks of the node 1
-		walkSet1, err := RWM.WalksByNodeID(1)
-		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
+			// dereference walks and sort them in lexicographic order
+			walks, err := sortWalks(walkSet)
+			if err != nil {
+				t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
+			}
 
-		// which should be empty
-		if walkSet1.Cardinality() > 0 {
-			t.Errorf("updateRemovedNodes(): nodeID %d: expected %v, got %v", 1, mapset.NewSet[*RandomWalk](), walkSet1)
-		}
-
-		// get the walks of the node 1
-		walkSet2, err := RWM.WalksByNodeID(2)
-		if err != nil {
-			t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
-
-		// which should be empty
-		if walkSet2.Cardinality() > 0 {
-			t.Errorf("updateRemovedNodes(): nodeID %d: expected %v, got %v", 1, mapset.NewSet[*RandomWalk](), walkSet2)
+			if !reflect.DeepEqual(walks, expectedWalks[nodeID]) {
+				t.Errorf("updateRemovedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalks[nodeID], walks)
+			}
 		}
 
 	})
@@ -330,45 +144,37 @@ func TestUpdateAddedNodes(t *testing.T) {
 			t.Errorf("updateAddedNodes(): expected nil, got %v", err)
 		}
 
-		// get the walkSet of node0
-		walkSet0, err := RWM.WalksByNodeID(0)
-		if err != nil {
-			t.Fatalf("updateAddedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
+		nodeIDs, _ := DB.AllNodeIDs()
+		for _, nodeID := range nodeIDs {
 
-		// should be unchanged
-		if !walkSet0.Equal(walkSet) {
-			t.Errorf("updateAddedNodes(): expected %v, got %v", walkSet, walkSet0)
-		}
+			newWalkSet, err := RWM.WalksByNodeID(nodeID)
+			if err != nil {
+				t.Fatalf("updateRemovedNodes() -> WalksByNodeID(): expected nil, got %v", err)
+			}
 
-		// get the walkSet of node1
-		walkSet1, err := RWM.WalksByNodeID(1)
-		if err != nil {
-			t.Fatalf("updateAddedNodes() -> WalksByNodeID(): expected nil, got %v", err)
-		}
-
-		// should be unchanged
-		if !walkSet1.Equal(walkSet) {
-			t.Errorf("updateAddedNodes(): expected %v, got %v", walkSet, walkSet1)
+			// should be unchanged
+			if !newWalkSet.Equal(walkSet) {
+				t.Errorf("updateRemovedNodes(): expected %v, got %v", newWalkSet, walkSet)
+			}
 		}
 	})
 
-	t.Run("positive updateAddedNodes, multiple addNodes", func(t *testing.T) {
+	t.Run("positive updateAddedNodes, multiple additions", func(t *testing.T) {
 
 		RWM, _ := NewRandomWalksManager(0.85, 1)
 
 		// the old walks in the RWM:   0 --> 1;
-		randomWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1}}
-		randomWalk1 := &RandomWalk{NodeIDs: []uint32{1}}
-		randomWalk2 := &RandomWalk{NodeIDs: []uint32{2}}
-		randomWalk3 := &RandomWalk{NodeIDs: []uint32{3, 0, 2}}
-		randomWalk4 := &RandomWalk{NodeIDs: []uint32{4}}
+		rWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1}}
+		rWalk1 := &RandomWalk{NodeIDs: []uint32{1}}
+		rWalk2 := &RandomWalk{NodeIDs: []uint32{2}}
+		rWalk3 := &RandomWalk{NodeIDs: []uint32{3, 0, 2}}
+		rWalk4 := &RandomWalk{NodeIDs: []uint32{4}}
 
-		RWM.AddWalk(randomWalk0)
-		RWM.AddWalk(randomWalk1)
-		RWM.AddWalk(randomWalk2)
-		RWM.AddWalk(randomWalk3)
-		RWM.AddWalk(randomWalk4)
+		RWM.AddWalk(rWalk0)
+		RWM.AddWalk(rWalk1)
+		RWM.AddWalk(rWalk2)
+		RWM.AddWalk(rWalk3)
+		RWM.AddWalk(rWalk4)
 
 		// the new successors of nodeID
 		nodeID := uint32(0)
@@ -386,37 +192,67 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		// for reproducibility
 		rng := rand.New(rand.NewSource(4))
-		expectedWalks := map[uint32][][]uint32{
+
+		// walkSet.Iter() returns the walk in an arbitrary order.
+		// Because there are two walks, there can be two expected results!
+		expectedWalks1 := map[uint32][][]uint32{
 			0: {
-				{0, 3},
-				{3, 0, 2},
+				{0, 4},
+				{3, 0},
 			},
 			1: {
 				{1},
 			},
 			2: {
 				{2},
-				{3, 0, 2},
 			},
 			3: {
-				{0, 3},
-				{3, 0, 2},
+				{3, 0},
 			},
 			4: {
+				{0, 4},
 				{4},
 			},
 		}
+
+		expectedWalks2 := map[uint32][][]uint32{
+			0: {
+				{0, 3},
+				{3, 0, 4},
+			},
+			1: {
+				{1},
+			},
+			2: {
+				{2},
+			},
+			3: {
+				{0, 3},
+				{3, 0, 4},
+			},
+			4: {
+				{3, 0, 4},
+				{4},
+			},
+		}
+
+		_ = expectedWalks2
 
 		err := RWM.updateAddedNodes(DB, nodeID, addedIDs, newOutDegree, rng)
 		if err != nil {
 			t.Fatalf("updateAddedNodes(): expected nil, got %v", err)
 		}
 
-		nodeIDs, err := DB.AllNodeIDs()
-		if err != nil {
-			t.Fatalf("updateAddedNodes() -> AllNodeIDs(): expected nil, got %v", err)
+		var expectedWalks map[uint32][][]uint32
+
+		// check which expectedWalk to use
+		if RWM.WalksByNode[3].Cardinality() == 1 {
+			expectedWalks = expectedWalks1
+		} else {
+			expectedWalks = expectedWalks2
 		}
 
+		nodeIDs, _ := DB.AllNodeIDs()
 		for _, nodeID := range nodeIDs {
 
 			walkSet, err := RWM.WalksByNodeID(nodeID)
@@ -427,32 +263,166 @@ func TestUpdateAddedNodes(t *testing.T) {
 			// dereference walks and sort them in lexicographic order
 			walks, err := sortWalks(walkSet)
 			if err != nil {
-				t.Errorf("GenerateRandomWalks(): expected nil, got %v", err)
+				t.Errorf("updateAddedNodes(): expected nil, got %v", err)
 			}
 
 			if !reflect.DeepEqual(walks, expectedWalks[nodeID]) {
-				t.Errorf("GenerateRandomWalks() nodeID = %d: expected %v, got %v", nodeID, expectedWalks[nodeID], walks)
+				t.Errorf("updateAddedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalks[nodeID], walks)
 			}
 		}
 	})
 
 }
 
-func TestNodeChanges(t *testing.T) {
+func TestUpdate(t *testing.T) {
 
-	oldIDs := []uint32{0, 1, 2, 4}
-	newIDs := []uint32{1, 2, 3}
+	t.Run("negative Update, nil DB", func(t *testing.T) {
 
-	removedIDs, addedIDs := nodeChanges(oldIDs, newIDs)
+		var DB *mock.MockDatabase //	nil DB
 
-	if removedIDs[0] != 0 || removedIDs[1] != 4 {
-		t.Errorf("expected [0, 4], got %v", removedIDs)
-	}
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		rWalk := RandomWalk{NodeIDs: []uint32{0}}
+		RWM.AddWalk(&rWalk)
 
-	if addedIDs[0] != 3 {
-		t.Errorf("expected 3, got %v", addedIDs[3])
-	}
+		err := RWM.Update(DB, 0, []uint32{}, []uint32{})
 
+		if err != graph.ErrNilDatabasePointer {
+			t.Errorf("Update(): expected %v, got %v", graph.ErrNilDatabasePointer, err)
+		}
+	})
+
+	t.Run("negative Update, empty DB", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase() // empty DB
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		rWalk := RandomWalk{NodeIDs: []uint32{0}}
+		RWM.AddWalk(&rWalk)
+
+		err := RWM.Update(DB, 0, []uint32{}, []uint32{})
+
+		if err != graph.ErrDatabaseIsEmpty {
+			t.Errorf("Update(): expected %v, got %v", graph.ErrDatabaseIsEmpty, err)
+		}
+	})
+
+	t.Run("negative Update, nil RWM", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		var RWM *RandomWalksManager // nil RWM
+		err := RWM.Update(DB, 0, []uint32{}, []uint32{})
+
+		if err != ErrNilRWMPointer {
+			t.Errorf("Update(): expected %v, got %v", ErrNilRWMPointer, err)
+		}
+	})
+
+	t.Run("negative Update, empty RWM", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
+		err := RWM.Update(DB, 0, []uint32{}, []uint32{})
+
+		if err != ErrEmptyRWM {
+			t.Errorf("Update(): expected %v, got %v", ErrEmptyRWM, err)
+		}
+	})
+
+	t.Run("negative Update, nodeID not in DB", func(t *testing.T) {
+
+		DB := mock.NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
+
+		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM.GenerateAll(DB)
+
+		invalidNodeID := uint32(999) // invalid nodeID
+		err := RWM.Update(DB, invalidNodeID, []uint32{}, []uint32{})
+
+		if err != graph.ErrNodeNotFoundDB {
+			t.Errorf("Update(): expected %v, got %v", graph.ErrNodeNotFoundDB, err)
+		}
+	})
+}
+
+func TestDifferences(t *testing.T) {
+
+	t.Run("positive, Differences", func(t *testing.T) {
+
+		oldSlice := []uint32{0, 1, 2, 4}
+		newSlice := []uint32{1, 2, 3}
+
+		removed, added := Differences(oldSlice, newSlice)
+
+		if removed[0] != 0 || removed[1] != 4 {
+			t.Errorf("expected [0, 4], got %v", removed)
+		}
+
+		if added[0] != 3 {
+			t.Errorf("expected 3, got %v", added[3])
+		}
+	})
+
+	t.Run("Differences, empty slices", func(t *testing.T) {
+
+		oldSlice := []uint32{}
+		newSlice := []uint32{}
+
+		removed, added := Differences(oldSlice, newSlice)
+
+		if removed == nil || len(removed) > 0 {
+			t.Errorf("Differences(): expected [], got %v", removed)
+		}
+
+		if added == nil || len(added) > 0 {
+			t.Errorf("Differences(): expected [], got %v", added)
+		}
+	})
+
+}
+
+func TestRemoveCycles(t *testing.T) {
+
+	t.Run("removeCycles, empty slices", func(t *testing.T) {
+
+		oldWalk := []uint32{}
+		newWalkSegment := []uint32{}
+
+		got := removeCycles(oldWalk, newWalkSegment)
+
+		if got == nil || len(got) > 0 {
+			t.Errorf("removeCycles(): expected [], got %v", got)
+		}
+	})
+
+	t.Run("removeCycles, immediate cycle", func(t *testing.T) {
+
+		oldWalk := []uint32{0, 1, 2, 3}
+		newWalkSegment := []uint32{3, 4, 5, 6}
+
+		got := removeCycles(oldWalk, newWalkSegment)
+
+		if got == nil || len(got) > 0 {
+			t.Errorf("removeCycles(): expected [], got %v", got)
+		}
+	})
+
+	t.Run("removeCycles, cycle", func(t *testing.T) {
+
+		oldWalk := []uint32{0, 1, 2, 3}
+		newWalkSegment := []uint32{4, 2, 6}
+
+		want := []uint32{4}
+		got := removeCycles(oldWalk, newWalkSegment)
+
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("removeCycles(): expected %v, got %v", want, got)
+		}
+	})
 }
 
 // ---------------------------------BENCHMARKS---------------------------------
@@ -461,57 +431,70 @@ func BenchmarkNodeChanges(b *testing.B) {
 
 	size := int32(10000)
 
-	oldIDs := make([]uint32, size)
-	newIDs := make([]uint32, size)
+	oldSlice := make([]uint32, size)
+	newSlice := make([]uint32, size)
 
 	// setup old and current IDs
 	for i := int32(0); i < size; i++ {
 
-		oldID := uint32(rand.Int31n(size * 2))
-		newID := uint32(rand.Int31n(size * 2))
+		old := uint32(rand.Int31n(size * 2))
+		new := uint32(rand.Int31n(size * 2))
 
-		oldIDs = append(oldIDs, oldID)
-		newIDs = append(newIDs, newID)
+		oldSlice = append(oldSlice, old)
+		newSlice = append(newSlice, new)
 	}
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		nodeChanges(oldIDs, newIDs)
+		Differences(oldSlice, newSlice)
 	}
 }
 
-// func BenchmarkUpdateRandomWalks(b *testing.B) {
+func BenchmarkUpdate(b *testing.B) {
 
-// 	DB := mock.NewMockDatabase()
+	// initial setup
+	nodeSize := 2000
+	edgePerNode := 100
+	DB := mock.GenerateMockDB(uint32(nodeSize), uint32(edgePerNode))
+	RWM, _ := NewRandomWalksManager(0.85, 10)
+	RWM.GenerateAll(DB)
 
-// 	oldIDs := make([]uint32, 5000)
-// 	currentIDs := make([]uint32, 5000)
+	// store the changes here
+	oldSuccessorMap := make(map[uint32][]uint32, nodeSize)
+	currentSuccessorMap := make(map[uint32][]uint32, nodeSize)
 
-// 	// setup old and current IDs
-// 	for i := 0; i < 5000; i++ {
-// 		oldIDs = append(oldIDs, uint32(i))
+	// a bunch of graph changes
+	for nodeID := uint32(0); nodeID < uint32(nodeSize); nodeID++ {
 
-// 		currentID := uint32(i + 2000)
-// 		currentIDs = append(currentIDs, currentID)
-// 		DB.Nodes[currentID] = &graph.Node{ID: currentID, SuccessorIDs: []uint32{}}
-// 	}
+		oldSuccessorIDs, _ := DB.NodeSuccessorIDs(nodeID)
+		currentSuccessorIDs := make([]uint32, len(oldSuccessorIDs))
+		copy(currentSuccessorIDs, oldSuccessorIDs)
 
-// 	nodeID := uint32(0)
-// 	DB.Nodes[nodeID] = &graph.Node{ID: nodeID, SuccessorIDs: currentIDs}
+		// change 10 successors
+		for i := 0; i < 10; i++ {
+			randomIndex := rand.Intn(len(currentSuccessorIDs))
+			newNode := rand.Intn(nodeSize)
+			currentSuccessorIDs[randomIndex] = uint32(newNode)
+		}
 
-// 	RWM, _ := NewRandomWalksManager(0.85, 1)
-// 	err := RWM.GenerateRandomWalks(DB)
-// 	if err != nil {
-// 		b.Fatalf("expected nil, got %v", err)
-// 	}
+		oldSuccessorMap[nodeID] = oldSuccessorIDs
+		currentSuccessorMap[nodeID] = currentSuccessorIDs
+	}
 
-// 	b.ResetTimer()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 
-// 	for i := 0; i < b.N; i++ {
-// 		err := RWM.UpdateRandomWalks(DB, nodeID, oldIDs)
-// 		if err != nil {
-// 			b.Fatalf("expected nil, got %v", err)
-// 		}
-// 	}
-// }
+		// perform benchmark
+		for nodeID := uint32(0); nodeID < uint32(nodeSize); nodeID++ {
+
+			oldSuccessorIDs := oldSuccessorMap[nodeID]
+			currentSuccessorIDs := currentSuccessorMap[nodeID]
+
+			err := RWM.Update(DB, nodeID, oldSuccessorIDs, currentSuccessorIDs)
+			if err != nil {
+				b.Fatalf("Update() failed: %v", err)
+			}
+		}
+	}
+}
