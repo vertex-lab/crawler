@@ -1,4 +1,4 @@
-module github.com/pippellia-btc/analytic_engine
+module github.com/pippellia-btc/Nostrcrawler
 
 go 1.23.1
 

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/pippellia-btc/analytic_engine/pkg/graph"
-	"github.com/pippellia-btc/analytic_engine/pkg/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
 )
 
 func TestUpdateRemovedNodes(t *testing.T) {

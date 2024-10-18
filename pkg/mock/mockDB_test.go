@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pippellia-btc/analytic_engine/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 )
 
 func TestCheckEmpty(t *testing.T) {

@@ -3,7 +3,7 @@ package mock
 import (
 	"math/rand"
 
-	"github.com/pippellia-btc/analytic_engine/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 )
 
 // MockDatabase simulates a simple in-memory database for testing.

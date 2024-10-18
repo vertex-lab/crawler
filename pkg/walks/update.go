@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/pippellia-btc/analytic_engine/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 )
 
 /*
