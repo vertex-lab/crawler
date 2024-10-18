@@ -2,10 +2,12 @@ package pagerank
 
 import (
 	"errors"
+	"math/rand"
 	"reflect"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
 )
 
 //------------------------------RANDOM-WALKS-TESTS------------------------------
@@ -567,15 +569,14 @@ func TestGraftWalk(t *testing.T) {
 
 func BenchmarkNeedsUpdate(b *testing.B) {
 
-	rWalk := &RandomWalk{NodeIDs: []uint32{10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}}
+	rWalk := &RandomWalk{NodeIDs: []uint32{0, 1, 2, 3, 4, 5, 6}}
 	nodeID := uint32(2)
 
-	// setup unusually big removedNodes
+	// setup unusually big removedNodes, in opposite order for worst case scenario
 	removedNodes := make([]uint32, 101)
 	for i := uint32(0); i < 100; i++ {
-		removedNodes = append(removedNodes, 100-i)
+		removedNodes[i] = 100 - i
 	}
-	removedNodes = append(removedNodes, 1) // worst case scenario
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -584,26 +585,29 @@ func BenchmarkNeedsUpdate(b *testing.B) {
 }
 
 func BenchmarkAddWalk(b *testing.B) {
-	RWM, err := NewRandomWalksManager(0.85, 1)
-	if err != nil {
-		b.Fatalf("BenchmarkAddWalk(): failed to initialize RWM: %v", err)
-	}
+
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	RWM, _ := NewRandomWalksManager(0.85, 1)
 
 	// setup the walks
-	walkPointers := []*RandomWalk{}
+	rWalks := []*RandomWalk{}
 	for i := uint32(0); i < uint32(b.N); i++ {
 
-		// simple walk pattern
-		nodeIDs := []uint32{i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6}
-		walk := &RandomWalk{NodeIDs: nodeIDs}
-		walkPointers = append(walkPointers, walk)
+		startingNodeID := uint32(rng.Intn(nodesSize))
+		walk, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		rWalk := &RandomWalk{NodeIDs: walk}
+		rWalks = append(rWalks, rWalk)
 	}
 
 	b.ResetTimer()
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		err := RWM.AddWalk(walkPointers[i])
+		err := RWM.AddWalk(rWalks[i])
 
 		if err != nil {
 			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
@@ -612,29 +616,32 @@ func BenchmarkAddWalk(b *testing.B) {
 }
 
 func BenchmarkPruneWalk(b *testing.B) {
-	RWM, err := NewRandomWalksManager(0.85, 1)
-	if err != nil {
-		b.Fatalf("Failed to initialize RandomWalksManager: %v", err)
-	}
 
-	// setup the walks and RWM
-	walkPointers := []*RandomWalk{}
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	RWM, _ := NewRandomWalksManager(0.85, 1)
+
+	// setup the walks
+	rWalks := []*RandomWalk{}
 	for i := uint32(0); i < uint32(b.N); i++ {
 
-		// simple walk pattern
-		nodeIDs := []uint32{i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6}
-		walk := &RandomWalk{NodeIDs: nodeIDs}
+		startingNodeID := uint32(rng.Intn(nodesSize))
+		walk, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		rWalk := &RandomWalk{NodeIDs: walk}
+		RWM.AddWalk(rWalk)
 
-		walkPointers = append(walkPointers, walk)
-		RWM.AddWalk(walk)
+		rWalks = append(rWalks, rWalk)
 	}
 
 	b.ResetTimer()
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		RWM.PruneWalk(walkPointers[i], 0)
 
+		err := RWM.PruneWalk(rWalks[i], 0)
 		if err != nil {
 			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
 		}
@@ -642,20 +649,27 @@ func BenchmarkPruneWalk(b *testing.B) {
 }
 
 func BenchmarkGraftWalk(b *testing.B) {
-	RWM, err := NewRandomWalksManager(0.85, 1)
-	if err != nil {
-		b.Fatalf("BenchmarkAddWalk(): failed to initialize RWM: %v", err)
-	}
 
-	walk := &RandomWalk{NodeIDs: []uint32{0}}
-	RWM.AddWalk(walk)
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	RWM, _ := NewRandomWalksManager(0.85, 1)
 
-	// setup the walk segments
+	// setup the walks and walk segments
+	rWalks := []*RandomWalk{}
 	walkSegments := [][]uint32{}
 	for i := uint32(0); i < uint32(b.N); i++ {
 
-		// simple walk pattern
-		walkSegment := []uint32{i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6}
+		startingNodeID := uint32(rng.Intn(nodesSize))
+		walk, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		rWalk := &RandomWalk{NodeIDs: walk}
+		RWM.AddWalk(rWalk)
+		rWalks = append(rWalks, rWalk)
+
+		startingNodeID = uint32(rng.Intn(nodesSize))
+		walkSegment, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
 		walkSegments = append(walkSegments, walkSegment)
 	}
 
@@ -663,8 +677,8 @@ func BenchmarkGraftWalk(b *testing.B) {
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		err := RWM.GraftWalk(walk, walkSegments[i])
 
+		err := RWM.GraftWalk(rWalks[i], walkSegments[i])
 		if err != nil {
 			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
 		}

@@ -429,7 +429,7 @@ func TestRemoveCycles(t *testing.T) {
 
 func BenchmarkNodeChanges(b *testing.B) {
 
-	size := int32(10000)
+	size := int32(1000)
 
 	oldSlice := make([]uint32, size)
 	newSlice := make([]uint32, size)
@@ -451,43 +451,47 @@ func BenchmarkNodeChanges(b *testing.B) {
 	}
 }
 
-func BenchmarkUpdate(b *testing.B) {
+func BenchmarkUpdateAdd(b *testing.B) {
 
 	// initial setup
-	nodeSize := 2000
-	edgePerNode := 100
-	DB := mock.GenerateMockDB(uint32(nodeSize), uint32(edgePerNode))
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+
 	RWM, _ := NewRandomWalksManager(0.85, 10)
 	RWM.GenerateAll(DB)
 
 	// store the changes here
-	oldSuccessorMap := make(map[uint32][]uint32, nodeSize)
-	currentSuccessorMap := make(map[uint32][]uint32, nodeSize)
+	oldSuccessorMap := make(map[uint32][]uint32, nodesSize)
+	currentSuccessorMap := make(map[uint32][]uint32, nodesSize)
 
-	// a bunch of graph changes
-	for nodeID := uint32(0); nodeID < uint32(nodeSize); nodeID++ {
+	b.Run("Update(), 10% new successors", func(b *testing.B) {
 
-		oldSuccessorIDs, _ := DB.NodeSuccessorIDs(nodeID)
-		currentSuccessorIDs := make([]uint32, len(oldSuccessorIDs))
-		copy(currentSuccessorIDs, oldSuccessorIDs)
+		// prepare the graph changes
+		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
 
-		// change 10 successors
-		for i := 0; i < 10; i++ {
-			randomIndex := rand.Intn(len(currentSuccessorIDs))
-			newNode := rand.Intn(nodeSize)
-			currentSuccessorIDs[randomIndex] = uint32(newNode)
+			oldSuccessorIDs, _ := DB.NodeSuccessorIDs(nodeID)
+			currentSuccessorIDs := make([]uint32, len(oldSuccessorIDs))
+			copy(currentSuccessorIDs, oldSuccessorIDs)
+
+			// add 10% new nodes
+			for i := 0; i < edgesPerNode/10; i++ {
+
+				newNode := uint32(rng.Intn(nodesSize))
+				currentSuccessorIDs = append(currentSuccessorIDs, newNode)
+			}
+
+			oldSuccessorMap[nodeID] = oldSuccessorIDs
+			currentSuccessorMap[nodeID] = currentSuccessorIDs
 		}
 
-		oldSuccessorMap[nodeID] = oldSuccessorIDs
-		currentSuccessorMap[nodeID] = currentSuccessorIDs
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+		b.ResetTimer()
 
 		// perform benchmark
-		for nodeID := uint32(0); nodeID < uint32(nodeSize); nodeID++ {
+		for i := 0; i < b.N; i++ {
 
+			nodeID := uint32(i % nodesSize)
 			oldSuccessorIDs := oldSuccessorMap[nodeID]
 			currentSuccessorIDs := currentSuccessorMap[nodeID]
 
@@ -496,5 +500,64 @@ func BenchmarkUpdate(b *testing.B) {
 				b.Fatalf("Update() failed: %v", err)
 			}
 		}
-	}
+	})
+}
+
+/*
+!IMPORTANT!
+
+run this benchmark with:
+
+> -benchtime=nodesSizex
+
+each node should only be updated once. Each subsequent update will be
+much cheaper because no walk will need an update, thus compromizing the measurement
+*/
+func BenchmarkUpdateRemove(b *testing.B) {
+
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+
+	RWM, _ := NewRandomWalksManager(0.85, 10)
+	RWM.GenerateAll(DB)
+
+	// store the changes here
+	oldSuccessorMap := make(map[uint32][]uint32, nodesSize)
+	currentSuccessorMap := make(map[uint32][]uint32, nodesSize)
+
+	b.Run("Update(), 10% removed successors", func(b *testing.B) {
+
+		// prepare the graph changes
+		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
+
+			oldSuccessorIDs, _ := DB.NodeSuccessorIDs(nodeID)
+			currentSuccessorIDs := make([]uint32, len(oldSuccessorIDs)-edgesPerNode/10)
+
+			// remove 10% of the nodes
+			copy(currentSuccessorIDs, oldSuccessorIDs[edgesPerNode/10:])
+
+			oldSuccessorMap[nodeID] = oldSuccessorIDs
+			currentSuccessorMap[nodeID] = currentSuccessorIDs
+		}
+
+		b.ResetTimer()
+
+		// perform benchmark
+		for i := 0; i < b.N; i++ {
+
+			nodeID := uint32(i % nodesSize)
+			oldSuccessorIDs := oldSuccessorMap[nodeID]
+			currentSuccessorIDs := currentSuccessorMap[nodeID]
+
+			err := RWM.Update(DB, nodeID, oldSuccessorIDs, currentSuccessorIDs)
+			if err != nil {
+				b.Fatalf("Update() failed: %v", err)
+			}
+
+		}
+	})
+
 }

@@ -82,18 +82,18 @@ func (DB *MockDatabase) AllNodeIDs() ([]uint32, error) {
 
 // Helper function that generates a random database of a specified number of nodes
 // and successors per node
-func GenerateMockDB(nodesNum uint32, successorsPerNode uint32) *MockDatabase {
+func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockDatabase {
 
 	DB := NewMockDatabase()
-	for i := uint32(0); i < nodesNum; i++ {
+	for i := 0; i < nodesNum; i++ {
 
 		// create random successors
 		random_successors := make([]uint32, successorsPerNode)
-		for j := uint32(0); j < successorsPerNode; j++ {
-			random_successors[j] = uint32(rand.Intn(int(nodesNum)))
+		for j := 0; j < successorsPerNode; j++ {
+			random_successors[j] = uint32(rng.Intn(int(nodesNum)))
 		}
 
-		DB.Nodes[i] = &graph.Node{ID: i, SuccessorIDs: random_successors}
+		DB.Nodes[uint32(i)] = &graph.Node{ID: uint32(i), SuccessorIDs: random_successors}
 	}
 
 	return DB

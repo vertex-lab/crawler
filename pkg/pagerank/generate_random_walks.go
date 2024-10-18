@@ -93,8 +93,7 @@ func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 			}
 
 			// add the RandomWalk's pointer to the RWM
-			rWalk := RandomWalk{NodeIDs: walk}
-			RWM.AddWalk(&rWalk)
+			RWM.AddWalk(&RandomWalk{NodeIDs: walk})
 		}
 	}
 

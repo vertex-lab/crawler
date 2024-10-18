@@ -302,19 +302,52 @@ func TestGenerateAll(t *testing.T) {
 
 func BenchmarkGenerateWalk(b *testing.B) {
 
-	DB := mock.GenerateMockDB(10000, 100)
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		generateWalk(DB, 0, 0.85, rng)
+
+		_, err := generateWalk(DB, 0, 0.85, rng)
+		if err != nil {
+			b.Fatalf("generateWalk() failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkGenerateRandomWalks(b *testing.B) {
+
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	RWM, _ := NewRandomWalksManager(0.85, 10)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+
+		err := RWM.generateRandomWalks(DB, []uint32{0}, rng)
+		if err != nil {
+			b.Fatalf("Generate() failed: %v", err)
+		}
 	}
 }
 
 func BenchmarkGenerateAll(b *testing.B) {
 
-	DB := mock.GenerateMockDB(2000, 100)
-	b.ResetTimer() // to exclude the time to set up
+	// initial setup
+	nodesSize := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 
