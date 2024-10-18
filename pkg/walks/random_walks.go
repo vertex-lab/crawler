@@ -93,7 +93,7 @@ type RandomWalksManager struct {
 }
 
 // Creates a new RandomWalksManager
-func NewRandomWalksManager(alpha float32, walksPerNode uint16) (*RandomWalksManager, error) {
+func NewRWM(alpha float32, walksPerNode uint16) (*RandomWalksManager, error) {
 
 	if alpha <= 0 || alpha >= 1 {
 		return nil, ErrInvalidAlpha

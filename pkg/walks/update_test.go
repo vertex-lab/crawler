@@ -8,7 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pippellia-btc/analytic_engine/pkg/graph"
-	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
+	"github.com/pippellia-btc/analytic_engine/pkg/mock"
 )
 
 func TestUpdateRemovedNodes(t *testing.T) {
@@ -22,7 +22,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		nodeID := uint32(0)
 		removedIDs := []uint32{} // empty slice
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0, 1}})
 
 		RWM.WalksByNode[nodeID] = walkSet
@@ -51,7 +51,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 	t.Run("positive updateRemovedNodes, multiple removals", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 
 		rWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1}}    // will be updated
 		rWalk3 := &RandomWalk{NodeIDs: []uint32{3, 0, 2}} // will be updated
@@ -132,7 +132,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 		nodeID := uint32(0)
 		addedIDs := []uint32{} // empty slice
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0, 1}})
 
 		RWM.WalksByNode[nodeID] = walkSet
@@ -161,7 +161,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 	t.Run("positive updateAddedNodes, multiple additions", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 
 		// the old walks in the RWM:   0 --> 1;
 		rWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1}}
@@ -280,7 +280,7 @@ func TestUpdate(t *testing.T) {
 
 		var DB *mock.MockDatabase //	nil DB
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		rWalk := RandomWalk{NodeIDs: []uint32{0}}
 		RWM.AddWalk(&rWalk)
 
@@ -295,7 +295,7 @@ func TestUpdate(t *testing.T) {
 
 		DB := mock.NewMockDatabase() // empty DB
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		rWalk := RandomWalk{NodeIDs: []uint32{0}}
 		RWM.AddWalk(&rWalk)
 
@@ -324,7 +324,7 @@ func TestUpdate(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
+		RWM, _ := NewRWM(0.85, 1) // empty RWM
 		err := RWM.Update(DB, 0, []uint32{}, []uint32{})
 
 		if err != ErrEmptyRWM {
@@ -337,7 +337,7 @@ func TestUpdate(t *testing.T) {
 		DB := mock.NewMockDatabase()
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		RWM.GenerateAll(DB)
 
 		invalidNodeID := uint32(999) // invalid nodeID
@@ -459,7 +459,7 @@ func BenchmarkUpdateAdd(b *testing.B) {
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
 
-	RWM, _ := NewRandomWalksManager(0.85, 10)
+	RWM, _ := NewRWM(0.85, 10)
 	RWM.GenerateAll(DB)
 
 	// store the changes here
@@ -521,7 +521,7 @@ func BenchmarkUpdateRemove(b *testing.B) {
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
 
-	RWM, _ := NewRandomWalksManager(0.85, 10)
+	RWM, _ := NewRWM(0.85, 10)
 	RWM.GenerateAll(DB)
 
 	// store the changes here

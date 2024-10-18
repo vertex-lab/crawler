@@ -2,22 +2,27 @@ package graph
 
 import "errors"
 
+// defines the basic structure of a node in the graph
+type Node struct {
+	ID           uint32   // unique identifier
+	SuccessorIDs []uint32 // List of nodes it follows
+}
+
 /*
-The Database interface abstracts the db basic functions, so I can develop
-the analytics engine without relaying on a specific database
+The Database interface abstracts the DB basic functions
 */
 type Database interface {
 
-	// CheckEmpty returns the appropriate error if the db is nil or has no nodes
+	// CheckEmpty returns the appropriate error if the DB is nil or has no nodes
 	CheckEmpty() error
 
-	// FetchNodeByID retrieves a node by ID from the db
+	// NodeByID retrieves a node by ID from the DB
 	NodeByID(ID uint32) (*Node, error)
 
-	// GetNodesuccessorIDs returns a slice that contains the ids of all successors of a node
+	// NodeSuccessorIDs returns a slice that contains the IDs of all successors of a node
 	NodeSuccessorIDs(ID uint32) ([]uint32, error)
 
-	// GetAllNodeIDs returns a slice with the ids of all nodes in the db
+	// AllNodeIDs returns a slice with the IDss of all nodes in the DB
 	AllNodeIDs() ([]uint32, error)
 }
 

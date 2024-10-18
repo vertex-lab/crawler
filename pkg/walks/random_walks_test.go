@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	mock "github.com/pippellia-btc/analytic_engine/pkg/mock_database"
+	"github.com/pippellia-btc/analytic_engine/pkg/mock"
 )
 
 //------------------------------RANDOM-WALKS-TESTS------------------------------
@@ -119,53 +119,53 @@ func TestNeedsUpdate(t *testing.T) {
 
 func TestNewRandomWalksManager(t *testing.T) {
 
-	t.Run("negative NewRandomWalksManager, invalid alphas", func(t *testing.T) {
+	t.Run("negative NewRWM, invalid alphas", func(t *testing.T) {
 
 		invalidAlphas := []float32{1.01, 1.0, -0.1, -2}
 		for _, alpha := range invalidAlphas {
 
-			RWM, err := NewRandomWalksManager(alpha, 1)
+			RWM, err := NewRWM(alpha, 1)
 
 			if !errors.Is(err, ErrInvalidAlpha) {
-				t.Errorf("NewRandomWalksManager(%f,1): expected %v, got %v", alpha, ErrInvalidAlpha, err)
+				t.Errorf("NewRWM(%f,1): expected %v, got %v", alpha, ErrInvalidAlpha, err)
 			}
 
 			if RWM != nil {
-				t.Errorf("NewRandomWalksManager(%f,1): expected nil, got %v", alpha, RWM)
+				t.Errorf("NewRWM(%f,1): expected nil, got %v", alpha, RWM)
 			}
 		}
 	})
 
-	t.Run("negative NewRandomWalksManager, invalid walkPerNode", func(t *testing.T) {
+	t.Run("negative NewRWM, invalid walkPerNode", func(t *testing.T) {
 
 		walksPerNode := uint16(0) // invalid walksPerNode
-		RWM, err := NewRandomWalksManager(0.85, walksPerNode)
+		RWM, err := NewRWM(0.85, walksPerNode)
 
 		if !errors.Is(err, ErrInvalidWalksPerNode) {
-			t.Errorf("NewRandomWalksManager(0.85,0): expected %v, got %v", ErrInvalidWalksPerNode, err)
+			t.Errorf("NewRWM(0.85,0): expected %v, got %v", ErrInvalidWalksPerNode, err)
 		}
 
 		if RWM != nil {
-			t.Errorf("NewRandomWalksManager(0.85,0): expected nil, got %v", RWM)
+			t.Errorf("NewRWM(0.85,0): expected nil, got %v", RWM)
 		}
 	})
 
-	t.Run("positive NewRandomWalksManager", func(t *testing.T) {
+	t.Run("positive NewRWM", func(t *testing.T) {
 
 		alpha := float32(0.85)
 		walksPerNode := uint16(1)
 
-		RWM, err := NewRandomWalksManager(alpha, walksPerNode)
+		RWM, err := NewRWM(alpha, walksPerNode)
 		if err != nil {
-			t.Errorf("NewRandomWalksManager(): expected nil, got %v", err)
+			t.Errorf("NewRWM(): expected nil, got %v", err)
 		}
 
 		if RWM.alpha != alpha {
-			t.Errorf("NewRandomWalksManager(): expected %v, got %v", alpha, RWM.alpha)
+			t.Errorf("NewRWM(): expected %v, got %v", alpha, RWM.alpha)
 		}
 
 		if RWM.walksPerNode != walksPerNode {
-			t.Errorf("NewRandomWalksManager(): expected %v, got %v", walksPerNode, RWM.walksPerNode)
+			t.Errorf("NewRWM(): expected %v, got %v", walksPerNode, RWM.walksPerNode)
 		}
 	})
 }
@@ -184,7 +184,7 @@ func TestIsEmpty(t *testing.T) {
 
 	t.Run("IsEmpty, empty RWM", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		empty := RWM.IsEmpty()
 
 		if empty != true {
@@ -194,7 +194,7 @@ func TestIsEmpty(t *testing.T) {
 
 	t.Run("IsEmpty, non-empty RWM", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1, 2}})
 		RWM.WalksByNode[1] = walkSet
 
@@ -221,7 +221,7 @@ func TestCheckState(t *testing.T) {
 
 	t.Run("negative CheckState, empty RWM, expected non-empty", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		expectEmptyRWM := false
 		err := RWM.CheckState(expectEmptyRWM)
 
@@ -232,7 +232,7 @@ func TestCheckState(t *testing.T) {
 
 	t.Run("negative CheckState, non-empty RWM, expected empty", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1, 2}})
 		RWM.WalksByNode[1] = walkSet
 
@@ -246,7 +246,7 @@ func TestCheckState(t *testing.T) {
 
 	t.Run("positive CheckState, empty RWM, expected empty", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		expectEmptyRWM := true
 		err := RWM.CheckState(expectEmptyRWM)
 
@@ -257,7 +257,7 @@ func TestCheckState(t *testing.T) {
 
 	t.Run("positive CheckState, non-empty RWM, expected non-empty", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1, 2}})
 		RWM.WalksByNode[1] = walkSet
 
@@ -288,7 +288,7 @@ func TestWalksByNodeID(t *testing.T) {
 
 	t.Run("negative WalksByNodeID, empty RWM", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		got, err := RWM.WalksByNodeID(1)
 
 		if !errors.Is(err, ErrEmptyRWM) {
@@ -303,7 +303,7 @@ func TestWalksByNodeID(t *testing.T) {
 	t.Run("negative WalksByNodeID, node not found", func(t *testing.T) {
 
 		// create non empty RWM
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{}})
 		RWM.WalksByNode[0] = walkSet
 
@@ -320,7 +320,7 @@ func TestWalksByNodeID(t *testing.T) {
 
 	t.Run("positive WalksByNodeID", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0, 1}})
 		RWM.WalksByNode[0] = walkSet
 
@@ -352,7 +352,7 @@ func TestAddWalk(t *testing.T) {
 	})
 
 	t.Run("negative AddWalk, nil walk", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 
 		err := RWM.AddWalk(nil)
 
@@ -362,7 +362,7 @@ func TestAddWalk(t *testing.T) {
 	})
 
 	t.Run("negative AddWalk, empty walk", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		emptyWalk := RandomWalk{NodeIDs: []uint32{}}
 
 		err := RWM.AddWalk(&emptyWalk)
@@ -374,7 +374,7 @@ func TestAddWalk(t *testing.T) {
 
 	t.Run("positive AddWalk", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walk := RandomWalk{NodeIDs: []uint32{1, 2}}
 
 		// should add the walk to all nodes that are part of it
@@ -408,7 +408,7 @@ func TestPruneWalk(t *testing.T) {
 	})
 
 	t.Run("negative PruneWalk, empty RWM", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1) // empty RWM
+		RWM, _ := NewRWM(0.85, 1) // empty RWM
 
 		err := RWM.PruneWalk(&RandomWalk{NodeIDs: []uint32{1, 2}}, 0)
 
@@ -418,7 +418,7 @@ func TestPruneWalk(t *testing.T) {
 	})
 
 	t.Run("negative PruneWalk, nil walk", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
 
 		err := RWM.PruneWalk(nil, 0) // nil walk
@@ -429,7 +429,7 @@ func TestPruneWalk(t *testing.T) {
 	})
 
 	t.Run("negative PruneWalk, empty walk", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
 
 		emptyWalk := RandomWalk{NodeIDs: []uint32{}} // empty walk
@@ -441,7 +441,7 @@ func TestPruneWalk(t *testing.T) {
 	})
 
 	t.Run("negative PruneWalk, invalid cutIndex", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walk := RandomWalk{NodeIDs: []uint32{1, 2}}
 		RWM.AddWalk(&walk)
 
@@ -458,7 +458,7 @@ func TestPruneWalk(t *testing.T) {
 
 	t.Run("positive PruneWalk", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walk := RandomWalk{NodeIDs: []uint32{5, 7}}
 		RWM.AddWalk(&walk)
 
@@ -495,7 +495,7 @@ func TestGraftWalk(t *testing.T) {
 
 	t.Run("negative GraftWalk, empty RWM", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 
 		walk := RandomWalk{NodeIDs: []uint32{0}}
 		newNodeIDs := []uint32{1, 2}
@@ -508,7 +508,7 @@ func TestGraftWalk(t *testing.T) {
 	})
 
 	t.Run("negative GraftWalk, nil walk", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
 
 		err := RWM.GraftWalk(nil, []uint32{0}) // nil walk
@@ -519,7 +519,7 @@ func TestGraftWalk(t *testing.T) {
 	})
 
 	t.Run("negative GraftWalk, empty walk", func(t *testing.T) {
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		RWM.AddWalk(&RandomWalk{NodeIDs: []uint32{1, 2}})
 
 		emptyWalk := RandomWalk{NodeIDs: []uint32{}} // empty walk
@@ -532,7 +532,7 @@ func TestGraftWalk(t *testing.T) {
 
 	t.Run("positive GraftWalk", func(t *testing.T) {
 
-		RWM, _ := NewRandomWalksManager(0.85, 1)
+		RWM, _ := NewRWM(0.85, 1)
 		walk := &RandomWalk{NodeIDs: []uint32{0}}
 		RWM.AddWalk(walk)
 
@@ -591,7 +591,7 @@ func BenchmarkAddWalk(b *testing.B) {
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
-	RWM, _ := NewRandomWalksManager(0.85, 1)
+	RWM, _ := NewRWM(0.85, 1)
 
 	// setup the walks
 	rWalks := []*RandomWalk{}
@@ -622,7 +622,7 @@ func BenchmarkPruneWalk(b *testing.B) {
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
-	RWM, _ := NewRandomWalksManager(0.85, 1)
+	RWM, _ := NewRWM(0.85, 1)
 
 	// setup the walks
 	rWalks := []*RandomWalk{}
@@ -655,7 +655,7 @@ func BenchmarkGraftWalk(b *testing.B) {
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
-	RWM, _ := NewRandomWalksManager(0.85, 1)
+	RWM, _ := NewRWM(0.85, 1)
 
 	// setup the walks and walk segments
 	rWalks := []*RandomWalk{}
