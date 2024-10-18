@@ -1,4 +1,4 @@
-package pagerank
+package walks
 
 import (
 	"math/rand"

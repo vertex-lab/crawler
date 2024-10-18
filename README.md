@@ -1,21 +1,26 @@
-# Analytics Engine for a graph
+# Nostrcrawler
 
-The goal of this project is to efficiently generate random walks for the underlying graph, and keep them updated over time.
+The goals of this project are
+
+1. Crawl the nostr network 24/7/365, looking for follow lists (kind3s).
+
+2. Quicky estimate whether these new followlists should be added to the DB or not, based on the author's rank.
+
+3. Generate random walks for the nodes in the graph, and keep them updated all the time.
+
+4. Use these random walks to efficiently compute acyclic Monte Carlo Pageranks (personalized and normal).
 
 This project implements the algorithms described in [this paper](http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf)
 
 ## Structure
 
-`/cmd/app/main.go`: the main function, that should:
-- generate the random walks upon restart
-- listen to graph updates (e.g. a node is added, or a node has changed it's out-edges)
-- recompute the random walks
+`/cmd/app/main.go`: the main function, which should
+- generate the random walks on restart
+- listen for graph updates (e.g. a node is added, or a node has changed it's out-edges)
+- update the random walks
 
-`/pkg/graph/`: includes `database.go` and `graph.go` which describe the database
-interface and the graph struct.
+`/pkg/graph/`: includes `database.go` which describes the database interface and the node struct.
 
-`/mock_database/mock_database.go`: creates a mock database structure that is 
-used to test other functions by simulating calls to a database
+`/pkg/walks/`: contains the definitions of the fundamental structures of `RandomWalk` and `RandomWalksManager` and the algorithms that deal with generating and updating them.
 
-`/pagerank/random_walks.go`: creates the RandomWalksMap function, used to store
-and access random walks in memory
+`/pkg/pagerank/`: contains the definitions of all algorithms that use random walks, such as pagerank and personalized pagerank.
