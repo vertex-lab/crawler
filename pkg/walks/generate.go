@@ -169,13 +169,5 @@ func checkInputs(RWM *RandomWalksManager, DB graph.Database, expectEmptyRWM bool
 		return err
 	}
 
-	if RWM.alpha <= 0 || RWM.alpha >= 1 {
-		return ErrInvalidAlpha
-	}
-
-	if RWM.walksPerNode <= 0 {
-		return ErrInvalidWalksPerNode
-	}
-
 	return nil
 }

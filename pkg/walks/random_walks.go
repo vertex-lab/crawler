@@ -117,12 +117,20 @@ func (RWM *RandomWalksManager) IsEmpty() bool {
 	return RWM == nil || len(RWM.WalksByNode) == 0
 }
 
-// CheckState checks whether the RWM is nil, empty or non-empty and returns
-// an appropriate error based on the requirement
+// checks the fields alpha, walksPerNode and whether the RWM is nil, empty or
+// non-empty and returns an appropriate error based on the requirement
 func (RWM *RandomWalksManager) CheckState(expectEmptyRWM bool) error {
 
 	if RWM == nil {
 		return ErrNilRWMPointer
+	}
+
+	if RWM.alpha <= 0 || RWM.alpha >= 1 {
+		return ErrInvalidAlpha
+	}
+
+	if RWM.walksPerNode <= 0 {
+		return ErrInvalidWalksPerNode
 	}
 
 	if len(RWM.WalksByNode) == 0 && !expectEmptyRWM {

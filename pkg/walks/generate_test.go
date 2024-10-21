@@ -3,7 +3,6 @@ package walks
 import (
 	"math/rand"
 	"reflect"
-	"sort"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -300,6 +299,8 @@ func TestGenerateAll(t *testing.T) {
 
 }
 
+// ---------------------------------BENCHMARKS---------------------------------
+
 func BenchmarkGenerateWalk(b *testing.B) {
 
 	// initial setup
@@ -357,38 +358,4 @@ func BenchmarkGenerateAll(b *testing.B) {
 			b.Fatalf("GenerateAll() failed: %v", err)
 		}
 	}
-}
-
-//--------------------------------HELPER-FUNCTION-------------------------------
-
-// dereferences the random walks and sorts them in lexicographic order
-func sortWalks(walkSet WalkSet) ([][]uint32, error) {
-
-	walkPointers := walkSet.ToSlice()
-
-	if len(walkPointers) == 0 {
-		return nil, ErrEmptyRandomWalk
-	}
-
-	// dereferencing the slice of pointers
-	walks := [][]uint32{}
-
-	for _, walk_pointer := range walkPointers {
-		walks = append(walks, walk_pointer.NodeIDs)
-	}
-
-	// Sort the walks lexicographically
-	sort.Slice(walks, func(i, j int) bool {
-		// Compare slices lexicographically
-		for x := 0; x < len(walks[i]) && x < len(walks[j]); x++ {
-			if walks[i][x] < walks[j][x] {
-				return true
-			} else if walks[i][x] > walks[j][x] {
-				return false
-			}
-		}
-		return len(walks[i]) < len(walks[j])
-	})
-
-	return walks, nil
 }

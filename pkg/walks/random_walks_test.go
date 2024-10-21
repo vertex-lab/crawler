@@ -219,6 +219,38 @@ func TestCheckState(t *testing.T) {
 
 	})
 
+	t.Run("negative CheckState, invalid alphas", func(t *testing.T) {
+
+		invalidAlphas := []float32{0.0, 1.1, -3}
+		expectEmptyRWM := true
+
+		for _, alpha := range invalidAlphas {
+
+			RWM, _ := NewRWM(0.85, 1)
+			RWM.alpha = alpha
+
+			err := RWM.CheckState(expectEmptyRWM)
+			if !errors.Is(err, ErrInvalidAlpha) {
+				t.Errorf("CheckState(): expected %v, got %v", ErrInvalidAlpha, err)
+			}
+		}
+	})
+
+	t.Run("negative CheckState, invalid walksPerNode", func(t *testing.T) {
+
+		invalidWalksPerNode := uint16(0)
+		expectEmptyRWM := true
+
+		RWM, _ := NewRWM(0.85, 1)
+		RWM.walksPerNode = invalidWalksPerNode
+
+		err := RWM.CheckState(expectEmptyRWM)
+		if !errors.Is(err, ErrInvalidWalksPerNode) {
+			t.Errorf("CheckState(): expected %v, got %v", ErrInvalidWalksPerNode, err)
+		}
+
+	})
+
 	t.Run("negative CheckState, empty RWM, expected non-empty", func(t *testing.T) {
 
 		RWM, _ := NewRWM(0.85, 1)
