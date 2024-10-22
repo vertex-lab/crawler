@@ -6,21 +6,23 @@ import (
 )
 
 /*
-returns removed and added elements, using set notation:
+returns removed, commond and added elements, using set notation:
 
 removed = oldSlice - newSlice
+common = oldSlice ^ newSlice
 added = newSlice - oldSlice
 
 Time complexity O(n * logn + m * logm), where n and m are the lengths of the slices.
 This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
 */
-func Differences(oldSlice, newSlice []uint32) ([]uint32, []uint32) {
+func Partition(oldSlice, newSlice []uint32) ([]uint32, []uint32, []uint32) {
 
 	// Sort both slices first
 	slices.Sort(oldSlice)
 	slices.Sort(newSlice)
 
 	removed := []uint32{}
+	common := []uint32{}
 	added := []uint32{}
 
 	i, j := 0, 0
@@ -40,7 +42,8 @@ func Differences(oldSlice, newSlice []uint32) ([]uint32, []uint32) {
 			j++
 
 		} else {
-			// Both are equal, move both pointers forward
+			// oldID = newID, so it's common
+			common = append(common, oldSlice[i])
 			i++
 			j++
 		}
@@ -50,7 +53,7 @@ func Differences(oldSlice, newSlice []uint32) ([]uint32, []uint32) {
 	removed = append(removed, oldSlice[i:]...)
 	added = append(added, newSlice[j:]...)
 
-	return removed, added
+	return removed, common, added
 }
 
 // returns newWalkSegment[i] with the highest i such that

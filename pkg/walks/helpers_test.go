@@ -9,33 +9,41 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-func TestDifferences(t *testing.T) {
+func TestPartition(t *testing.T) {
 
-	t.Run("Differences, empty slices", func(t *testing.T) {
+	t.Run("Partition, empty slices", func(t *testing.T) {
 
 		oldSlice := []uint32{}
 		newSlice := []uint32{}
 
-		removed, added := Differences(oldSlice, newSlice)
+		removed, common, added := Partition(oldSlice, newSlice)
 
 		if removed == nil || len(removed) > 0 {
-			t.Errorf("Differences(): expected [], got %v", removed)
+			t.Errorf("Partition(): expected [], got %v", removed)
+		}
+
+		if common == nil || len(common) > 0 {
+			t.Errorf("Partition(): expected [], got %v", common)
 		}
 
 		if added == nil || len(added) > 0 {
-			t.Errorf("Differences(): expected [], got %v", added)
+			t.Errorf("Partition(): expected [], got %v", added)
 		}
 	})
 
-	t.Run("positive, Differences", func(t *testing.T) {
+	t.Run("positive, Partition", func(t *testing.T) {
 
 		oldSlice := []uint32{0, 1, 2, 4}
 		newSlice := []uint32{1, 2, 3}
 
-		removed, added := Differences(oldSlice, newSlice)
+		removed, common, added := Partition(oldSlice, newSlice)
 
 		if removed[0] != 0 || removed[1] != 4 {
 			t.Errorf("expected [0, 4], got %v", removed)
+		}
+
+		if !reflect.DeepEqual(common, []uint32{1, 2}) {
+			t.Errorf("expected [1, 2], got %v", common)
 		}
 
 		if added[0] != 3 {
@@ -126,7 +134,7 @@ func TestSortWalks(t *testing.T) {
 
 // ---------------------------------BENCHMARKS---------------------------------
 
-func BenchmarkDifferences(b *testing.B) {
+func BenchmarkPartition(b *testing.B) {
 
 	size := int32(1000)
 
@@ -146,6 +154,6 @@ func BenchmarkDifferences(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Differences(oldSlice, newSlice)
+		Partition(oldSlice, newSlice)
 	}
 }

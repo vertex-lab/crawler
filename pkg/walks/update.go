@@ -10,7 +10,7 @@ import (
 
 /*
 Update updates the RandomWalksManager when a node's successors change from
-oldIDs to currentIDs.
+oldSucc to currentSucc.
 
 # REFERENCES
 
@@ -18,7 +18,7 @@ oldIDs to currentIDs.
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func (RWM *RandomWalksManager) Update(DB graph.Database, nodeID uint32,
-	oldIDs []uint32, currentIDs []uint32) error {
+	oldSucc []uint32, currentSucc []uint32) error {
 
 	// checking the inputs
 	const expectEmptyRWM = false
@@ -32,17 +32,17 @@ func (RWM *RandomWalksManager) Update(DB graph.Database, nodeID uint32,
 		return err
 	}
 
-	removedIDs, addedIDs := Differences(oldIDs, currentIDs)
+	removedSucc, commonSucc, addesSucc := Partition(oldSucc, currentSucc)
 
 	// for reproducibility in tests
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	err = RWM.updateRemovedNodes(DB, nodeID, removedIDs, currentIDs, rng)
+	err = RWM.updateRemovedNodes(DB, nodeID, removedSucc, commonSucc, rng)
 	if err != nil {
 		return err
 	}
 
-	err = RWM.updateAddedNodes(DB, nodeID, addedIDs, len(currentIDs), rng)
+	err = RWM.updateAddedNodes(DB, nodeID, addesSucc, len(currentSucc), rng)
 	if err != nil {
 		return err
 	}
@@ -52,12 +52,15 @@ func (RWM *RandomWalksManager) Update(DB graph.Database, nodeID uint32,
 
 /*
 a method that updates the RWM by "pruning" and "grafting" all the walks that
-contain the hop nodeID --> removedID in removedIDs
+contain the hop `nodeID` --> `removedID` in `removedSucc`.
+
+After the execution of this method, the state of the walks of nodeID is as if nodeID
+only successors are the common successors `commonSucc`.
 */
 func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint32,
-	removedIDs, currentIDs []uint32, rng *rand.Rand) error {
+	removedSucc, commonSucc []uint32, rng *rand.Rand) error {
 
-	if len(removedIDs) == 0 {
+	if len(removedSucc) == 0 {
 		return nil
 	}
 
@@ -69,7 +72,7 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 	// iterate over the walks
 	for rWalk := range walkSet.Iter() {
 
-		update, cutIndex, err := rWalk.NeedsUpdate(nodeID, removedIDs)
+		update, cutIndex, err := rWalk.NeedsUpdate(nodeID, removedSucc)
 		if err != nil {
 			return err
 		}
@@ -85,8 +88,8 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 			return err
 		}
 
-		// select the new next node
-		successorID, shouldStop := walkStep(currentIDs, rWalk.NodeIDs, rng)
+		// select the new next node among the common successors
+		successorID, shouldStop := walkStep(commonSucc, rWalk.NodeIDs, rng)
 		if shouldStop {
 			continue
 		}
@@ -115,9 +118,9 @@ a method that updates the RWM by "pruning" some randomly selected walks of nodeI
 and by "grafting" them using the newly added nodes
 */
 func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32,
-	addedIDs []uint32, newOutDegree int, rng *rand.Rand) error {
+	addesSucc []uint32, newOutDegree int, rng *rand.Rand) error {
 
-	if len(addedIDs) == 0 {
+	if len(addesSucc) == 0 {
 		return nil
 	}
 
@@ -127,7 +130,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 	}
 
 	// probabilistic update check
-	probabilityThreshold := float32(len(addedIDs)) / float32(newOutDegree)
+	probabilityThreshold := float32(len(addesSucc)) / float32(newOutDegree)
 
 	// iterate over the walks
 	for rWalk := range walkSet.Iter() {
@@ -149,7 +152,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		}
 
 		// select the new next node
-		addedID, shouldStop := walkStep(addedIDs, rWalk.NodeIDs, rng)
+		addedID, shouldStop := walkStep(addesSucc, rWalk.NodeIDs, rng)
 		if shouldStop {
 			continue
 		}
