@@ -122,7 +122,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks, err := sortWalks(walkSet)
+			walks, err := SortWalks(walkSet)
 			if err != nil {
 				t.Errorf("generateRandomWalks(): expected nil, got %v", err)
 			}

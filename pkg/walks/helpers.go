@@ -70,7 +70,7 @@ func removeCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
 }
 
 // dereferences the random walks and sorts them in lexicographic order
-func sortWalks(walkSet WalkSet) ([][]uint32, error) {
+func SortWalks(walkSet WalkSet) ([][]uint32, error) {
 
 	if walkSet.Cardinality() == 0 {
 		return nil, ErrEmptyRandomWalk

@@ -16,10 +16,13 @@ func TestUpdateRemovedNodes(t *testing.T) {
 	t.Run("positive updateRemovedNodes, empty removedIDs", func(t *testing.T) {
 
 		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
-		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
 
 		nodeID := uint32(0)
+		currentIDs := []uint32{1}
+
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: currentIDs}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
+
 		removedIDs := []uint32{} // empty slice
 
 		RWM, _ := NewRWM(0.85, 1)
@@ -29,7 +32,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		RWM.WalksByNode[1] = walkSet
 
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-		err := RWM.updateRemovedNodes(DB, nodeID, removedIDs, rng)
+		err := RWM.updateRemovedNodes(DB, nodeID, removedIDs, currentIDs, rng)
 		if err != nil {
 			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
@@ -65,12 +68,12 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		RWM.AddWalk(rWalk3)
 
 		nodeID := uint32(0)
-		newSuccessorIDs := []uint32{3}
+		currentIDs := []uint32{3}
 		removedIDs := []uint32{1, 2}
 
 		// the new database
 		DB := mock.NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: newSuccessorIDs}
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: currentIDs}
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{0}}
 		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{}}
 		DB.Nodes[3] = &graph.Node{ID: 3, SuccessorIDs: []uint32{0}}
@@ -93,7 +96,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			},
 		}
 
-		err := RWM.updateRemovedNodes(DB, nodeID, removedIDs, rng)
+		err := RWM.updateRemovedNodes(DB, nodeID, removedIDs, currentIDs, rng)
 		if err != nil {
 			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
@@ -107,7 +110,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks, err := sortWalks(walkSet)
+			walks, err := SortWalks(walkSet)
 			if err != nil {
 				t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 			}
@@ -260,7 +263,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks, err := sortWalks(walkSet)
+			walks, err := SortWalks(walkSet)
 			if err != nil {
 				t.Errorf("updateAddedNodes(): expected nil, got %v", err)
 			}

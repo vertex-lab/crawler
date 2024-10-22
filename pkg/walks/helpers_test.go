@@ -11,22 +11,6 @@ import (
 
 func TestDifferences(t *testing.T) {
 
-	t.Run("positive, Differences", func(t *testing.T) {
-
-		oldSlice := []uint32{0, 1, 2, 4}
-		newSlice := []uint32{1, 2, 3}
-
-		removed, added := Differences(oldSlice, newSlice)
-
-		if removed[0] != 0 || removed[1] != 4 {
-			t.Errorf("expected [0, 4], got %v", removed)
-		}
-
-		if added[0] != 3 {
-			t.Errorf("expected 3, got %v", added[3])
-		}
-	})
-
 	t.Run("Differences, empty slices", func(t *testing.T) {
 
 		oldSlice := []uint32{}
@@ -40,6 +24,22 @@ func TestDifferences(t *testing.T) {
 
 		if added == nil || len(added) > 0 {
 			t.Errorf("Differences(): expected [], got %v", added)
+		}
+	})
+
+	t.Run("positive, Differences", func(t *testing.T) {
+
+		oldSlice := []uint32{0, 1, 2, 4}
+		newSlice := []uint32{1, 2, 3}
+
+		removed, added := Differences(oldSlice, newSlice)
+
+		if removed[0] != 0 || removed[1] != 4 {
+			t.Errorf("expected [0, 4], got %v", removed)
+		}
+
+		if added[0] != 3 {
+			t.Errorf("expected 3, got %v", added[3])
 		}
 	})
 }
@@ -86,17 +86,17 @@ func TestRemoveCycles(t *testing.T) {
 
 func TestSortWalks(t *testing.T) {
 
-	t.Run("sortWalks, empty walkSet", func(t *testing.T) {
+	t.Run("SortWalks, empty walkSet", func(t *testing.T) {
 
 		walkSet := mapset.NewSet[*RandomWalk]()
-		_, err := sortWalks(walkSet)
+		_, err := SortWalks(walkSet)
 
 		if !errors.Is(err, ErrEmptyRandomWalk) {
-			t.Errorf("sortWalks(): expected %v, got %v", ErrEmptyRandomWalk, err)
+			t.Errorf("SortWalks(): expected %v, got %v", ErrEmptyRandomWalk, err)
 		}
 	})
 
-	t.Run("sortWalks, empty walkSet", func(t *testing.T) {
+	t.Run("SortWalks, empty walkSet", func(t *testing.T) {
 
 		expected := map[uint32][]uint32{
 			0: {0, 1},
@@ -109,15 +109,15 @@ func TestSortWalks(t *testing.T) {
 		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
 
 		walkSet := mapset.NewSet[*RandomWalk](rWalk1, rWalk2, rWalk3)
-		got, err := sortWalks(walkSet)
+		got, err := SortWalks(walkSet)
 
 		if err != nil {
-			t.Errorf("sortWalks(): expected nil, got %v", err)
+			t.Errorf("SortWalks(): expected nil, got %v", err)
 		}
 
 		for key, val := range expected {
 			if !reflect.DeepEqual(got[key], val) {
-				t.Errorf("sortWalks(): expected %v, got %v", val, got[key])
+				t.Errorf("SortWalks(): expected %v, got %v", val, got[key])
 			}
 		}
 

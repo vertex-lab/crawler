@@ -10,7 +10,7 @@ import (
 
 /*
 Update updates the RandomWalksManager when a node's successors change from
-oldSuccessorIDs to currentSuccessorIDs.
+oldIDs to currentIDs.
 
 # REFERENCES
 
@@ -18,7 +18,7 @@ oldSuccessorIDs to currentSuccessorIDs.
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func (RWM *RandomWalksManager) Update(DB graph.Database, nodeID uint32,
-	oldSuccessorIDs []uint32, currentSuccessorIDs []uint32) error {
+	oldIDs []uint32, currentIDs []uint32) error {
 
 	// checking the inputs
 	const expectEmptyRWM = false
@@ -32,17 +32,17 @@ func (RWM *RandomWalksManager) Update(DB graph.Database, nodeID uint32,
 		return err
 	}
 
-	removedIDs, addedIDs := Differences(oldSuccessorIDs, currentSuccessorIDs)
+	removedIDs, addedIDs := Differences(oldIDs, currentIDs)
 
 	// for reproducibility in tests
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	err = RWM.updateRemovedNodes(DB, nodeID, removedIDs, rng)
+	err = RWM.updateRemovedNodes(DB, nodeID, removedIDs, currentIDs, rng)
 	if err != nil {
 		return err
 	}
 
-	err = RWM.updateAddedNodes(DB, nodeID, addedIDs, len(currentSuccessorIDs), rng)
+	err = RWM.updateAddedNodes(DB, nodeID, addedIDs, len(currentIDs), rng)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ a method that updates the RWM by "pruning" and "grafting" all the walks that
 contain the hop nodeID --> removedID in removedIDs
 */
 func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint32,
-	removedIDs []uint32, rng *rand.Rand) error {
+	removedIDs, currentIDs []uint32, rng *rand.Rand) error {
 
 	if len(removedIDs) == 0 {
 		return nil
@@ -85,14 +85,20 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 			return err
 		}
 
-		// generate new walk from nodeID
-		newWalkSegment, err := generateWalk(DB, nodeID, RWM.alpha, rng)
+		// select the new next node
+		successorID, shouldStop := walkStep(currentIDs, rWalk.NodeIDs, rng)
+		if shouldStop {
+			continue
+		}
+
+		// generate the new walk segment
+		newWalkSegment, err := generateWalk(DB, successorID, RWM.alpha, rng)
 		if err != nil {
 			return err
 		}
 
-		// remove the first element (nodeID), because that's already in the walk and other potential cycles
-		newWalkSegment = removeCycles(rWalk.NodeIDs, newWalkSegment[1:])
+		// remove potential cycles
+		newWalkSegment = removeCycles(rWalk.NodeIDs, newWalkSegment)
 
 		// graft the walk with the new walk segment
 		err = RWM.GraftWalk(rWalk, newWalkSegment)
@@ -105,14 +111,13 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 }
 
 /*
-a method that updates the RWM by "pruning" some randomly selected walks and
-by "grafting" them using the newly added nodes
+a method that updates the RWM by "pruning" some randomly selected walks of nodeID
+and by "grafting" them using the newly added nodes
 */
 func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32,
 	addedIDs []uint32, newOutDegree int, rng *rand.Rand) error {
 
-	lenAddedIDs := len(addedIDs)
-	if lenAddedIDs == 0 {
+	if len(addedIDs) == 0 {
 		return nil
 	}
 
@@ -121,8 +126,8 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		return err
 	}
 
-	// skip with probability 1 - len(addedIDs)/newOutDegree
-	probabilityThreshold := float32(lenAddedIDs) / float32(newOutDegree)
+	// probabilistic update check
+	probabilityThreshold := float32(len(addedIDs)) / float32(newOutDegree)
 
 	// iterate over the walks
 	for rWalk := range walkSet.Iter() {
@@ -133,7 +138,6 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 
 		// prune the walk AFTER the position of nodeID
 		cutIndex := slices.Index(rWalk.NodeIDs, nodeID) + 1
-
 		err := RWM.PruneWalk(rWalk, cutIndex)
 		if err != nil {
 			return err
@@ -144,12 +148,14 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 			continue
 		}
 
-		// select the successor among the newly added nodes
-		randomIndex := rng.Intn(lenAddedIDs)
-		successorID := addedIDs[randomIndex]
+		// select the new next node
+		addedID, shouldStop := walkStep(addedIDs, rWalk.NodeIDs, rng)
+		if shouldStop {
+			continue
+		}
 
 		// generate a new walk from the successor
-		newWalkSegment, err := generateWalk(DB, successorID, RWM.alpha, rng)
+		newWalkSegment, err := generateWalk(DB, addedID, RWM.alpha, rng)
 		if err != nil {
 			return err
 		}
@@ -157,6 +163,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		// remove potential cycles
 		newWalkSegment = removeCycles(rWalk.NodeIDs, newWalkSegment)
 
+		// graft the walk with the new walk segment
 		err = RWM.GraftWalk(rWalk, newWalkSegment)
 		if err != nil {
 			return err

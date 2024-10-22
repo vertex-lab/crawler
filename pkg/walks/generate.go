@@ -1,12 +1,43 @@
 package walks
 
 import (
+	"math"
 	"math/rand"
 	"slices"
 	"time"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 )
+
+/*
+performs a walk step nodeID --> nextNodeID in successorIDs and returns
+`nextNodeID` and `shouldStop`.
+
+`shouldStop` is true if and only if:
+
+- successorIDs is empty
+
+- nextNodeID was already visited in one of the previous steps (walk)
+*/
+func walkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
+
+	// if it is a dandling node, stop
+	succLenght := len(successorIDs)
+	if succLenght == 0 {
+		return math.MaxUint32, true
+	}
+
+	// randomly select the next node
+	randomIndex := rng.Intn(succLenght)
+	nextNodeID := successorIDs[randomIndex]
+
+	// if there is a cycle, stop
+	if slices.Contains(walk, nextNodeID) {
+		return math.MaxUint32, true
+	}
+
+	return nextNodeID, false
+}
 
 /*
 generates a single walk []uint32 from a specified starting node.
@@ -17,7 +48,7 @@ This behaviour simplifies the data structure (now a walk visits a node only once
 so we can use Sets) and helps with mitigating self-boosting spam networks.
 
 At the same time this doesn't influence much the ranking of normal users
-since a cycle occurance is very inprobable.
+since a cycle occurance is very improbable.
 
 # REFERENCES
 
@@ -32,6 +63,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 		return nil, err
 	}
 
+	var shouldBreak bool
 	currentNodeID := startingNodeID
 	walk := []uint32{currentNodeID}
 
@@ -48,18 +80,9 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 			return nil, err
 		}
 
-		// if it is a dandling node, stop the walk
-		succLenght := len(successorIDs)
-		if succLenght == 0 {
-			break
-		}
-
-		// randomly select the next node, and set is as the current one
-		randomIndex := rng.Intn(succLenght)
-		currentNodeID = successorIDs[randomIndex]
-
-		// if there is a cycle, break the walk generation
-		if slices.Contains(walk, currentNodeID) {
+		// perform a walk step; break if one of the condition in walkStep is triggered
+		currentNodeID, shouldBreak = walkStep(successorIDs, walk, rng)
+		if shouldBreak {
 			break
 		}
 
