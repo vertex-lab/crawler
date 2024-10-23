@@ -11,7 +11,7 @@ import (
 
 func TestPartition(t *testing.T) {
 
-	t.Run("Partition, empty slices", func(t *testing.T) {
+	t.Run("empty slices", func(t *testing.T) {
 
 		oldSlice := []uint32{}
 		newSlice := []uint32{}
@@ -31,7 +31,7 @@ func TestPartition(t *testing.T) {
 		}
 	})
 
-	t.Run("positive, Partition", func(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
 
 		oldSlice := []uint32{0, 1, 2, 4}
 		newSlice := []uint32{1, 2, 3}
@@ -54,7 +54,7 @@ func TestPartition(t *testing.T) {
 
 func TestRemoveCycles(t *testing.T) {
 
-	t.Run("removeCycles, empty slices", func(t *testing.T) {
+	t.Run("empty slices", func(t *testing.T) {
 
 		oldWalk := []uint32{}
 		newWalkSegment := []uint32{}
@@ -66,7 +66,7 @@ func TestRemoveCycles(t *testing.T) {
 		}
 	})
 
-	t.Run("removeCycles, immediate cycle", func(t *testing.T) {
+	t.Run("immediate cycle", func(t *testing.T) {
 
 		oldWalk := []uint32{0, 1, 2, 3}
 		newWalkSegment := []uint32{3, 4, 5, 6}
@@ -78,7 +78,7 @@ func TestRemoveCycles(t *testing.T) {
 		}
 	})
 
-	t.Run("removeCycles, cycle", func(t *testing.T) {
+	t.Run("cycle", func(t *testing.T) {
 
 		oldWalk := []uint32{0, 1, 2, 3}
 		newWalkSegment := []uint32{4, 2, 6}
@@ -94,7 +94,7 @@ func TestRemoveCycles(t *testing.T) {
 
 func TestSortWalks(t *testing.T) {
 
-	t.Run("SortWalks, empty walkSet", func(t *testing.T) {
+	t.Run("empty walkSet", func(t *testing.T) {
 
 		walkSet := mapset.NewSet[*RandomWalk]()
 		_, err := SortWalks(walkSet)
@@ -104,7 +104,7 @@ func TestSortWalks(t *testing.T) {
 		}
 	})
 
-	t.Run("SortWalks, empty walkSet", func(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
 
 		expected := map[uint32][]uint32{
 			0: {0, 1},
@@ -116,7 +116,7 @@ func TestSortWalks(t *testing.T) {
 		rWalk2 := &RandomWalk{NodeIDs: expected[0]}
 		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
 
-		walkSet := mapset.NewSet[*RandomWalk](rWalk1, rWalk2, rWalk3)
+		walkSet := mapset.NewSet(rWalk1, rWalk2, rWalk3)
 		got, err := SortWalks(walkSet)
 
 		if err != nil {

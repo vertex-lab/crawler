@@ -508,7 +508,6 @@ func TestPruneWalk(t *testing.T) {
 			t.Errorf("PruneWalk(): expected %v, got %v", []uint32{1}, rWalk.NodeIDs)
 		}
 	})
-
 }
 
 func TestGraftWalk(t *testing.T) {
@@ -584,7 +583,6 @@ func TestGraftWalk(t *testing.T) {
 			t.Errorf("GraftWalk(): expected %v, got %v", expectedGraftedWalk, rWalk.NodeIDs)
 		}
 	})
-
 }
 
 // ------------------------------BENCHMARKS------------------------------
