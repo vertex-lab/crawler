@@ -262,7 +262,7 @@ func TestGenerate(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := mock.SetupDB(test.DBType)
-			RWM := setupRWM(test.RWMType)
+			RWM := SetupRWM(test.RWMType)
 
 			err := RWM.Generate(DB, 0)
 
@@ -327,7 +327,7 @@ func TestGenerateAll(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := mock.SetupDB(test.DBType)
-			RWM := setupRWM(test.RWMType)
+			RWM := SetupRWM(test.RWMType)
 
 			err := RWM.GenerateAll(DB)
 

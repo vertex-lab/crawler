@@ -71,7 +71,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				DB := mock.SetupDB(test.DBType)
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 				err := RWM.updateRemovedNodes(DB, 0, test.removedSucc, []uint32{2}, rng)
@@ -87,7 +87,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 
 		DB := mock.SetupDB("triangle")
-		RWM := setupRWM("triangle")
+		RWM := SetupRWM("triangle")
 
 		nodeID := uint32(0)
 		removeSucc := []uint32{1}
@@ -203,7 +203,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				DB := mock.SetupDB(test.DBType)
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 				err := RWM.updateRemovedNodes(DB, 0, test.addedSucc, []uint32{2}, rng)
@@ -218,7 +218,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 
 		DB := mock.SetupDB("simple")
-		RWM := setupRWM("simple")
+		RWM := SetupRWM("simple")
 
 		nodeID := uint32(0)
 		addedSucc := []uint32{2}
@@ -333,7 +333,7 @@ func TestUpdate2(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				DB := mock.SetupDB(test.DBType)
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 
 				err := RWM.Update(DB, test.nodeID, test.oldSucc, test.currentSucc)
 

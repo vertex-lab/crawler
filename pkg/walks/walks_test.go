@@ -193,7 +193,7 @@ func TestIsEmpty(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			RWM := setupRWM(test.RWMType)
+			RWM := SetupRWM(test.RWMType)
 			empty := RWM.IsEmpty()
 
 			if empty != test.expectedEmpty {
@@ -259,7 +259,7 @@ func TestCheckState(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			RWM := setupRWM(test.RWMType)
+			RWM := SetupRWM(test.RWMType)
 			err := RWM.CheckState(test.expectedEmpty)
 
 			if !errors.Is(err, test.expectedError) {
@@ -294,7 +294,7 @@ func TestWalksByNodeID(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 				_, err := RWM.WalksByNodeID(1)
 
 				if !errors.Is(err, test.expectedError) {
@@ -306,7 +306,7 @@ func TestWalksByNodeID(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 
-		RWM := setupRWM("one-node1")
+		RWM := SetupRWM("one-node1")
 
 		walkSet, err := RWM.WalksByNodeID(1)
 		if err != nil {
@@ -347,7 +347,7 @@ func TestAddWalk(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 				err := RWM.AddWalk(test.rWalk)
 
 				if !errors.Is(err, test.expectedError) {
@@ -359,7 +359,7 @@ func TestAddWalk(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 
-		RWM := setupRWM("empty")
+		RWM := SetupRWM("empty")
 		rWalk := &RandomWalk{NodeIDs: []uint32{1, 2, 3}}
 
 		err := RWM.AddWalk(rWalk)
@@ -419,7 +419,7 @@ func TestPruneWalk(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 				err := RWM.PruneWalk(test.rWalk, 2)
 
 				if !errors.Is(err, test.expectedError) {
@@ -431,7 +431,7 @@ func TestPruneWalk(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 
-		RWM := setupRWM("empty")
+		RWM := SetupRWM("empty")
 		rWalk := &RandomWalk{NodeIDs: []uint32{1, 2}}
 
 		RWM.AddWalk(rWalk)
@@ -499,7 +499,7 @@ func TestGraftWalk(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 
-				RWM := setupRWM(test.RWMType)
+				RWM := SetupRWM(test.RWMType)
 				err := RWM.GraftWalk(test.rWalk, []uint32{1})
 
 				if !errors.Is(err, test.expectedError) {
@@ -511,7 +511,7 @@ func TestGraftWalk(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 
-		RWM := setupRWM("empty")
+		RWM := SetupRWM("empty")
 		rWalk := &RandomWalk{NodeIDs: []uint32{0}}
 		nodeIDs := []uint32{1, 2}
 		expectedGraftedWalk := append(rWalk.NodeIDs, nodeIDs...)

@@ -47,7 +47,7 @@ func TestPagerankStatic(t *testing.T) {
 		},
 		{
 			name:      "static Pagerank, single cycle long 30",
-			graphType: "cyclicLong30",
+			graphType: "cyclicLong50",
 		},
 	}
 
@@ -73,8 +73,8 @@ func TestPagerankStatic(t *testing.T) {
 			}
 
 			// compute the error
-			if distance(expectedPR, got) > maxExpectedDistance {
-				t.Errorf("Pagerank(): expected distance %v, got %v\n", maxExpectedDistance, distance(expectedPR, got))
+			if pagerank.Distance(expectedPR, got) > maxExpectedDistance {
+				t.Errorf("Pagerank(): expected pagerank.Distance %v, got %v\n", maxExpectedDistance, pagerank.Distance(expectedPR, got))
 				t.Errorf("expected %v \ngot %v", expectedPR, got)
 			}
 		})
@@ -120,7 +120,7 @@ func TestPagerankDynamic(t *testing.T) {
 		},
 		{
 			name:      "dynamic Pagerank, single cycle long 30",
-			graphType: "cyclicLong30",
+			graphType: "cyclicLong50",
 		},
 	}
 
@@ -160,8 +160,8 @@ func TestPagerankDynamic(t *testing.T) {
 			}
 
 			// check the error
-			if distance(expectedPR, got) > maxExpectedDistance {
-				t.Errorf("Pagerank(): expected distance %v, got %v\n\n", maxExpectedDistance, distance(expectedPR, got))
+			if pagerank.Distance(expectedPR, got) > maxExpectedDistance {
+				t.Errorf("Pagerank(): expected pagerank.Distance %v, got %v\n\n", maxExpectedDistance, pagerank.Distance(expectedPR, got))
 				t.Errorf("expected %v\n; got %v\n\n", expectedPR, got)
 
 				t.Errorf("nodeID: %v", nodeID)

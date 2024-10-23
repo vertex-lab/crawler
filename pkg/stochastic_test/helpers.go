@@ -1,7 +1,6 @@
 package stochastictest
 
 import (
-	"math"
 	"math/rand"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
@@ -9,18 +8,15 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/pagerank"
 )
 
-// computes the L1 distance between two maps who are supposed to have the same keys
-func distance(map1, map2 pagerank.PagerankMap) float64 {
+/*
+randomly selects one of the potentialChanges, and returns:
 
-	distance := 0.0
+- nodeID: the node whose successors got changed
 
-	for key, val1 := range map1 {
-		distance += math.Abs(val1 - map2[key])
-	}
+- oldSucc: the old state of the successors of nodeID
 
-	return distance
-}
-
+- currentSucc: the current state of the successors of nodeID
+*/
 func SetupOldState(DB *mock.MockDatabase,
 	potentialChanges map[uint32][]Change) (uint32, []uint32, []uint32) {
 
@@ -248,33 +244,33 @@ func SetupGraph(graphType string) TestSetup {
 			{OldSuccessors: []uint32{2, 3}},
 		}
 
-	case "cyclicLong30":
-		// it implements the simple cyclic graph with 30 nodes.
-		// 0 --> 1 --> 2 --> ... --> 28 --> 29 --> 0
+	case "cyclicLong50":
+		// it implements the simple cyclic graph with 50 nodes.
+		// 0 --> 1 --> 2 --> ... --> 48 --> 49 --> 0
 
-		expectedPR = make(pagerank.PagerankMap, 30)
+		expectedPR = make(pagerank.PagerankMap, 50)
 
-		for nodeID := uint32(0); nodeID < 29; nodeID++ {
+		for nodeID := uint32(0); nodeID < 49; nodeID++ {
 			DB.Nodes[nodeID] = &graph.Node{ID: nodeID, SuccessorIDs: []uint32{nodeID + 1}}
 
-			expectedPR[nodeID] = 1.0 / 30.0
+			expectedPR[nodeID] = 1.0 / 50.0
 		}
 
 		// closing the big cycle
-		DB.Nodes[29] = &graph.Node{ID: 29, SuccessorIDs: []uint32{0}}
-		expectedPR[29] = 1.0 / 30.0
+		DB.Nodes[49] = &graph.Node{ID: 49, SuccessorIDs: []uint32{0}}
+		expectedPR[49] = 1.0 / 50.0
 
 		// because of symmetry, these are all the possible changes
-		// that produce cycles longer than 15
+		// that produce cycles longer than 25
 		potentialChanges[0] = []Change{
 			// simple additions
 			{OldSuccessors: []uint32{}},
 
 			// simple removals
-			{OldSuccessors: []uint32{1, 15}},
+			{OldSuccessors: []uint32{1, 25}},
 
 			// addition and removals
-			{OldSuccessors: []uint32{15}},
+			{OldSuccessors: []uint32{25}},
 		}
 
 	default:

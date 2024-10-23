@@ -6,95 +6,78 @@ import (
 	"math/rand"
 	"testing"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
-func TestPagerankDummy(t *testing.T) {
+func TestPagerank(t *testing.T) {
 
-	t.Run("negative Pagerank, nil RWM", func(t *testing.T) {
+	testCases := []struct {
+		name             string
+		RWMType          string
+		expectedPagerank PagerankMap
+		expectedError    error
+	}{
+		{
+			name:          "nil RWM",
+			RWMType:       "nil",
+			expectedError: walks.ErrNilRWMPointer,
+		},
+		{
+			name:          "empty RWM",
+			RWMType:       "empty",
+			expectedError: walks.ErrEmptyRWM,
+		},
+		{
+			name:          "just one node",
+			RWMType:       "one-node0",
+			expectedError: nil,
+			expectedPagerank: PagerankMap{
+				0: 1.0,
+			},
+		},
+		{
+			name:          "simple RWM",
+			RWMType:       "simple",
+			expectedError: nil,
+			expectedPagerank: PagerankMap{
+				0: 0.5,
+				1: 0.5,
+				2: 0.0,
+			},
+		},
+		{
+			name:          "triangle RWM",
+			RWMType:       "triangle",
+			expectedError: nil,
+			expectedPagerank: PagerankMap{
+				0: 1.0 / 3.0,
+				1: 1.0 / 3.0,
+				2: 1.0 / 3.0,
+			},
+		},
+	}
 
-		var RWM *walks.RandomWalksManager
-		_, err := Pagerank(RWM)
+	for _, test := range testCases {
 
-		if !errors.Is(err, walks.ErrNilRWMPointer) {
-			t.Errorf("Pagerank(): expected %v, got %v", walks.ErrNilRWMPointer, err)
-		}
-	})
+		t.Run(test.name, func(t *testing.T) {
 
-	t.Run("negative Pagerank, empty RWM", func(t *testing.T) {
+			RWM := walks.SetupRWM(test.RWMType)
+			pagerank, err := Pagerank(RWM)
 
-		RWM, _ := walks.NewRWM(0.85, 1)
-		_, err := Pagerank(RWM)
-
-		if !errors.Is(err, walks.ErrEmptyRWM) {
-			t.Errorf("Pagerank(): expected %v, got %v", walks.ErrEmptyRWM, err)
-		}
-	})
-
-	t.Run("positive Pagerank, all dandling nodes", func(t *testing.T) {
-
-		size := uint32(5)
-		RWM, _ := walks.NewRWM(0.85, 1)
-
-		// all dandling nodes
-		for i := uint32(0); i < size; i++ {
-			rWalk := &walks.RandomWalk{NodeIDs: []uint32{i}}
-			RWM.WalksByNode[i] = mapset.NewSet[*walks.RandomWalk](rWalk)
-		}
-
-		// the expected pagerank
-		pr := float64(1) / float64(size)
-
-		got, err := Pagerank(RWM)
-		if err != nil {
-			t.Errorf("Pagerank(): expected nil, got %v", err)
-		}
-
-		for i := uint32(0); i < size; i++ {
-
-			if got[i] != pr {
-				t.Errorf("Pagerank(): expected %v, got %v", pr, got[i])
+			if !errors.Is(err, test.expectedError) {
+				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
 			}
-		}
 
-	})
+			// if provided, check the pagerank is equal to the expected
+			if test.expectedPagerank != nil {
 
-	t.Run("positive Pagerank, triangle graph", func(t *testing.T) {
-
-		RWM, _ := walks.NewRWM(0.85, 1)
-
-		triangleWalks := map[uint32][]uint32{
-
-			0: {0, 1, 2},
-			1: {1, 2, 0},
-			2: {2, 0, 1},
-		}
-
-		// adding triangle walks
-		for i := uint32(0); i < 3; i++ {
-
-			rWalk := &walks.RandomWalk{NodeIDs: triangleWalks[i]}
-			RWM.WalksByNode[i] = mapset.NewSet[*walks.RandomWalk](rWalk)
-		}
-
-		// the expected pagerank
-		pr := float64(1) / float64(3)
-
-		got, err := Pagerank(RWM)
-		if err != nil {
-			t.Errorf("Pagerank(): expected nil, got %v", err)
-		}
-
-		for i := uint32(0); i < 3; i++ {
-
-			if got[i] != pr {
-				t.Errorf("Pagerank(): expected %v, got %v", pr, got[i])
+				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
+					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
+				}
 			}
-		}
-	})
-
+		})
+	}
 }
 
 // ---------------------------------BENCHMARK----------------------------------

@@ -103,7 +103,7 @@ func SortWalks(walkSet WalkSet) [][]uint32 {
 }
 
 // function that returns a RWM setup based on the RWMType
-func setupRWM(RWMType string) *RandomWalksManager {
+func SetupRWM(RWMType string) *RandomWalksManager {
 
 	switch RWMType {
 
