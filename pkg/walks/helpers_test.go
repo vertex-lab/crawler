@@ -1,7 +1,6 @@
 package walks
 
 import (
-	"errors"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -97,10 +96,10 @@ func TestSortWalks(t *testing.T) {
 	t.Run("empty walkSet", func(t *testing.T) {
 
 		walkSet := mapset.NewSet[*RandomWalk]()
-		_, err := SortWalks(walkSet)
+		walks := SortWalks(walkSet)
 
-		if !errors.Is(err, ErrEmptyRandomWalk) {
-			t.Errorf("SortWalks(): expected %v, got %v", ErrEmptyRandomWalk, err)
+		if !reflect.DeepEqual(walks, [][]uint32{}) {
+			t.Errorf("SortWalks(): expected %v, got %v", [][]uint32{}, walks)
 		}
 	})
 
@@ -117,18 +116,13 @@ func TestSortWalks(t *testing.T) {
 		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
 
 		walkSet := mapset.NewSet(rWalk1, rWalk2, rWalk3)
-		got, err := SortWalks(walkSet)
-
-		if err != nil {
-			t.Errorf("SortWalks(): expected nil, got %v", err)
-		}
+		got := SortWalks(walkSet)
 
 		for key, val := range expected {
 			if !reflect.DeepEqual(got[key], val) {
 				t.Errorf("SortWalks(): expected %v, got %v", val, got[key])
 			}
 		}
-
 	})
 }
 

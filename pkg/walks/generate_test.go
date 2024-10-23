@@ -198,10 +198,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 				}
 
 				// dereference and sort walks in lexicographic order
-				walks, err := SortWalks(walkSet)
-				if err != nil {
-					t.Fatalf("SortWalks(): expected nil, got %v", err)
-				}
+				walks := SortWalks(walkSet)
 
 				// check if the walk is as expected
 				if !reflect.DeepEqual(walks, test.expectedWalks[nodeID]) {
@@ -281,10 +278,7 @@ func TestGenerate(t *testing.T) {
 				}
 
 				// dereference and sort walks in lexicographic order
-				walks, err := SortWalks(walkSet)
-				if err != nil {
-					t.Fatalf("SortWalks(): expected nil, got %v", err)
-				}
+				walks := SortWalks(walkSet)
 
 				if !reflect.DeepEqual(walks, test.expectedWalks[0]) {
 					t.Errorf("generateRandomWalks(): nodeID = %d; expected %v, got %v", 0, test.expectedWalks[0], walks)

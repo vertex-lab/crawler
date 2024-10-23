@@ -129,6 +129,13 @@ func SetupDB(DBType string) *MockDatabase {
 		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
 		return DB
 
+	case "simple":
+		DB := NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
+		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{}}
+		return DB
+
 	default:
 		return nil // Default to nil for unrecognized scenarios
 	}

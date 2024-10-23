@@ -76,11 +76,7 @@ func removeCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
 }
 
 // dereferences the random walks and sorts them in lexicographic order
-func SortWalks(walkSet WalkSet) ([][]uint32, error) {
-
-	if walkSet.Cardinality() == 0 {
-		return nil, ErrEmptyRandomWalk
-	}
+func SortWalks(walkSet WalkSet) [][]uint32 {
 
 	walks := [][]uint32{}
 
@@ -103,7 +99,7 @@ func SortWalks(walkSet WalkSet) ([][]uint32, error) {
 		return len(walks[i]) < len(walks[j])
 	})
 
-	return walks, nil
+	return walks
 }
 
 // function that returns a RWM setup based on the RWMType
@@ -141,6 +137,24 @@ func setupRWM(RWMType string) *RandomWalksManager {
 		RWM, _ := NewRWM(0.85, 1)
 		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1}})
 		RWM.WalksByNode[1] = walkSet
+		return RWM
+
+	case "triangle":
+		RWM, _ := NewRWM(0.85, 1)
+		rWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1, 2}}
+		rWalk1 := &RandomWalk{NodeIDs: []uint32{1, 2, 0}}
+		rWalk2 := &RandomWalk{NodeIDs: []uint32{2, 0, 1}}
+
+		RWM.AddWalk(rWalk0)
+		RWM.AddWalk(rWalk1)
+		RWM.AddWalk(rWalk2)
+		return RWM
+
+	case "simple":
+		RWM, _ := NewRWM(0.85, 1)
+		rWalk := &RandomWalk{NodeIDs: []uint32{0, 1}}
+		RWM.AddWalk(rWalk)
+
 		return RWM
 
 	default:
