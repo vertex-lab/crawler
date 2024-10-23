@@ -1,8 +1,11 @@
 package walks
 
 import (
+	"math/rand"
 	"slices"
 	"sort"
+
+	mapset "github.com/deckarep/golang-set/v2"
 )
 
 /*
@@ -101,4 +104,46 @@ func SortWalks(walkSet WalkSet) ([][]uint32, error) {
 	})
 
 	return walks, nil
+}
+
+// function that returns a RWM setup based on the RWMType
+func setupRWM(RWMType string) *RandomWalksManager {
+
+	switch RWMType {
+
+	case "nil":
+		return nil
+
+	case "empty":
+		RWM, _ := NewRWM(0.85, 1)
+		return RWM
+
+	case "invalid-alpha":
+		invalidAlphas := []float32{1.01, 1.0, -0.1, -2}
+		size := len(invalidAlphas)
+
+		RWM, _ := NewRWM(0.85, 1)
+		RWM.alpha = invalidAlphas[rand.Intn(size)]
+		return RWM
+
+	case "invalid-walksPerNode":
+		RWM, _ := NewRWM(0.85, 1)
+		RWM.walksPerNode = 0
+		return RWM
+
+	case "one-node0":
+		RWM, _ := NewRWM(0.85, 1)
+		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0}})
+		RWM.WalksByNode[0] = walkSet
+		return RWM
+
+	case "one-node1":
+		RWM, _ := NewRWM(0.85, 1)
+		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1}})
+		RWM.WalksByNode[1] = walkSet
+		return RWM
+
+	default:
+		return nil // Default to nil for unrecognized scenarios
+	}
 }

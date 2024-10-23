@@ -80,6 +80,8 @@ func (DB *MockDatabase) AllNodeIDs() ([]uint32, error) {
 
 }
 
+// ------------------------------------HELPERS----------------------------------
+
 // Helper function that generates a random database of a specified number of nodes
 // and successors per node
 func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockDatabase {
@@ -97,4 +99,37 @@ func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockDataba
 	}
 
 	return DB
+}
+
+// function that returns a DB setup based on the DBType
+func SetupDB(DBType string) *MockDatabase {
+
+	switch DBType {
+
+	case "nil":
+		return nil
+
+	case "empty":
+		return NewMockDatabase()
+
+	case "one-node0":
+		DB := NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
+		return DB
+
+	case "one-node1":
+		DB := NewMockDatabase()
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{1}}
+		return DB
+
+	case "triangle":
+		DB := NewMockDatabase()
+		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1}}
+		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
+		DB.Nodes[2] = &graph.Node{ID: 2, SuccessorIDs: []uint32{0}}
+		return DB
+
+	default:
+		return nil // Default to nil for unrecognized scenarios
+	}
 }

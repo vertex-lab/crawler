@@ -17,32 +17,6 @@ type testCases struct {
 	expectedSlice []uint32
 }
 
-// function that returns a DB setup based on the DBType
-func setupDB(DBType string) *MockDatabase {
-
-	switch DBType {
-
-	case "nil":
-		return nil
-
-	case "empty":
-		return NewMockDatabase()
-
-	case "one-node0":
-		DB := NewMockDatabase()
-		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{0}}
-		return DB
-
-	case "one-node1":
-		DB := NewMockDatabase()
-		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{1}}
-		return DB
-
-	default:
-		return nil // Default to nil for unrecognized scenarios
-	}
-}
-
 func TestCheckEmpty(t *testing.T) {
 
 	testCases := []testCases{
@@ -66,7 +40,7 @@ func TestCheckEmpty(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := setupDB(test.DBType)
+			DB := SetupDB(test.DBType)
 			err := DB.CheckEmpty()
 
 			if !errors.Is(err, test.expectedError) {
@@ -105,7 +79,7 @@ func TestNodeByID(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := setupDB(test.DBType)
+			DB := SetupDB(test.DBType)
 			node, err := DB.NodeByID(1)
 
 			if !errors.Is(err, test.expectedError) {
@@ -160,7 +134,7 @@ func TestNodeSuccessorIDs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := setupDB(test.DBType)
+			DB := SetupDB(test.DBType)
 			successorIDs, err := DB.NodeSuccessorIDs(1)
 
 			if !errors.Is(err, test.expectedError) {
@@ -206,7 +180,7 @@ func TestAllNodeIDs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := setupDB(test.DBType)
+			DB := SetupDB(test.DBType)
 			nodeIDs, err := DB.AllNodeIDs()
 
 			if !errors.Is(err, test.expectedError) {
