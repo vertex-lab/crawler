@@ -88,12 +88,12 @@ func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockDataba
 	for i := 0; i < nodesNum; i++ {
 
 		// create random successors
-		random_successors := make([]uint32, successorsPerNode)
+		randomSuccessors := make([]uint32, successorsPerNode)
 		for j := 0; j < successorsPerNode; j++ {
-			random_successors[j] = uint32(rng.Intn(int(nodesNum)))
+			randomSuccessors[j] = uint32(rng.Intn(int(nodesNum)))
 		}
 
-		DB.Nodes[uint32(i)] = &graph.Node{ID: uint32(i), SuccessorIDs: random_successors}
+		DB.Nodes[uint32(i)] = &graph.Node{ID: uint32(i), SuccessorIDs: randomSuccessors}
 	}
 
 	return DB

@@ -4,8 +4,8 @@ import "errors"
 
 // defines the basic structure of a node in the graph
 type Node struct {
-	ID           uint32   // unique identifier
-	SuccessorIDs []uint32 // List of nodes it follows
+	ID           uint32
+	SuccessorIDs []uint32
 }
 
 /*
@@ -22,7 +22,7 @@ type Database interface {
 	// NodeSuccessorIDs returns a slice that contains the IDs of all successors of a node
 	NodeSuccessorIDs(ID uint32) ([]uint32, error)
 
-	// AllNodeIDs returns a slice with the IDss of all nodes in the DB
+	// AllNodeIDs returns a slice with the IDs of all nodes in the DB
 	AllNodeIDs() ([]uint32, error)
 }
 
