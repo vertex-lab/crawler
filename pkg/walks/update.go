@@ -95,7 +95,7 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 		}
 
 		// generate the new walk segment
-		newWalkSegment, err := generateWalk(DB, successorID, RWM.alpha, rng)
+		newWalkSegment, err := generateWalk(DB, successorID, RWM.Alpha, rng)
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		}
 
 		// stop with probability 1-alpha
-		if rng.Float32() > RWM.alpha {
+		if rng.Float32() > RWM.Alpha {
 			continue
 		}
 
@@ -158,7 +158,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		}
 
 		// generate a new walk from the successor
-		newWalkSegment, err := generateWalk(DB, addedID, RWM.alpha, rng)
+		newWalkSegment, err := generateWalk(DB, addedID, RWM.Alpha, rng)
 		if err != nil {
 			return err
 		}

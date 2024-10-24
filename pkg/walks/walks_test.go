@@ -157,12 +157,12 @@ func TestNewRandomWalksManager(t *testing.T) {
 				// check if the parameters have been added correctly
 				if RWM != nil {
 
-					if RWM.alpha != alpha {
-						t.Errorf("NewRWM(): expected %v, got %v", alpha, RWM.alpha)
+					if RWM.Alpha != alpha {
+						t.Errorf("NewRWM(): expected %v, got %v", alpha, RWM.Alpha)
 					}
 
-					if RWM.walksPerNode != test.walksPerNode {
-						t.Errorf("NewRWM(): expected %v, got %v", test.walksPerNode, RWM.walksPerNode)
+					if RWM.WalksPerNode != test.walksPerNode {
+						t.Errorf("NewRWM(): expected %v, got %v", test.walksPerNode, RWM.WalksPerNode)
 					}
 				}
 			}
@@ -575,7 +575,7 @@ func BenchmarkAddWalk(b *testing.B) {
 	for i := uint32(0); i < uint32(b.N); i++ {
 
 		startingNodeID := uint32(rng.Intn(nodesSize))
-		walk, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		walk, _ := generateWalk(DB, startingNodeID, RWM.Alpha, rng)
 		rWalk := &RandomWalk{NodeIDs: walk}
 		rWalks = append(rWalks, rWalk)
 	}
@@ -606,7 +606,7 @@ func BenchmarkPruneWalk(b *testing.B) {
 	for i := uint32(0); i < uint32(b.N); i++ {
 
 		startingNodeID := uint32(rng.Intn(nodesSize))
-		walk, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		walk, _ := generateWalk(DB, startingNodeID, RWM.Alpha, rng)
 		rWalk := &RandomWalk{NodeIDs: walk}
 		RWM.AddWalk(rWalk)
 
@@ -640,13 +640,13 @@ func BenchmarkGraftWalk(b *testing.B) {
 	for i := uint32(0); i < uint32(b.N); i++ {
 
 		startingNodeID := uint32(rng.Intn(nodesSize))
-		walk, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		walk, _ := generateWalk(DB, startingNodeID, RWM.Alpha, rng)
 		rWalk := &RandomWalk{NodeIDs: walk}
 		RWM.AddWalk(rWalk)
 		rWalks = append(rWalks, rWalk)
 
 		startingNodeID = uint32(rng.Intn(nodesSize))
-		walkSegment, _ := generateWalk(DB, startingNodeID, RWM.alpha, rng)
+		walkSegment, _ := generateWalk(DB, startingNodeID, RWM.Alpha, rng)
 		walkSegments = append(walkSegments, walkSegment)
 	}
 

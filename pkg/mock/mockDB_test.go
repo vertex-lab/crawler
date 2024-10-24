@@ -156,6 +156,59 @@ func TestNodeSuccessorIDs(t *testing.T) {
 	}
 }
 
+func TestIsDandling(t *testing.T) {
+
+	testCases := []struct {
+		name       string
+		DBType     string
+		nodeID     uint32
+		isDandling bool
+	}{
+		{
+			name:       "nil DB",
+			DBType:     "nil",
+			nodeID:     0,
+			isDandling: true,
+		},
+		{
+			name:       "empty DB",
+			DBType:     "empty",
+			nodeID:     0,
+			isDandling: true,
+		},
+		{
+			name:       "node 0 not found",
+			DBType:     "one-node1",
+			nodeID:     0,
+			isDandling: true,
+		},
+		{
+			name:       "dandling node 1",
+			DBType:     "simple",
+			nodeID:     1,
+			isDandling: true,
+		},
+		{
+			name:       "non-dandling node 1",
+			DBType:     "one-node1",
+			nodeID:     1,
+			isDandling: false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			DB := SetupDB(test.DBType)
+			dandling := DB.IsDandling(test.nodeID)
+
+			if dandling != test.isDandling {
+				t.Errorf("IsDandling(): expected %v, got %v", test.isDandling, dandling)
+			}
+		})
+	}
+}
+
 func TestAllNodeIDs(t *testing.T) {
 
 	testCases := []testCases{

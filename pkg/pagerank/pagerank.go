@@ -16,11 +16,11 @@ func Pagerank(RWM *walks.RandomWalksManager) (PagerankMap, error) {
 	}
 
 	// initialize
-	pagerank := make(PagerankMap, len(RWM.WalksByNode))
+	pagerank := make(PagerankMap, len(RWM.NodeWalkSet))
 	totalVisits := 0.0
 
 	// iterate over the RWM
-	for nodeID, walkSet := range RWM.WalksByNode {
+	for nodeID, walkSet := range RWM.NodeWalkSet {
 
 		// this can be made more efficient by fetching the nodeVisits directly
 		nodeVisits := float64(walkSet.Cardinality())

@@ -13,16 +13,18 @@ The Database interface abstracts the DB basic functions
 */
 type Database interface {
 
-	// CheckEmpty returns the appropriate error if the DB is nil or has no nodes
+	// returns the appropriate error if the DB is nil or has no nodes
 	CheckEmpty() error
 
-	// NodeByID retrieves a node by ID from the DB
+	// retrieves a node by its ID from the DB
 	NodeByID(ID uint32) (*Node, error)
 
-	// NodeSuccessorIDs returns a slice that contains the IDs of all successors of a node
+	IsDandling(ID uint32) bool
+
+	// returns a slice that contains the IDs of all successors of a node
 	NodeSuccessorIDs(ID uint32) ([]uint32, error)
 
-	// AllNodeIDs returns a slice with the IDs of all nodes in the DB
+	// returns a slice with the IDs of all nodes in the DB
 	AllNodeIDs() ([]uint32, error)
 }
 

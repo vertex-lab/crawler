@@ -103,8 +103,8 @@ func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
 	nodeIDs []uint32, rng *rand.Rand) error {
 
 	// unpack the parameters
-	alpha := RWM.alpha
-	walksPerNode := RWM.walksPerNode
+	alpha := RWM.Alpha
+	walksPerNode := RWM.WalksPerNode
 
 	// for each node, perform `walksPerNode` random walks
 	for _, nodeID := range nodeIDs {
@@ -137,7 +137,7 @@ func (RWM *RandomWalksManager) Generate(DB graph.Database, nodeID uint32) error 
 	}
 
 	// if nodeID is already in the RWM, exit
-	if _, exist := RWM.WalksByNode[nodeID]; exist {
+	if _, exist := RWM.NodeWalkSet[nodeID]; exist {
 		return nil
 	}
 

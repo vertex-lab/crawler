@@ -66,7 +66,7 @@ RandomWalksManager structure; The fundamental structure of the pagerank package.
 FIELDS
 ------
 
-	> WalksByNode: map[uint32] WalkSet
+	> NodeWalkSet: map[uint32] WalkSet
 	Associate a node ID to the set of walks that pass through tat node. Each walk
 	is uniquely added to a node set because we break the walk when a cycle is encountered.
 	e.g. {0: { {0}, {2,3,4,0} } ...}; this means that the only walks that passed
@@ -83,13 +83,13 @@ NOTE
 ----
 
  1. The number of walksPerNode is not to be confused with the number of walks
-    associated with each node in the WalksByNode map. In fact, the former will always
+    associated with each node in the NodeWalkSet map. In fact, the former will always
     be smaller or equal to the latter.
 */
 type RandomWalksManager struct {
-	WalksByNode  map[uint32]WalkSet
-	alpha        float32
-	walksPerNode uint16
+	NodeWalkSet  map[uint32]WalkSet
+	Alpha        float32
+	WalksPerNode uint16
 }
 
 // Creates a new RandomWalksManager
@@ -104,9 +104,9 @@ func NewRWM(alpha float32, walksPerNode uint16) (*RandomWalksManager, error) {
 	}
 
 	RWM := &RandomWalksManager{
-		WalksByNode:  make(map[uint32]WalkSet),
-		alpha:        alpha,
-		walksPerNode: walksPerNode,
+		NodeWalkSet:  make(map[uint32]WalkSet),
+		Alpha:        alpha,
+		WalksPerNode: walksPerNode,
 	}
 
 	return RWM, nil
@@ -114,7 +114,7 @@ func NewRWM(alpha float32, walksPerNode uint16) (*RandomWalksManager, error) {
 
 // IsEmpty returns whether RWM is empty (ignores errors)
 func (RWM *RandomWalksManager) IsEmpty() bool {
-	return RWM == nil || len(RWM.WalksByNode) == 0
+	return RWM == nil || len(RWM.NodeWalkSet) == 0
 }
 
 // checks the fields alpha, walksPerNode and whether the RWM is nil, empty or
@@ -125,19 +125,19 @@ func (RWM *RandomWalksManager) CheckState(expectEmptyRWM bool) error {
 		return ErrNilRWMPointer
 	}
 
-	if RWM.alpha <= 0 || RWM.alpha >= 1 {
+	if RWM.Alpha <= 0 || RWM.Alpha >= 1 {
 		return ErrInvalidAlpha
 	}
 
-	if RWM.walksPerNode <= 0 {
+	if RWM.WalksPerNode <= 0 {
 		return ErrInvalidWalksPerNode
 	}
 
-	if len(RWM.WalksByNode) == 0 && !expectEmptyRWM {
+	if len(RWM.NodeWalkSet) == 0 && !expectEmptyRWM {
 		return ErrEmptyRWM
 	}
 
-	if len(RWM.WalksByNode) > 0 && expectEmptyRWM {
+	if len(RWM.NodeWalkSet) > 0 && expectEmptyRWM {
 		return ErrNonEmptyRWM
 	}
 
@@ -154,7 +154,7 @@ func (RWM *RandomWalksManager) WalksByNodeID(nodeID uint32) (WalkSet, error) {
 		return nil, err
 	}
 
-	walkSet, exist := RWM.WalksByNode[nodeID]
+	walkSet, exist := RWM.NodeWalkSet[nodeID]
 
 	if !exist {
 		return nil, ErrNodeNotFoundRWM
@@ -180,11 +180,11 @@ func (RWM *RandomWalksManager) AddWalk(walk *RandomWalk) error {
 	for _, nodeID := range walk.NodeIDs {
 
 		// Initialize the WalkSet for nodeID if it doesn't exist
-		if _, exists := RWM.WalksByNode[nodeID]; !exists {
-			RWM.WalksByNode[nodeID] = mapset.NewSet[*RandomWalk]()
+		if _, exists := RWM.NodeWalkSet[nodeID]; !exists {
+			RWM.NodeWalkSet[nodeID] = mapset.NewSet[*RandomWalk]()
 		}
 
-		RWM.WalksByNode[nodeID].Add(walk)
+		RWM.NodeWalkSet[nodeID].Add(walk)
 	}
 
 	return nil
@@ -212,7 +212,7 @@ func (RWM *RandomWalksManager) PruneWalk(walk *RandomWalk, cutIndex int) error {
 
 	// remove the pointer from the WalkSet of each node
 	for _, prunedNodeID := range walk.NodeIDs[cutIndex:] {
-		RWM.WalksByNode[prunedNodeID].Remove(walk)
+		RWM.NodeWalkSet[prunedNodeID].Remove(walk)
 	}
 
 	// prune the walk
@@ -245,11 +245,11 @@ func (RWM *RandomWalksManager) GraftWalk(walk *RandomWalk, walkSegment []uint32)
 	for _, nodeID := range walkSegment {
 
 		// Initialize the WalkSet for nodeID if it doesn't exist
-		if _, exists := RWM.WalksByNode[nodeID]; !exists {
-			RWM.WalksByNode[nodeID] = mapset.NewSet[*RandomWalk]()
+		if _, exists := RWM.NodeWalkSet[nodeID]; !exists {
+			RWM.NodeWalkSet[nodeID] = mapset.NewSet[*RandomWalk]()
 		}
 
-		RWM.WalksByNode[nodeID].Add(walk)
+		RWM.NodeWalkSet[nodeID].Add(walk)
 	}
 
 	// graft the walk
