@@ -48,14 +48,14 @@ func TestWalkStep(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			rng := rand.New(rand.NewSource(42))
-			nodeID, shouldStop := walkStep(test.successorIDs, test.walk, rng)
+			nodeID, shouldStop := WalkStep(test.successorIDs, test.walk, rng)
 
 			if shouldStop != test.expectedStop {
-				t.Errorf("walkStep(): expected %v, got %v", test.expectedStop, shouldStop)
+				t.Errorf("WalkStep(): expected %v, got %v", test.expectedStop, shouldStop)
 			}
 
 			if nodeID != test.expectedNodeID {
-				t.Errorf("walkStep(): expected %v, got %v", test.expectedNodeID, nodeID)
+				t.Errorf("WalkStep(): expected %v, got %v", test.expectedNodeID, nodeID)
 			}
 		})
 	}
@@ -198,7 +198,7 @@ func TestGenerateRandomWalks(t *testing.T) {
 				}
 
 				// dereference and sort walks in lexicographic order
-				walks := SortWalks(walkSet)
+				walks := SortWalkSet(walkSet)
 
 				// check if the walk is as expected
 				if !reflect.DeepEqual(walks, test.expectedWalks[nodeID]) {
@@ -278,7 +278,7 @@ func TestGenerate(t *testing.T) {
 				}
 
 				// dereference and sort walks in lexicographic order
-				walks := SortWalks(walkSet)
+				walks := SortWalkSet(walkSet)
 
 				if !reflect.DeepEqual(walks, test.expectedWalks[0]) {
 					t.Errorf("generateRandomWalks(): nodeID = %d; expected %v, got %v", 0, test.expectedWalks[0], walks)

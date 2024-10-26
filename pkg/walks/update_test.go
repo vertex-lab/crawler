@@ -126,7 +126,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks := SortWalks(walkSet)
+			walks := SortWalkSet(walkSet)
 
 			if !reflect.DeepEqual(walks, expectedWalk) {
 				t.Errorf("updateRemovedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walks)
@@ -251,7 +251,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 			}
 
 			// dereference walks and sort them in lexicographic order
-			walks := SortWalks(walkSet)
+			walks := SortWalkSet(walkSet)
 
 			if !reflect.DeepEqual(walks, expectedWalk) {
 				t.Errorf("updateAddedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walks)

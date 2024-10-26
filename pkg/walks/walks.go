@@ -57,7 +57,7 @@ func (rWalk *RandomWalk) NeedsUpdate(nodeID uint32,
 	return false, -1, nil
 }
 
-// WalkSet; a set of pointers to RandomWalks.
+// a set of pointers to RandomWalks.
 type WalkSet mapset.Set[*RandomWalk]
 
 /*

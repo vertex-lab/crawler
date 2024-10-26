@@ -13,25 +13,21 @@ func TestCheckEmpty(t *testing.T) {
 	testCases := []struct {
 		name          string
 		WCType        string
-		nodeID        uint32
 		expectedError error
 	}{
 		{
 			name:          "nil WC",
 			WCType:        "nil",
-			nodeID:        0,
 			expectedError: ErrNilWCPointer,
 		},
 		{
-			name:          "node already in WC",
-			WCType:        "one-node0",
-			nodeID:        0,
-			expectedError: ErrNonEmptyNodeWalkSlice,
+			name:          "empty WC",
+			WCType:        "empty",
+			expectedError: ErrEmptyWC,
 		},
 		{
-			name:          "valid",
+			name:          "non empty WC",
 			WCType:        "one-node0",
-			nodeID:        1,
 			expectedError: nil,
 		},
 	}
@@ -41,10 +37,108 @@ func TestCheckEmpty(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			WC := SetupWC(test.WCType)
-			err := WC.CheckEmpty(test.nodeID)
+			err := WC.CheckEmpty()
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("CheckEmpty(): expected %v, got %v", test.expectedError, err)
+			}
+		})
+	}
+}
+
+func TestContains(t *testing.T) {
+	testCases := []struct {
+		name        string
+		WCType      string
+		nodeID      uint32
+		expectedRes bool
+	}{
+		{
+			name:        "nil WC",
+			WCType:      "nil",
+			nodeID:      0,
+			expectedRes: false,
+		},
+		{
+			name:        "empty WC",
+			WCType:      "empty",
+			nodeID:      0,
+			expectedRes: false,
+		},
+		{
+			name:        "contains node 0",
+			WCType:      "one-node0",
+			nodeID:      0,
+			expectedRes: true,
+		},
+		{
+			name:        "doesn't contain node 0",
+			WCType:      "one-node1",
+			nodeID:      0,
+			expectedRes: false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			WC := SetupWC(test.WCType)
+			contains := WC.Contains(test.nodeID)
+
+			if contains != test.expectedRes {
+				t.Errorf("Contains(): expected %v, got %v", test.expectedRes, contains)
+			}
+		})
+	}
+}
+
+func TestFullyUsed(t *testing.T) {
+	testCases := []struct {
+		name        string
+		WCType      string
+		nodeID      uint32
+		expectedRes bool
+	}{
+		{
+			name:        "nil WC",
+			WCType:      "nil",
+			nodeID:      0,
+			expectedRes: true,
+		},
+		{
+			name:        "empty WC",
+			WCType:      "empty",
+			nodeID:      0,
+			expectedRes: true,
+		},
+		{
+			name:        "doesn't contain node 0",
+			WCType:      "one-node1",
+			nodeID:      0,
+			expectedRes: true,
+		},
+		{
+			name:        "some walks left",
+			WCType:      "one-node0",
+			nodeID:      0,
+			expectedRes: false,
+		},
+		{
+			name:        "all used",
+			WCType:      "all-used",
+			nodeID:      0,
+			expectedRes: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			WC := SetupWC(test.WCType)
+			contains := WC.FullyUsed(test.nodeID)
+
+			if contains != test.expectedRes {
+				t.Errorf("FullyUsed(): expected %v, got %v", test.expectedRes, contains)
 			}
 		})
 	}
@@ -58,7 +152,7 @@ func TestLoad(t *testing.T) {
 		WCType        string
 		nodeID        uint32
 		walksNum      int
-		expectedLen   int
+		expectedWalks [][]uint32
 		expectedError error
 	}{
 		{
@@ -67,7 +161,6 @@ func TestLoad(t *testing.T) {
 			WCType:        "empty",
 			nodeID:        0,
 			walksNum:      100,
-			expectedLen:   100,
 			expectedError: walks.ErrNilRWMPointer,
 		},
 		{
@@ -76,7 +169,6 @@ func TestLoad(t *testing.T) {
 			WCType:        "empty",
 			nodeID:        0,
 			walksNum:      100,
-			expectedLen:   100,
 			expectedError: walks.ErrEmptyRWM,
 		},
 		{
@@ -85,7 +177,6 @@ func TestLoad(t *testing.T) {
 			WCType:        "empty",
 			nodeID:        0,
 			walksNum:      100,
-			expectedLen:   100,
 			expectedError: walks.ErrNodeNotFoundRWM,
 		},
 		{
@@ -94,7 +185,6 @@ func TestLoad(t *testing.T) {
 			WCType:        "nil",
 			nodeID:        0,
 			walksNum:      100,
-			expectedLen:   100,
 			expectedError: ErrNilWCPointer,
 		},
 		{
@@ -103,8 +193,7 @@ func TestLoad(t *testing.T) {
 			WCType:        "one-node0",
 			nodeID:        0,
 			walksNum:      100,
-			expectedLen:   100,
-			expectedError: ErrNonEmptyNodeWalkSlice,
+			expectedError: ErrNodeAlreadyLoadedWC,
 		},
 		{
 			name:          "valid, negative walksNum",
@@ -112,16 +201,16 @@ func TestLoad(t *testing.T) {
 			WCType:        "empty",
 			nodeID:        0,
 			walksNum:      -1,
-			expectedLen:   3,
+			expectedWalks: [][]uint32{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}},
 			expectedError: nil,
 		},
 		{
 			name:          "valid, positive walksNum",
-			RWMType:       "triangle",
+			RWMType:       "simple",
 			WCType:        "empty",
 			nodeID:        0,
 			walksNum:      1,
-			expectedLen:   1,
+			expectedWalks: [][]uint32{{0, 1}},
 			expectedError: nil,
 		},
 	}
@@ -140,10 +229,13 @@ func TestLoad(t *testing.T) {
 			}
 
 			// check if the walks have been correctly added to the WC
-			if test.expectedError == nil {
+			if expectedWalks := test.expectedWalks; expectedWalks != nil {
 
-				if len(WC.NodeWalkSlice[test.nodeID]) != test.expectedLen {
-					t.Errorf("Load(): expected %v, got %v", test.expectedLen, WC.NodeWalkSlice[test.nodeID])
+				// dereference walks and sort them in lexographic order
+				walks := walks.SortWalks(WC.NodeWalkSlice[test.nodeID])
+
+				if !reflect.DeepEqual(walks, expectedWalks) {
+					t.Errorf("Load(): expected %v, got %v", expectedWalks, walks)
 				}
 			}
 		})
@@ -166,17 +258,17 @@ func TestNextWalk(t *testing.T) {
 			expectedError: ErrNilWCPointer,
 		},
 		{
-			name:          "node not in WC",
-			WCType:        "one-node0",
-			nodeID:        1,
-			expectedError: ErrEmptyNodeWalkSlice,
+			name:          "empty WC",
+			WCType:        "empty",
+			nodeID:        0,
+			expectedError: ErrEmptyWC,
 		},
 		{
 			name:          "all walks used for node 0",
 			WCType:        "all-used",
 			nodeID:        0,
 			expectedWalk:  nil,
-			expectedError: nil,
+			expectedError: ErrAllWalksUsedWC,
 		},
 		{
 			name:          "triangle walks, cut",
@@ -195,13 +287,12 @@ func TestNextWalk(t *testing.T) {
 			walk, err := WC.NextWalk(test.nodeID)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NextWalk(): expected %v got %v", test.expectedError, err)
+				t.Fatalf("NextWalk(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(walk, test.expectedWalk) {
-				t.Errorf("NextWalk(): expected %v got %v", test.expectedWalk, walk)
+				t.Errorf("NextWalk(): expected %v, got %v", test.expectedWalk, walk)
 			}
-
 		})
 	}
 }

@@ -89,7 +89,7 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 		}
 
 		// select the new next node among the common successors
-		successorID, shouldStop := walkStep(commonSucc, rWalk.NodeIDs, rng)
+		successorID, shouldStop := WalkStep(commonSucc, rWalk.NodeIDs, rng)
 		if shouldStop {
 			continue
 		}
@@ -101,7 +101,7 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 		}
 
 		// remove potential cycles
-		newWalkSegment = removeCycles(rWalk.NodeIDs, newWalkSegment)
+		newWalkSegment = RemoveCycles(rWalk.NodeIDs, newWalkSegment)
 
 		// graft the walk with the new walk segment
 		err = RWM.GraftWalk(rWalk, newWalkSegment)
@@ -152,7 +152,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		}
 
 		// select the new next node
-		addedID, shouldStop := walkStep(addesSucc, rWalk.NodeIDs, rng)
+		addedID, shouldStop := WalkStep(addesSucc, rWalk.NodeIDs, rng)
 		if shouldStop {
 			continue
 		}
@@ -164,7 +164,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		}
 
 		// remove potential cycles
-		newWalkSegment = removeCycles(rWalk.NodeIDs, newWalkSegment)
+		newWalkSegment = RemoveCycles(rWalk.NodeIDs, newWalkSegment)
 
 		// graft the walk with the new walk segment
 		err = RWM.GraftWalk(rWalk, newWalkSegment)

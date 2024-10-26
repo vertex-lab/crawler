@@ -19,7 +19,7 @@ performs a walk step nodeID --> nextNodeID in successorIDs and returns
 
 - nextNodeID was already visited in one of the previous steps (walk)
 */
-func walkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
+func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
 
 	// if it is a dandling node, stop
 	succLenght := len(successorIDs)
@@ -80,8 +80,8 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 			return nil, err
 		}
 
-		// perform a walk step; break if one of the condition in walkStep is triggered
-		currentNodeID, shouldBreak = walkStep(successorIDs, walk, rng)
+		// perform a walk step; break if one of the condition in WalkStep is triggered
+		currentNodeID, shouldBreak = WalkStep(successorIDs, walk, rng)
 		if shouldBreak {
 			break
 		}

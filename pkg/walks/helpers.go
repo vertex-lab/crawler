@@ -61,7 +61,7 @@ func Partition(oldSlice, newSlice []uint32) ([]uint32, []uint32, []uint32) {
 
 // returns newWalkSegment[i] with the highest i such that
 // oldWalk + newWalkSegment[i] doesn't contain a cycle.
-func removeCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
+func RemoveCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
 
 	for i, newNodeID := range newWalkSegment {
 
@@ -76,12 +76,12 @@ func removeCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
 }
 
 // dereferences the random walks and sorts them in lexicographic order
-func SortWalks(walkSet WalkSet) [][]uint32 {
+func SortWalks(rWalks []*RandomWalk) [][]uint32 {
 
 	walks := [][]uint32{}
 
 	// dereference the pointers
-	for rWalk := range walkSet.Iter() {
+	for _, rWalk := range rWalks {
 		walks = append(walks, rWalk.NodeIDs)
 	}
 
@@ -100,6 +100,11 @@ func SortWalks(walkSet WalkSet) [][]uint32 {
 	})
 
 	return walks
+}
+
+// dereferences the random walks in the walkSet and sorts them in lexicographic order
+func SortWalkSet(walkSet WalkSet) [][]uint32 {
+	return SortWalks(walkSet.ToSlice())
 }
 
 // function that returns a RWM setup based on the RWMType

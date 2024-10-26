@@ -58,10 +58,10 @@ func TestRemoveCycles(t *testing.T) {
 		oldWalk := []uint32{}
 		newWalkSegment := []uint32{}
 
-		got := removeCycles(oldWalk, newWalkSegment)
+		got := RemoveCycles(oldWalk, newWalkSegment)
 
 		if got == nil || len(got) > 0 {
-			t.Errorf("removeCycles(): expected [], got %v", got)
+			t.Errorf("RemoveCycles(): expected [], got %v", got)
 		}
 	})
 
@@ -70,10 +70,10 @@ func TestRemoveCycles(t *testing.T) {
 		oldWalk := []uint32{0, 1, 2, 3}
 		newWalkSegment := []uint32{3, 4, 5, 6}
 
-		got := removeCycles(oldWalk, newWalkSegment)
+		got := RemoveCycles(oldWalk, newWalkSegment)
 
 		if got == nil || len(got) > 0 {
-			t.Errorf("removeCycles(): expected [], got %v", got)
+			t.Errorf("RemoveCycles(): expected [], got %v", got)
 		}
 	})
 
@@ -83,23 +83,23 @@ func TestRemoveCycles(t *testing.T) {
 		newWalkSegment := []uint32{4, 2, 6}
 
 		want := []uint32{4}
-		got := removeCycles(oldWalk, newWalkSegment)
+		got := RemoveCycles(oldWalk, newWalkSegment)
 
 		if !reflect.DeepEqual(got, want) {
-			t.Errorf("removeCycles(): expected %v, got %v", want, got)
+			t.Errorf("RemoveCycles(): expected %v, got %v", want, got)
 		}
 	})
 }
 
-func TestSortWalks(t *testing.T) {
+func TestSortWalkSet(t *testing.T) {
 
 	t.Run("empty walkSet", func(t *testing.T) {
 
 		walkSet := mapset.NewSet[*RandomWalk]()
-		walks := SortWalks(walkSet)
+		walks := SortWalkSet(walkSet)
 
 		if !reflect.DeepEqual(walks, [][]uint32{}) {
-			t.Errorf("SortWalks(): expected %v, got %v", [][]uint32{}, walks)
+			t.Errorf("SortWalkSet(): expected %v, got %v", [][]uint32{}, walks)
 		}
 	})
 
@@ -116,11 +116,11 @@ func TestSortWalks(t *testing.T) {
 		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
 
 		walkSet := mapset.NewSet(rWalk1, rWalk2, rWalk3)
-		got := SortWalks(walkSet)
+		got := SortWalkSet(walkSet)
 
 		for key, val := range expected {
 			if !reflect.DeepEqual(got[key], val) {
-				t.Errorf("SortWalks(): expected %v, got %v", val, got[key])
+				t.Errorf("SortWalkSet(): expected %v, got %v", val, got[key])
 			}
 		}
 	})
