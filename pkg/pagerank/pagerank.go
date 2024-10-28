@@ -10,8 +10,7 @@ type PagerankMap map[uint32]float64
 func Pagerank(RWM *walks.RandomWalksManager) (PagerankMap, error) {
 
 	const expectEmptyRWM = false
-	err := RWM.CheckState(expectEmptyRWM)
-	if err != nil {
+	if err := RWM.CheckState(expectEmptyRWM); err != nil {
 		return nil, err
 	}
 

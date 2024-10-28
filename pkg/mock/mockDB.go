@@ -115,7 +115,6 @@ func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockDataba
 
 // function that returns a DB setup based on the DBType
 func SetupDB(DBType string) *MockDatabase {
-
 	switch DBType {
 
 	case "nil":

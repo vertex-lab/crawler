@@ -75,15 +75,7 @@ func RemoveCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
 	return newWalkSegment
 }
 
-// dereferences the random walks and sorts them in lexicographic order
-func SortWalks(rWalks []*RandomWalk) [][]uint32 {
-
-	walks := [][]uint32{}
-
-	// dereference the pointers
-	for _, rWalk := range rWalks {
-		walks = append(walks, rWalk.NodeIDs)
-	}
+func SortWalks(walks [][]uint32) [][]uint32 {
 
 	// Sort the walks lexicographically
 	sort.Slice(walks, func(i, j int) bool {
@@ -102,14 +94,26 @@ func SortWalks(rWalks []*RandomWalk) [][]uint32 {
 	return walks
 }
 
+// dereferences the random walks and sorts them in lexicographic order
+func SortRandomWalks(rWalks []*RandomWalk) [][]uint32 {
+
+	walks := [][]uint32{}
+
+	// dereference the pointers
+	for _, rWalk := range rWalks {
+		walks = append(walks, rWalk.NodeIDs)
+	}
+
+	return SortWalks(walks)
+}
+
 // dereferences the random walks in the walkSet and sorts them in lexicographic order
 func SortWalkSet(walkSet WalkSet) [][]uint32 {
-	return SortWalks(walkSet.ToSlice())
+	return SortRandomWalks(walkSet.ToSlice())
 }
 
 // function that returns a RWM setup based on the RWMType
 func SetupRWM(RWMType string) *RandomWalksManager {
-
 	switch RWMType {
 
 	case "nil":

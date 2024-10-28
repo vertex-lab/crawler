@@ -3,7 +3,6 @@ package pagerank
 import (
 	"errors"
 	"math/rand"
-	"reflect"
 	"testing"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
@@ -143,7 +142,7 @@ func TestPersonalizedWalk(t *testing.T) {
 		RWMType        string
 		startingNodeID uint32
 		requiredLenght int
-		expectedWalk   [][]uint32
+		expectedVisits map[uint32]int
 		expectedError  error
 	}{
 		{
@@ -168,16 +167,15 @@ func TestPersonalizedWalk(t *testing.T) {
 			RWMType:        "one-node0",
 			startingNodeID: 0,
 			requiredLenght: 0,
-			expectedWalk:   [][]uint32{},
 			expectedError:  nil,
 		},
 		{
 			name:           "single walk added",
-			DBType:         "triangle",
-			RWMType:        "triangle",
+			DBType:         "simple",
+			RWMType:        "simple",
 			startingNodeID: 0,
 			requiredLenght: 1,
-			expectedWalk:   [][]uint32{{0, 1, 2}},
+			expectedVisits: map[uint32]int{0: 1, 1: 1},
 			expectedError:  nil,
 		},
 		{
@@ -185,8 +183,8 @@ func TestPersonalizedWalk(t *testing.T) {
 			DBType:         "triangle",
 			RWMType:        "triangle",
 			startingNodeID: 0,
-			requiredLenght: 20,
-			expectedWalk:   [][]uint32{{0, 1, 2}},
+			requiredLenght: 10,
+			expectedVisits: map[uint32]int{0: 4, 1: 4, 2: 3},
 			expectedError:  nil,
 		},
 	}
@@ -204,8 +202,21 @@ func TestPersonalizedWalk(t *testing.T) {
 				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(pWalk, test.expectedWalk) {
-				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedWalk, pWalk)
+			// check the visits match the expected ones.
+			// Note: Order of visits cannot be inforced due to walkSet.Iter()
+			if test.expectedVisits != nil {
+
+				// count the visits
+				visits := make(map[uint32]int, 3)
+				for _, nodeID := range pWalk {
+					visits[nodeID]++
+				}
+
+				for _, nodeID := range []uint32{0, 1, 2} {
+					if visits[nodeID] != test.expectedVisits[nodeID] {
+						t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedVisits, visits)
+					}
+				}
 			}
 		})
 	}

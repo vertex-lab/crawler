@@ -32,27 +32,28 @@ func SetupWC(WCType string) *WalkCache {
 
 	case "one-node0":
 		WC := NewWalkCache()
-		WC.NodeWalkSlice[0] = []*walks.RandomWalk{{NodeIDs: []uint32{0}}}
+		rWalk := walks.RandomWalk{NodeIDs: []uint32{0}}
+		WC.NodeWalkSlice[0] = [][]uint32{rWalk.NodeIDs}
+		WC.FetchedWalks.Add(&rWalk)
 		return WC
 
 	case "all-used":
 		WC := NewWalkCache()
-		rWalk := &walks.RandomWalk{NodeIDs: []uint32{0}}
+		rWalk := walks.RandomWalk{NodeIDs: []uint32{0}}
+		WC.NodeWalkSlice[0] = [][]uint32{rWalk.NodeIDs}
+		WC.FetchedWalks.Add(&rWalk)
 
-		WC.NodeWalkSlice[0] = []*walks.RandomWalk{rWalk}
-		WC.UsedWalks.Add(rWalk)
-		WC.NodeFullyUsed[0] = true
+		WC.NodeWalkIndex[0] = 1 // all used
 		return WC
 
 	case "triangle":
 		WC := NewWalkCache()
-		rWalk0 := &walks.RandomWalk{NodeIDs: []uint32{0, 1, 2}}
-		rWalk1 := &walks.RandomWalk{NodeIDs: []uint32{1, 2, 0}}
-		rWalk2 := &walks.RandomWalk{NodeIDs: []uint32{2, 0, 1}}
+		rWalk0 := walks.RandomWalk{NodeIDs: []uint32{0, 1, 2}}
+		rWalk1 := walks.RandomWalk{NodeIDs: []uint32{1, 2, 0}}
+		rWalk2 := walks.RandomWalk{NodeIDs: []uint32{2, 0, 1}}
 
-		WC.NodeWalkSlice[0] = []*walks.RandomWalk{rWalk0, rWalk1, rWalk2}
-		WC.UsedWalks.Add(rWalk0)
-		WC.UsedWalks.Add(rWalk1)
+		WC.NodeWalkSlice[0] = [][]uint32{rWalk0.NodeIDs[1:], rWalk2.NodeIDs[2:]}
+		WC.FetchedWalks.Append(&rWalk0, &rWalk1, &rWalk2)
 		return WC
 
 	default:

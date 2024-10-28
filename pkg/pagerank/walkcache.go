@@ -7,31 +7,41 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
-// a slice of random walks pointers
-type WalkSlice []*walks.RandomWalk
+// a slice of walks
+type WalkSlice [][]uint32
 
 /*
 WalkCache keeps track of the walks associated with each node and the walks that
 have been used in the personalized walk.
 
-If all walks for a node have been used, we set NodeFullyUsed[nodeID] = true for
-faster checking.
+# FIELDS
 
-The WalkCache is used in the Personalized pagerank function to select a walk
-associated with nodeID that has never been used before.
+	> NodeWalkSlice map[uint32]WalkSlice
+	A map that associates each nodeID with a slice of walks that go through that node
+
+	> NodeWalkIndex map[uint32]int
+	A map that associates each nodeID with the last used walk index.
+	The personalized walk will use the first walk in NodeWalkSlice[nodeID] (index = 0),
+	then the second (index = 1) and so on. When the index reaches the lenght of
+	the walkSlice, all walks have been used.
+
+	> FetchedWalks walks.WalkSet
+	A set of walk IDs that have been already fetched from the RWM. Because walks
+	should not be reused in the personalized walk, we won't fetch walks that
+	have already been fetched (even if not yet used).
 */
 type WalkCache struct {
 	NodeWalkSlice map[uint32]WalkSlice
-	UsedWalks     walks.WalkSet
-	NodeFullyUsed map[uint32]bool
+	NodeWalkIndex map[uint32]int
+	FetchedWalks  walks.WalkSet
 }
 
 // initializes an empty WC
 func NewWalkCache() *WalkCache {
 	return &WalkCache{
 		NodeWalkSlice: make(map[uint32]WalkSlice),
-		UsedWalks:     mapset.NewSet[*walks.RandomWalk](),
-		NodeFullyUsed: make(map[uint32]bool),
+		NodeWalkIndex: make(map[uint32]int),
+		FetchedWalks:  mapset.NewSet[*walks.RandomWalk](),
 	}
 }
 
@@ -56,8 +66,8 @@ func (WC *WalkCache) Contains(nodeID uint32) bool {
 		return false
 	}
 
-	walkSlice, exists := WC.NodeWalkSlice[nodeID]
-	return exists && len(walkSlice) > 0
+	_, exist := WC.NodeWalkSlice[nodeID]
+	return exist
 }
 
 // returns whether all walks of nodeID have been used. if WC is nil, returns true
@@ -67,18 +77,14 @@ func (WC *WalkCache) FullyUsed(nodeID uint32) bool {
 		return true
 	}
 
-	if WC.NodeFullyUsed[nodeID] {
-		return true
-	}
-
-	return false
+	return WC.NodeWalkIndex[nodeID] >= len(WC.NodeWalkSlice[nodeID])
 }
 
 /*
-fetches the WalkSet of nodeID from the RWM and stores up to `walkNum` random walks
-pointers in the WalkCache.
+fetches the WalkSet of nodeID from the RWM and stores up to `walkNum` walks
+in the WalkCache. It avoid storing walks that have already been fetched (by other nodes).
 
-To avoid complexity, the load method will fetch the walks for nodeID only once.
+The Load method will fetch the walks for nodeID only once.
 Subsequent fetching will result in an error.
 
 If walkNum is <= 0, all walks will be fetched.
@@ -99,35 +105,48 @@ func (WC *WalkCache) Load(RWM *walks.RandomWalksManager,
 		return err
 	}
 
-	// if it's <= 0, fetch all the walks
-	if walksNum <= 0 || walksNum > walkSet.Cardinality() {
+	// avoid adding previously fetched walks
+	walkDiffSet := walkSet.Difference(WC.FetchedWalks)
 
-		WC.NodeWalkSlice[nodeID] = walkSet.ToSlice()
-		return nil
+	// determine the number of walks to fetch
+	if walksNum <= 0 || walksNum > walkDiffSet.Cardinality() {
+		walksNum = walkDiffSet.Cardinality()
 	}
 
-	// add the first walksNum elements to the walkSlice
-	walkSlice := make([]*walks.RandomWalk, 0, walksNum)
-	for rWalk := range walkSet.Iter() {
-
+	walkSlice := [][]uint32{}
+	for rWalk := range walkDiffSet.Iter() {
 		if len(walkSlice) == walksNum {
 			break
 		}
-		walkSlice = append(walkSlice, rWalk)
+
+		walkSegment, err := CropWalk(rWalk, nodeID)
+		if err != nil {
+			return err
+		}
+
+		// skip empty walk segments
+		if len(walkSegment) == 0 {
+			continue
+		}
+
+		WC.FetchedWalks.Add(rWalk)
+		walkSlice = append(walkSlice, walkSegment)
 	}
 
-	WC.NodeWalkSlice[nodeID] = walkSlice
+	WC.NodeWalkSlice[nodeID] = walkSlice // adding an empty slice signals that it was Loaded
 	return nil
 }
 
 /*
-returns the next walk of nodeID from the WalkCache. It returns an empty slice if all walks have been used.
-An error is returned if the WalkCache is nil or if no walks exist for the nodeID.
+returns the next walk of nodeID from the WalkCache.
+It returns errors if:
+- the WalkCache is nil
+- no walks exist for nodeID
+- all walks for nodeID have been used
 */
 func (WC *WalkCache) NextWalk(nodeID uint32) ([]uint32, error) {
 
-	err := WC.CheckEmpty()
-	if err != nil {
+	if err := WC.CheckEmpty(); err != nil {
 		return nil, err
 	}
 
@@ -135,29 +154,15 @@ func (WC *WalkCache) NextWalk(nodeID uint32) ([]uint32, error) {
 		return nil, ErrNodeNotFoundWC
 	}
 
-	// try to find an unused walk
-	walkSlice := WC.NodeWalkSlice[nodeID]
-	for i, rWalk := range walkSlice {
-
-		if !WC.UsedWalks.ContainsOne(rWalk) {
-
-			// if this was the last available walk, now all are fully used
-			if i == len(walkSlice)-1 {
-				WC.NodeFullyUsed[nodeID] = true
-			}
-
-			WC.UsedWalks.Add(rWalk)
-			walk, err := CropWalk(rWalk, nodeID)
-			if err != nil {
-				return nil, err
-			}
-
-			return walk, nil
-		}
+	if WC.NodeWalkIndex[nodeID] >= len(WC.NodeWalkSlice[nodeID]) {
+		return nil, ErrAllWalksUsedWC
 	}
 
-	return nil, ErrAllWalksUsedWC
+	index := WC.NodeWalkIndex[nodeID]
+	nextWalk := WC.NodeWalkSlice[nodeID][index]
+	WC.NodeWalkIndex[nodeID]++
 
+	return nextWalk, nil
 }
 
 // returns the walk from nodeID onward (included). If nodeID is not found, returns an error

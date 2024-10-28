@@ -76,10 +76,10 @@ To avoid the overhead of continually fetching walks from the RWM, the requests
 are batched and the walks are stored in the WalkCache struct.
 */
 func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
-	startingNodeID uint32, requiredLenght int, rng *rand.Rand) ([][]uint32, error) {
+	startingNodeID uint32, requiredLenght int, rng *rand.Rand) ([]uint32, error) {
 
 	WC := NewWalkCache()
-	pWalk := make([][]uint32, 0, requiredLenght)
+	pWalk := make([]uint32, 0, requiredLenght)
 
 	err := WC.Load(RWM, startingNodeID, estimateWalksNum(requiredLenght, RWM.Alpha))
 	if err != nil {
@@ -99,7 +99,7 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 
 		// append the current walk and reset
 		if rng.Float32() > RWM.Alpha {
-			pWalk = append(pWalk, currentWalk)
+			pWalk = append(pWalk, currentWalk...)
 			currentNodeID = startingNodeID
 			currentWalk = []uint32{startingNodeID}
 			continue
@@ -107,15 +107,13 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 
 		// if there are no walks, load them
 		if !WC.Contains(currentNodeID) {
-			err := WC.Load(RWM, currentNodeID, 1000)
-			if err != nil {
+			if err := WC.Load(RWM, currentNodeID, 1000); err != nil {
 				return nil, err
 			}
 		}
 
 		// if all walks have been used, do a walk step
 		if WC.FullyUsed(currentNodeID) {
-
 			// fetch the successors
 			successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
 			if err != nil {
@@ -123,17 +121,17 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 			}
 
 			// perform a walk step
-			currentNodeID, shouldStop := walks.WalkStep(successorIDs, currentWalk, rng)
-
+			nextNodeID, shouldStop := walks.WalkStep(successorIDs, currentWalk, rng)
 			if shouldStop {
-				pWalk = append(pWalk, currentWalk)
+				pWalk = append(pWalk, currentWalk...)
 				currentNodeID = startingNodeID
 				currentWalk = []uint32{startingNodeID}
 				continue
 			}
 
 			// append and continue
-			currentWalk = append(currentWalk, currentNodeID)
+			currentWalk = append(currentWalk, nextNodeID)
+			currentNodeID = nextNodeID
 			continue
 		}
 
@@ -148,7 +146,7 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 
 		// append current walk
 		currentWalk = append(currentWalk, walkSegment...)
-		pWalk = append(pWalk, currentWalk)
+		pWalk = append(pWalk, currentWalk...)
 
 		// reset
 		currentNodeID = startingNodeID
@@ -188,7 +186,6 @@ func estimateWalksNum(lenght int, alpha float32) int {
 // returns the required lenght of the walkSegment for the Personalized pagerank.
 // the result has to be strictly positive
 func requiredLenght(topK uint16) int {
-
 	_ = topK
 	return 300000
 }
@@ -197,14 +194,12 @@ func requiredLenght(topK uint16) int {
 func checkInputs(DB graph.Database, RWM *walks.RandomWalksManager,
 	nodeID uint32, topK uint16) error {
 
-	err := DB.CheckEmpty()
-	if err != nil {
+	if err := DB.CheckEmpty(); err != nil {
 		return err
 	}
 
 	const expectedEmpty = false
-	err = RWM.CheckState(expectedEmpty)
-	if err != nil {
+	if err := RWM.CheckState(expectedEmpty); err != nil {
 		return err
 	}
 
@@ -225,6 +220,6 @@ func checkInputs(DB graph.Database, RWM *walks.RandomWalksManager,
 	return nil
 }
 
-// ---------------------------------ERROR-CODES--------------------------------
+// // ---------------------------------ERROR-CODES--------------------------------
 
 var ErrInvalidTopN = errors.New("topK shoud be greater than 0")
