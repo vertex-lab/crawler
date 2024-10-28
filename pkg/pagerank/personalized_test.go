@@ -3,6 +3,7 @@ package pagerank
 import (
 	"errors"
 	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
@@ -135,6 +136,151 @@ func TestCountAndNormalize(t *testing.T) {
 	}
 }
 
+func TestReached(t *testing.T) {
+
+	testCases := []struct {
+		name            string
+		targetLength    int
+		expectedReached bool
+	}{
+		{
+			name:            "target Lenght reached",
+			targetLength:    0,
+			expectedReached: true,
+		},
+		{
+			name:            "target Lenght not reached",
+			targetLength:    10,
+			expectedReached: false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			pWalk := NewPersonalizedWalk(0, test.targetLength)
+			reached := pWalk.Reached(test.targetLength)
+			if reached != test.expectedReached {
+				t.Errorf("Reached(): expected %v, got %v", test.expectedReached, reached)
+			}
+		})
+	}
+}
+
+func TestReset(t *testing.T) {
+
+	testCases := []struct {
+		name            string
+		pWalkType       string
+		expectedNodeIDs []uint32
+	}{
+		{
+			name:            "one-node0",
+			pWalkType:       "one-node0",
+			expectedNodeIDs: []uint32{0},
+		},
+		{
+			name:            "triangle",
+			pWalkType:       "triangle",
+			expectedNodeIDs: []uint32{0, 1, 2},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			pWalk := SetupPWalk(test.pWalkType, 10)
+			pWalk.Reset()
+
+			if pWalk.currentNodeID != pWalk.startingNodeID {
+				t.Errorf("Reset(): expected %v, got %v", pWalk.startingNodeID, pWalk.currentNodeID)
+			}
+
+			if !reflect.DeepEqual(pWalk.currentWalk, []uint32{pWalk.startingNodeID}) {
+				t.Errorf("Reset(): expected %v, got %v", []uint32{pWalk.startingNodeID}, pWalk.currentWalk)
+			}
+
+			if !reflect.DeepEqual(pWalk.nodeIDs, test.expectedNodeIDs) {
+				t.Errorf("Reset(): expected %v, got %v", test.expectedNodeIDs, pWalk.nodeIDs)
+			}
+		})
+	}
+}
+
+func TestAppendNode(t *testing.T) {
+
+	testCases := []struct {
+		name                string
+		pWalkType           string
+		nextNodeID          uint32
+		expectedCurrentWalk []uint32
+	}{
+		{
+			name:                "one-node0",
+			pWalkType:           "one-node0",
+			nextNodeID:          1,
+			expectedCurrentWalk: []uint32{0, 1},
+		},
+		{
+			name:                "triangle",
+			pWalkType:           "triangle",
+			nextNodeID:          3,
+			expectedCurrentWalk: []uint32{0, 1, 2, 3},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			pWalk := SetupPWalk(test.pWalkType, 10)
+			pWalk.AppendNode(test.nextNodeID)
+
+			if pWalk.currentNodeID != test.nextNodeID {
+				t.Errorf("AppendNode(): expected %v, got %v", test.nextNodeID, pWalk.currentNodeID)
+			}
+
+			if !reflect.DeepEqual(pWalk.currentWalk, test.expectedCurrentWalk) {
+				t.Errorf("AppendNode(): expected %v, got %v", test.expectedCurrentWalk, pWalk.currentWalk)
+			}
+		})
+	}
+}
+
+func TestAppendWalkSegment(t *testing.T) {
+
+	testCases := []struct {
+		name            string
+		pWalkType       string
+		walkSegment     []uint32
+		expectedNodeIDs []uint32
+	}{
+		{
+			name:            "one-node0",
+			pWalkType:       "one-node0",
+			walkSegment:     []uint32{1, 2},
+			expectedNodeIDs: []uint32{0, 1, 2},
+		},
+		{
+			name:            "triangle",
+			pWalkType:       "triangle",
+			walkSegment:     []uint32{3, 1},
+			expectedNodeIDs: []uint32{0, 1, 2, 3},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			pWalk := SetupPWalk(test.pWalkType, 10)
+			pWalk.AppendWalk(test.walkSegment)
+
+			if !reflect.DeepEqual(pWalk.nodeIDs, test.expectedNodeIDs) {
+				t.Errorf("AppendNode(): expected %v, got %v", test.expectedNodeIDs, pWalk.currentWalk)
+			}
+		})
+	}
+}
+
 func TestPersonalizedWalk(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -183,7 +329,7 @@ func TestPersonalizedWalk(t *testing.T) {
 			DBType:         "triangle",
 			RWMType:        "triangle",
 			startingNodeID: 0,
-			requiredLenght: 10,
+			requiredLenght: 11,
 			expectedVisits: map[uint32]int{0: 4, 1: 4, 2: 3},
 			expectedError:  nil,
 		},
@@ -214,7 +360,7 @@ func TestPersonalizedWalk(t *testing.T) {
 
 				for _, nodeID := range []uint32{0, 1, 2} {
 					if visits[nodeID] != test.expectedVisits[nodeID] {
-						t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedVisits, visits)
+						t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedVisits, pWalk)
 					}
 				}
 			}
@@ -222,85 +368,138 @@ func TestPersonalizedWalk(t *testing.T) {
 	}
 }
 
-// func TestPersonalizedPagerank(t *testing.T) {
+func TestPersonalizedPagerank(t *testing.T) {
 
-// 	t.Run("simple errors", func(t *testing.T) {
+	t.Run("simple errors", func(t *testing.T) {
 
-// 		testCases := []struct {
-// 			name          string
-// 			DBType        string
-// 			RWMType       string
-// 			nodeID        uint32
-// 			topK          uint16
-// 			expectedError error
-// 		}{
-// 			{
-// 				name:          "nil DB",
-// 				DBType:        "nil",
-// 				RWMType:       "one-node0",
-// 				nodeID:        0,
-// 				topK:          5,
-// 				expectedError: graph.ErrNilDatabasePointer,
-// 			},
-// 			{
-// 				name:          "empty DB",
-// 				DBType:        "empty",
-// 				RWMType:       "one-node0",
-// 				nodeID:        0,
-// 				topK:          5,
-// 				expectedError: graph.ErrDatabaseIsEmpty,
-// 			},
-// 			{
-// 				name:          "nil RWM",
-// 				DBType:        "one-node0",
-// 				RWMType:       "nil",
-// 				nodeID:        0,
-// 				topK:          5,
-// 				expectedError: walks.ErrNilRWMPointer,
-// 			},
-// 			{
-// 				name:          "empty RWM",
-// 				RWMType:       "empty",
-// 				DBType:        "one-node0",
-// 				nodeID:        0,
-// 				topK:          5,
-// 				expectedError: walks.ErrEmptyRWM,
-// 			},
-// 			{
-// 				name:          "node not in the RWM",
-// 				DBType:        "triangle",
-// 				RWMType:       "one-node0",
-// 				nodeID:        1,
-// 				topK:          5,
-// 				expectedError: walks.ErrNodeNotFoundRWM,
-// 			},
-// 			{
-// 				name:          "invalid topK",
-// 				DBType:        "one-node0",
-// 				RWMType:       "one-node0",
-// 				nodeID:        0,
-// 				topK:          0,
-// 				expectedError: ErrInvalidTopN,
-// 			},
-// 		}
+		testCases := []struct {
+			name          string
+			DBType        string
+			RWMType       string
+			nodeID        uint32
+			topK          uint16
+			expectedError error
+		}{
+			{
+				name:          "nil DB",
+				DBType:        "nil",
+				RWMType:       "one-node0",
+				nodeID:        0,
+				topK:          5,
+				expectedError: graph.ErrNilDatabasePointer,
+			},
+			{
+				name:          "empty DB",
+				DBType:        "empty",
+				RWMType:       "one-node0",
+				nodeID:        0,
+				topK:          5,
+				expectedError: graph.ErrDatabaseIsEmpty,
+			},
+			{
+				name:          "nil RWM",
+				DBType:        "one-node0",
+				RWMType:       "nil",
+				nodeID:        0,
+				topK:          5,
+				expectedError: walks.ErrNilRWMPointer,
+			},
+			{
+				name:          "empty RWM",
+				RWMType:       "empty",
+				DBType:        "one-node0",
+				nodeID:        0,
+				topK:          5,
+				expectedError: walks.ErrEmptyRWM,
+			},
+			{
+				name:          "node not in the RWM",
+				DBType:        "triangle",
+				RWMType:       "one-node0",
+				nodeID:        1,
+				topK:          5,
+				expectedError: walks.ErrNodeNotFoundRWM,
+			},
+			{
+				name:          "invalid topK",
+				DBType:        "one-node0",
+				RWMType:       "one-node0",
+				nodeID:        0,
+				topK:          0,
+				expectedError: ErrInvalidTopN,
+			},
+		}
 
-// 		for _, test := range testCases {
-// 			t.Run(test.name, func(t *testing.T) {
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
 
-// 				DB := mock.SetupDB(test.DBType)
-// 				RWM := walks.SetupRWM(test.RWMType)
+				DB := mock.SetupDB(test.DBType)
+				RWM := walks.SetupRWM(test.RWMType)
 
-// 				_, err := Personalized(DB, RWM, test.nodeID, test.topK)
+				_, err := Personalized(DB, RWM, test.nodeID, test.topK)
 
-// 				if !errors.Is(err, test.expectedError) {
-// 					t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
-// 				}
-// 			})
-// 		}
-// 	})
+				if !errors.Is(err, test.expectedError) {
+					t.Errorf("Personalized(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
 
-// 	t.Run("valid", func(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
 
-// 	})
+		const alpha = 0.85
+		const walksPerNode = 1000
+		const expectedError = 0.01
 
-// }
+		testCases := []struct {
+			name       string
+			DBType     string
+			nodeID     uint32
+			topK       uint16
+			expectedPP PagerankMap
+		}{
+			{
+				name:       "dandling",
+				DBType:     "dandling",
+				nodeID:     0,
+				topK:       5,
+				expectedPP: PagerankMap{0: 1.0},
+			},
+			{
+				name:       "simple",
+				DBType:     "simple",
+				nodeID:     0,
+				topK:       5,
+				expectedPP: PagerankMap{0: 0.5405399037185797, 1: 0.4594600962814203, 2: 0.0},
+			},
+			{
+				name:       "triangle",
+				DBType:     "triangle",
+				nodeID:     0,
+				topK:       5,
+				expectedPP: PagerankMap{0: 0.3887264613719621, 1: 0.3304174921661678, 2: 0.28085604646187007},
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+
+				DB := mock.SetupDB(test.DBType)
+				RWM, _ := walks.NewRWM(alpha, walksPerNode)
+				RWM.GenerateAll(DB)
+
+				pp, err := Personalized(DB, RWM, test.nodeID, test.topK)
+				if err != nil {
+					t.Fatalf("Personalized(): expected nil, got %v", err)
+				}
+
+				distance := Distance(test.expectedPP, pp)
+				if distance > expectedError {
+
+					t.Errorf("Personalized(): expected distance %v, got %v\n", expectedError, distance)
+					t.Errorf("Personalized(): expected %v\n, got %v", test.expectedPP, pp)
+				}
+			})
+		}
+	})
+}

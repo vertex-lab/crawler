@@ -60,3 +60,22 @@ func SetupWC(WCType string) *WalkCache {
 		return nil
 	}
 }
+
+// function that set up a PersonalizedWalk based on the provided type and required lenght
+func SetupPWalk(pWalkType string, targetLenght int) *PersonalizedWalk {
+
+	switch pWalkType {
+
+	case "one-node0":
+		return NewPersonalizedWalk(0, targetLenght)
+
+	case "triangle":
+		pWalk := NewPersonalizedWalk(0, targetLenght)
+		pWalk.currentNodeID = 2
+		pWalk.currentWalk = []uint32{0, 1, 2}
+		return pWalk
+
+	default:
+		return NewPersonalizedWalk(0, targetLenght)
+	}
+}
