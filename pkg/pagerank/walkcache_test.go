@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -341,5 +342,87 @@ func TestNextWalk(t *testing.T) {
 				t.Errorf("NextWalk(): expected %v, got %v", test.expectedIndex, WC.NodeWalkIndex[test.nodeID])
 			}
 		})
+	}
+}
+
+func TestCropWalk(t *testing.T) {
+
+	testCases := []struct {
+		name          string
+		rWalk         *walks.RandomWalk
+		nodeID        uint32
+		expectedWalk  []uint32
+		expectedError error
+	}{
+		{
+			name:          "empty random walk",
+			rWalk:         &walks.RandomWalk{},
+			nodeID:        0,
+			expectedError: ErrNodeNotInWalk,
+		},
+		{
+			name:          "node not in random walk",
+			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{1, 2, 3, 4}},
+			nodeID:        0,
+			expectedError: ErrNodeNotInWalk,
+		},
+		{
+			name:          "node in random walk",
+			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{0, 1, 2, 3}},
+			nodeID:        0,
+			expectedError: nil,
+			expectedWalk:  []uint32{1, 2, 3},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			walk, err := CropWalk(test.rWalk, test.nodeID)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("CropWalk(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(walk, test.expectedWalk) {
+				t.Errorf("CropWalk(): expected %v, got %v", test.expectedWalk, walk)
+			}
+		})
+	}
+}
+
+// ---------------------------------BENCHMARKS---------------------------------
+
+func BenchmarkLoad(b *testing.B) {
+	DB := mock.SetupDB("triangle")
+	RWM, _ := walks.NewRWM(0.85, 1000)
+	RWM.GenerateAll(DB)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+
+		WC := NewWalkCache()
+		nodeID := uint32(i % 3)
+		if err := WC.Load(RWM, nodeID, 1000); err != nil {
+			b.Fatalf("Benchmark Load() failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkNextWalk(b *testing.B) {
+
+	RWM := walks.SetupRWM("triangle")
+	WC := NewWalkCache()
+	WC.Load(RWM, 0, 10)
+
+	for i := 0; i < b.N; i++ {
+		if _, err := WC.NextWalk(0); err != nil {
+			b.Fatalf("Benchmark NextWalk(0) failed: %v", err)
+		}
+
+		// reset the index to avoid the error
+		if (i+1)%2 == 0 {
+			WC.NodeWalkIndex[0] = 0
+		}
 	}
 }

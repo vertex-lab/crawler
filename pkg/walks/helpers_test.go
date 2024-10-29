@@ -8,6 +8,33 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
+func TestDifference(t *testing.T) {
+
+	t.Run("empty slices", func(t *testing.T) {
+
+		slice1 := []uint32{}
+		slice2 := []uint32{}
+
+		difference := Difference(slice1, slice2)
+
+		if !reflect.DeepEqual(difference, []uint32{}) {
+			t.Errorf("Partition(): expected [], got %v", difference)
+		}
+	})
+
+	t.Run("normal", func(t *testing.T) {
+
+		slice1 := []uint32{0, 1, 2, 4}
+		slice2 := []uint32{1, 2, 3}
+
+		difference := Difference(slice1, slice2)
+
+		if !reflect.DeepEqual(difference, []uint32{0, 4}) {
+			t.Errorf("Partition(): expected [], got %v", difference)
+		}
+	})
+}
+
 func TestPartition(t *testing.T) {
 
 	t.Run("empty slices", func(t *testing.T) {
@@ -131,7 +158,6 @@ func TestSortWalkSet(t *testing.T) {
 func BenchmarkPartition(b *testing.B) {
 
 	size := int32(1000)
-
 	oldSlice := make([]uint32, size)
 	newSlice := make([]uint32, size)
 
@@ -149,5 +175,68 @@ func BenchmarkPartition(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		Partition(oldSlice, newSlice)
+	}
+}
+
+func BenchmarkDifference(b *testing.B) {
+
+	size := int32(1000)
+	slice1 := make([]uint32, size)
+	slice2 := make([]uint32, size)
+
+	// setup up the two slices
+	for i := int32(0); i < size; i++ {
+
+		element1 := uint32(rand.Int31n(size * 2))
+		element2 := uint32(rand.Int31n(size * 2))
+
+		slice1 = append(slice1, element1)
+		slice2 = append(slice2, element2)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		Difference(slice1, slice2)
+	}
+}
+
+func BenchmarkSetDifference(b *testing.B) {
+
+	size := int32(1000)
+	set1 := mapset.NewSetWithSize[uint32](int(size))
+	set2 := mapset.NewSetWithSize[uint32](int(size))
+
+	// setup up the two sets
+	for i := int32(0); i < size; i++ {
+
+		element1 := uint32(rand.Int31n(size * 2))
+		element2 := uint32(rand.Int31n(size * 2))
+
+		set1.Add(element1)
+		set2.Add(element2)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		set1.Difference(set2)
+	}
+}
+
+func BenchmarkSetToSlice(b *testing.B) {
+
+	size := int32(1000)
+	set := mapset.NewSetWithSize[uint32](int(size))
+
+	for i := int32(0); i < size; i++ {
+		element := uint32(rand.Int31n(size * 2))
+		set.Add(element)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		set.ToSlice()
 	}
 }

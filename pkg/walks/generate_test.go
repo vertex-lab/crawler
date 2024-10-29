@@ -5,7 +5,9 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
@@ -290,52 +292,80 @@ func TestGenerate(t *testing.T) {
 
 func TestGenerateAll(t *testing.T) {
 
-	testCases := []struct {
-		name          string
-		DBType        string
-		RWMType       string
-		expectedError error
-	}{
-		{
-			name:          "nil DB",
-			DBType:        "nil",
-			RWMType:       "one-node1",
-			expectedError: graph.ErrNilDatabasePointer,
-		},
-		{
-			name:          "empty DB",
-			DBType:        "empty",
-			RWMType:       "one-node1",
-			expectedError: graph.ErrDatabaseIsEmpty,
-		},
-		{
-			name:          "nil RWM",
-			DBType:        "one-node0",
-			RWMType:       "nil",
-			expectedError: ErrNilRWMPointer,
-		},
-		{
-			name:          "non-empty RWM",
-			DBType:        "one-node0",
-			RWMType:       "one-node0",
-			expectedError: ErrNonEmptyRWM,
-		},
-	}
+	t.Run("simple errors", func(t *testing.T) {
 
-	for _, test := range testCases {
+		testCases := []struct {
+			name          string
+			DBType        string
+			RWMType       string
+			expectedError error
+		}{
+			{
+				name:          "nil DB",
+				DBType:        "nil",
+				RWMType:       "one-node1",
+				expectedError: graph.ErrNilDatabasePointer,
+			},
+			{
+				name:          "empty DB",
+				DBType:        "empty",
+				RWMType:       "one-node1",
+				expectedError: graph.ErrDatabaseIsEmpty,
+			},
+			{
+				name:          "nil RWM",
+				DBType:        "one-node0",
+				RWMType:       "nil",
+				expectedError: ErrNilRWMPointer,
+			},
+			{
+				name:          "non-empty RWM",
+				DBType:        "one-node0",
+				RWMType:       "one-node0",
+				expectedError: ErrNonEmptyRWM,
+			},
+		}
 
-		t.Run(test.name, func(t *testing.T) {
+		for _, test := range testCases {
 
-			DB := mock.SetupDB(test.DBType)
-			RWM := SetupRWM(test.RWMType)
+			t.Run(test.name, func(t *testing.T) {
 
-			err := RWM.GenerateAll(DB)
+				DB := mock.SetupDB(test.DBType)
+				RWM := SetupRWM(test.RWMType)
 
-			if !errors.Is(err, test.expectedError) {
-				t.Errorf("generateRandomWalks(): expected %v, got %v", test.expectedError, err)
+				err := RWM.GenerateAll(DB)
+				if !errors.Is(err, test.expectedError) {
+					t.Errorf("GenerateAll(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
+
+	t.Run("fuzzy test", func(t *testing.T) {
+
+		nodesNum := 2000
+		edgesPerNode := 100
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
+		RWM, _ := NewRWM(0.85, 10)
+		RWM.GenerateAll(DB)
+
+		// check that each walk in the WalkSet of nodeID contains nodeID
+		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
+
+			walkSet, err := RWM.WalksByNodeID(nodeID)
+			if err != nil {
+				t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
 			}
-		})
-	}
+
+			for rWalk := range walkSet.Iter() {
+				if !slices.Contains(rWalk.NodeIDs, nodeID) {
+					t.Fatalf("walk %v should contain nodeID = %d", rWalk.NodeIDs, nodeID)
+				}
+			}
+		}
+	})
 }
 
 // ---------------------------------BENCHMARKS---------------------------------

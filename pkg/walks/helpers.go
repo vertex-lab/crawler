@@ -9,52 +9,90 @@ import (
 )
 
 /*
-returns removed, commond and added elements, using set notation:
+returns the difference between slice1 and slice2; in set notation:
 
-removed = oldSlice - newSlice
-common = oldSlice ^ newSlice
-added = newSlice - oldSlice
+- difference = slice1 - slice2
 
 Time complexity O(n * logn + m * logm), where n and m are the lengths of the slices.
 This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
 */
-func Partition(oldSlice, newSlice []uint32) ([]uint32, []uint32, []uint32) {
+func Difference(slice1, slice2 []uint32) []uint32 {
 
 	// Sort both slices first
-	slices.Sort(oldSlice)
-	slices.Sort(newSlice)
+	slices.Sort(slice1)
+	slices.Sort(slice2)
 
-	removed := []uint32{}
-	common := []uint32{}
-	added := []uint32{}
+	difference := []uint32{}
 
 	i, j := 0, 0
-	lenOld, lenNew := len(oldSlice), len(newSlice)
+	lenOld, lenNew := len(slice1), len(slice2)
 
 	// Use two pointers to compare both sorted lists
 	for i < lenOld && j < lenNew {
-
-		if oldSlice[i] < newSlice[j] {
-			// oldID is not in newSlice, so it was removed
-			removed = append(removed, oldSlice[i])
+		if slice1[i] < slice2[j] {
+			// the element is in slice1 but not in slice2
+			difference = append(difference, slice1[i])
 			i++
-
-		} else if oldSlice[i] > newSlice[j] {
-			// newID is not in oldSlice, so it was added
-			added = append(added, newSlice[j])
+		} else if slice1[i] > slice2[j] {
 			j++
-
 		} else {
-			// oldID = newID, so it's common
-			common = append(common, oldSlice[i])
 			i++
 			j++
 		}
 	}
 
 	// Add all elements not traversed
-	removed = append(removed, oldSlice[i:]...)
-	added = append(added, newSlice[j:]...)
+	difference = append(difference, slice1[i:]...)
+	return difference
+}
+
+/*
+returns removed, commond and added elements, using set notation:
+
+removed = slice1 - slice2
+common = slice1 ^ slice2
+added = slice2 - slice1
+
+Time complexity O(n * logn + m * logm), where n and m are the lengths of the slices.
+This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
+*/
+func Partition(slice1, slice2 []uint32) ([]uint32, []uint32, []uint32) {
+
+	// Sort both slices first
+	slices.Sort(slice1)
+	slices.Sort(slice2)
+
+	removed := []uint32{}
+	common := []uint32{}
+	added := []uint32{}
+
+	i, j := 0, 0
+	lenOld, lenNew := len(slice1), len(slice2)
+
+	// Use two pointers to compare both sorted lists
+	for i < lenOld && j < lenNew {
+
+		if slice1[i] < slice2[j] {
+			// oldID is not in slice2, so it was removed
+			removed = append(removed, slice1[i])
+			i++
+
+		} else if slice1[i] > slice2[j] {
+			// newID is not in slice1, so it was added
+			added = append(added, slice2[j])
+			j++
+
+		} else {
+			// oldID = newID, so it's common
+			common = append(common, slice1[i])
+			i++
+			j++
+		}
+	}
+
+	// Add all elements not traversed
+	removed = append(removed, slice1[i:]...)
+	added = append(added, slice2[j:]...)
 
 	return removed, common, added
 }

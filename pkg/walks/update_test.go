@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -133,7 +134,6 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			}
 		}
 	})
-
 }
 
 func TestUpdateAddedNodes(t *testing.T) {
@@ -260,7 +260,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 	})
 }
 
-func TestUpdate2(t *testing.T) {
+func TestUpdate(t *testing.T) {
 
 	t.Run("simple errors", func(t *testing.T) {
 
@@ -341,6 +341,49 @@ func TestUpdate2(t *testing.T) {
 					t.Fatalf("updateAddedNodes(): expected %v, got %v", test.expectedError, err)
 				}
 			})
+		}
+	})
+
+	t.Run("fuzzy test", func(t *testing.T) {
+
+		nodesNum := 2000
+		edgesPerNode := 100
+
+		// generate the first DB
+		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
+		DB1 := mock.GenerateMockDB(nodesNum, edgesPerNode, rng1)
+		RWM, _ := NewRWM(0.85, 10)
+		RWM.GenerateAll(DB1)
+
+		// generate another database
+		rng2 := rand.New(rand.NewSource(time.Now().UnixNano()))
+		DB2 := mock.GenerateMockDB(nodesNum, edgesPerNode, rng2)
+
+		// update one node at the time
+		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
+			oldSucc := DB1.Nodes[nodeID].SuccessorIDs
+			newSucc := DB2.Nodes[nodeID].SuccessorIDs
+
+			DB1.Nodes[nodeID].SuccessorIDs = newSucc
+
+			if err := RWM.Update(DB1, nodeID, oldSucc, newSucc); err != nil {
+				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
+			}
+		}
+
+		// check that each walk in the WalkSet of nodeID contains nodeID
+		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
+
+			walkSet, err := RWM.WalksByNodeID(nodeID)
+			if err != nil {
+				t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
+			}
+
+			for rWalk := range walkSet.Iter() {
+				if !slices.Contains(rWalk.NodeIDs, nodeID) {
+					t.Fatalf("walk %v should contain nodeID = %d", rWalk.NodeIDs, nodeID)
+				}
+			}
 		}
 	})
 }

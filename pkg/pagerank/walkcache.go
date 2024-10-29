@@ -105,15 +105,22 @@ func (WC *WalkCache) Load(RWM *walks.RandomWalksManager,
 		return err
 	}
 
-	// avoid adding previously fetched walks
+	// remove previously fetched walks
 	walkDiffSet := walkSet.Difference(WC.FetchedWalks)
 
-	// determine the number of walks to fetch
-	if walksNum <= 0 || walksNum > walkDiffSet.Cardinality() {
-		walksNum = walkDiffSet.Cardinality()
+	totalWalks := walkDiffSet.Cardinality()
+	if totalWalks == 0 {
+		// adding an empty slice signals that it was Loaded
+		WC.NodeWalkSlice[nodeID] = [][]uint32{}
+		return nil
 	}
 
-	walkSlice := [][]uint32{}
+	// determine the number of walks to be fetched
+	if walksNum <= 0 || walksNum > totalWalks {
+		walksNum = totalWalks
+	}
+
+	walkSlice := make([][]uint32, 0, walksNum)
 	for rWalk := range walkDiffSet.Iter() {
 		if len(walkSlice) == walksNum {
 			break
@@ -133,8 +140,25 @@ func (WC *WalkCache) Load(RWM *walks.RandomWalksManager,
 		walkSlice = append(walkSlice, walkSegment)
 	}
 
-	WC.NodeWalkSlice[nodeID] = walkSlice // adding an empty slice signals that it was Loaded
+	WC.NodeWalkSlice[nodeID] = walkSlice
 	return nil
+}
+
+// returns the walk from nodeID onward (excluded). If nodeID is not found, returns an error
+func CropWalk(rWalk *walks.RandomWalk, nodeID uint32) ([]uint32, error) {
+
+	// return the walk after nodeID (excluded)
+	for i, ID := range rWalk.NodeIDs {
+		if ID == nodeID {
+
+			// make a copy for higher safety
+			walkSegment := make([]uint32, len(rWalk.NodeIDs)-(i+1))
+			copy(walkSegment, rWalk.NodeIDs[i+1:])
+			return walkSegment, nil
+		}
+	}
+
+	return nil, ErrNodeNotInWalk
 }
 
 /*
@@ -163,19 +187,6 @@ func (WC *WalkCache) NextWalk(nodeID uint32) ([]uint32, error) {
 	WC.NodeWalkIndex[nodeID]++
 
 	return nextWalk, nil
-}
-
-// returns the walk from nodeID onward (included). If nodeID is not found, returns an error
-func CropWalk(rWalk *walks.RandomWalk, nodeID uint32) ([]uint32, error) {
-
-	// return the walk after nodeID
-	for i, ID := range rWalk.NodeIDs {
-		if ID == nodeID {
-			return rWalk.NodeIDs[i+1:], nil
-		}
-	}
-
-	return nil, ErrNodeNotInWalk
 }
 
 // ---------------------------------ERROR-CODES--------------------------------

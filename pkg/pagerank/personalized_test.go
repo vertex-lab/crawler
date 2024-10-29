@@ -445,7 +445,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 		}
 	})
 
-	t.Run("valid", func(t *testing.T) {
+	t.Run("simple graphs", func(t *testing.T) {
 
 		const alpha = 0.85
 		const walksPerNode = 1000
@@ -502,4 +502,42 @@ func TestPersonalizedPagerank(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("fuzzy test", func(t *testing.T) {
+
+		nodesNum := 20
+		edgesPerNode := 10
+		rng := rand.New(rand.NewSource(69))
+
+		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
+		RWM, _ := walks.NewRWM(0.85, 1)
+		RWM.GenerateAll(DB)
+
+		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+			t.Fatalf("Personalized() expected nil, got %v", err)
+		}
+
+		// doing it two times to check that it donesn't change the DB or RWM
+		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+			t.Fatalf("Personalized() expected nil, got %v", err)
+		}
+	})
+}
+
+func BenchmarkPersonalized(b *testing.B) {
+
+	nodesNum := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+
+	DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
+	RWM, _ := walks.NewRWM(0.85, 10)
+	RWM.GenerateAll(DB)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+			b.Fatalf("Benchmark Personalized() failed: %v", err)
+		}
+	}
 }
