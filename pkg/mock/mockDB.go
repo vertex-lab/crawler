@@ -2,6 +2,7 @@ package mock
 
 import (
 	"math/rand"
+	"slices"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 )
@@ -94,22 +95,30 @@ func (DB *MockDatabase) AllNodeIDs() ([]uint32, error) {
 
 // ------------------------------------HELPERS----------------------------------
 
-// function that generates a random database of a specified number of nodes
-// and successors per node
+// generates a random database of a specified number of nodes and successors per node
+// the successor of a node won't include itself, and won't have repetitions
 func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockDatabase {
 
 	DB := NewMockDatabase()
-	for i := 0; i < nodesNum; i++ {
+	if successorsPerNode > nodesNum {
+		return nil
+	}
 
-		// create random successors
-		randomSuccessors := make([]uint32, successorsPerNode)
-		for j := 0; j < successorsPerNode; j++ {
-			randomSuccessors[j] = uint32(rng.Intn(int(nodesNum)))
+	for i := 0; i < nodesNum; i++ {
+		// create random successors for each node
+		randomSuccessors := make([]uint32, 0, successorsPerNode)
+		for len(randomSuccessors) != successorsPerNode {
+
+			succ := uint32(rng.Intn(nodesNum))
+			if slices.Contains(randomSuccessors, succ) {
+				continue
+			}
+
+			randomSuccessors = append(randomSuccessors, succ)
 		}
 
 		DB.Nodes[uint32(i)] = &graph.Node{ID: uint32(i), SuccessorIDs: randomSuccessors}
 	}
-
 	return DB
 }
 

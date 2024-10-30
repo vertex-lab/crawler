@@ -379,7 +379,6 @@ func BenchmarkGenerateWalk(b *testing.B) {
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
 
 	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
 
 		_, err := generateWalk(DB, 0, 0.85, rng)

@@ -97,20 +97,36 @@ func Partition(slice1, slice2 []uint32) ([]uint32, []uint32, []uint32) {
 	return removed, common, added
 }
 
-// returns newWalkSegment[i] with the highest i such that
-// oldWalk + newWalkSegment[i] doesn't contain a cycle.
-func RemoveCycles(oldWalk []uint32, newWalkSegment []uint32) []uint32 {
+/*
+returns a new slice up to the first occurrence of a cycle by checking against
+oldWalk. TrimCycles doesn't change newWalk in the caller. If that's wanted,
+use DeleteCyclesInPlace instead.
+*/
+func TrimCycles(oldWalk []uint32, newWalk []uint32) []uint32 {
 
-	for i, newNodeID := range newWalkSegment {
-
+	for i, newNodeID := range newWalk {
 		// if it was already visited, we've found a cycle
 		if slices.Contains(oldWalk, newNodeID) {
-			newWalkSegment = slices.Delete(newWalkSegment, i, len(newWalkSegment))
-			break
+			return newWalk[:i]
 		}
 	}
+	return newWalk
+}
 
-	return newWalkSegment
+/*
+removes (in place) all elements from newWalk after the first occurrence of a
+cycle by checking against oldWalk. DeleteCyclesInPlace changes newWalk in the
+caller. If that's not wanted, use TrimCycles instead.
+*/
+func DeleteCyclesInPlace(oldWalk []uint32, newWalk []uint32) []uint32 {
+
+	for i, newNodeID := range newWalk {
+		// if it was already visited, we've found a cycle
+		if slices.Contains(oldWalk, newNodeID) {
+			return slices.Delete(newWalk, i, len(newWalk))
+		}
+	}
+	return newWalk
 }
 
 func SortWalks(walks [][]uint32) [][]uint32 {

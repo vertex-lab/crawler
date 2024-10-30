@@ -101,7 +101,7 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 		}
 
 		// remove potential cycles
-		newWalkSegment = RemoveCycles(rWalk.NodeIDs, newWalkSegment)
+		newWalkSegment = DeleteCyclesInPlace(rWalk.NodeIDs, newWalkSegment)
 
 		// graft the walk with the new walk segment
 		err = RWM.GraftWalk(rWalk, newWalkSegment)
@@ -164,7 +164,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		}
 
 		// remove potential cycles
-		newWalkSegment = RemoveCycles(rWalk.NodeIDs, newWalkSegment)
+		newWalkSegment = DeleteCyclesInPlace(rWalk.NodeIDs, newWalkSegment)
 
 		// graft the walk with the new walk segment
 		err = RWM.GraftWalk(rWalk, newWalkSegment)

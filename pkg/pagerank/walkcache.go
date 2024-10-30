@@ -150,11 +150,7 @@ func CropWalk(rWalk *walks.RandomWalk, nodeID uint32) ([]uint32, error) {
 	// return the walk after nodeID (excluded)
 	for i, ID := range rWalk.NodeIDs {
 		if ID == nodeID {
-
-			// make a copy for higher safety
-			walkSegment := make([]uint32, len(rWalk.NodeIDs)-(i+1))
-			copy(walkSegment, rWalk.NodeIDs[i+1:])
-			return walkSegment, nil
+			return rWalk.NodeIDs[i+1:], nil
 		}
 	}
 

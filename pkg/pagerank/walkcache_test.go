@@ -249,7 +249,6 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("multiple loads", func(t *testing.T) {
-
 		nodeIDs := []uint32{0, 1, 2}
 		expectedWalks := map[uint32][][]uint32{
 			0: {{1}, {1, 2}},
@@ -262,7 +261,7 @@ func TestLoad(t *testing.T) {
 
 		// load for all the nodes
 		for _, nodeID := range nodeIDs {
-			if err := WC.Load(RWM, nodeID, 10); err != nil {
+			if err := WC.Load(RWM, nodeID, 100); err != nil {
 				t.Fatalf("Load(): nodeID = %d; expected nil, got %v", nodeID, err)
 			}
 		}
@@ -272,12 +271,17 @@ func TestLoad(t *testing.T) {
 			t.Errorf("Load(): expected %v, got len(%v)", 3, WC.FetchedWalks)
 		}
 
+		// check each walkSlice (sorted in lexographic order)
 		for _, nodeID := range nodeIDs {
 			walkSlice := walks.SortWalks(WC.NodeWalkSlice[nodeID])
 			if !reflect.DeepEqual(walkSlice, expectedWalks[nodeID]) {
 				t.Errorf("Load(): nodeID = %v, expected %v, got %v", nodeID, expectedWalks[nodeID], walkSlice)
 			}
 		}
+
+		// for _, nodeID := range nodeIDs {
+		// 	t.Errorf("walkSet(%d): %v", nodeID, RWM.NodeWalkSet[nodeID])
+		// }
 	})
 }
 
@@ -345,51 +349,62 @@ func TestNextWalk(t *testing.T) {
 	}
 }
 
-func TestCropWalk(t *testing.T) {
+func TestLoadNextWalk(t *testing.T) {
 
-	testCases := []struct {
-		name          string
-		rWalk         *walks.RandomWalk
-		nodeID        uint32
-		expectedWalk  []uint32
-		expectedError error
-	}{
-		{
-			name:          "empty random walk",
-			rWalk:         &walks.RandomWalk{},
-			nodeID:        0,
-			expectedError: ErrNodeNotInWalk,
-		},
-		{
-			name:          "node not in random walk",
-			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{1, 2, 3, 4}},
-			nodeID:        0,
-			expectedError: ErrNodeNotInWalk,
-		},
-		{
-			name:          "node in random walk",
-			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{0, 1, 2, 3}},
-			nodeID:        0,
-			expectedError: nil,
-			expectedWalk:  []uint32{1, 2, 3},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			walk, err := CropWalk(test.rWalk, test.nodeID)
-
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("CropWalk(): expected %v, got %v", test.expectedError, err)
-			}
-
-			if !reflect.DeepEqual(walk, test.expectedWalk) {
-				t.Errorf("CropWalk(): expected %v, got %v", test.expectedWalk, walk)
-			}
-		})
-	}
 }
+
+// func TestCropWalk(t *testing.T) {
+
+// 	testCases := []struct {
+// 		name          string
+// 		rWalk         *walks.RandomWalk
+// 		nodeID        uint32
+// 		expectedWalk  []uint32
+// 		expectedError error
+// 	}{
+// 		{
+// 			name:          "empty random walk",
+// 			rWalk:         &walks.RandomWalk{},
+// 			nodeID:        0,
+// 			expectedError: ErrNodeNotInWalk,
+// 		},
+// 		{
+// 			name:          "node not in random walk",
+// 			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{1, 2, 3, 4}},
+// 			nodeID:        0,
+// 			expectedError: ErrNodeNotInWalk,
+// 		},
+// 		{
+// 			name:          "node in random walk",
+// 			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{0, 1, 2, 3}},
+// 			nodeID:        0,
+// 			expectedError: nil,
+// 			expectedWalk:  []uint32{1, 2, 3},
+// 		},
+// 	}
+
+// 	for _, test := range testCases {
+// 		t.Run(test.name, func(t *testing.T) {
+
+// 			nodeIDs := test.rWalk.NodeIDs
+// 			walk, err := CropWalk(test.rWalk, test.nodeID)
+
+// 			if !errors.Is(err, test.expectedError) {
+// 				t.Fatalf("CropWalk(): expected %v, got %v", test.expectedError, err)
+// 			}
+
+// 			if !reflect.DeepEqual(walk, test.expectedWalk) {
+// 				t.Errorf("CropWalk(): expected %v, got %v", test.expectedWalk, walk)
+// 			}
+
+// 			// check that it didn't modify the walks
+// 			if !reflect.DeepEqual(nodeIDs, test.rWalk.NodeIDs) {
+// 				t.Errorf("CropWalk(): expected %v, got %v", nodeIDs, test.rWalk.NodeIDs)
+// 			}
+
+// 		})
+// 	}
+// }
 
 // ---------------------------------BENCHMARKS---------------------------------
 

@@ -83,7 +83,6 @@ func TestPagerank(t *testing.T) {
 // ---------------------------------BENCHMARK----------------------------------
 
 func BenchmarkPagerank(b *testing.B) {
-
 	b.Run("FixedDB", func(b *testing.B) {
 
 		// initial setup
@@ -101,7 +100,6 @@ func BenchmarkPagerank(b *testing.B) {
 				RWM.GenerateAll(DB)
 
 				b.ResetTimer()
-
 				for i := 0; i < b.N; i++ {
 
 					_, err := Pagerank(RWM)
@@ -114,7 +112,6 @@ func BenchmarkPagerank(b *testing.B) {
 	})
 
 	b.Run("FixedWalksPerNode", func(b *testing.B) {
-
 		edgesPerNode := 100
 		rng := rand.New(rand.NewSource(69))
 
@@ -136,7 +133,6 @@ func BenchmarkPagerank(b *testing.B) {
 						b.Fatalf("Benchmark failed: %v", err)
 					}
 				}
-
 			})
 		}
 	})

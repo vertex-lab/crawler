@@ -78,44 +78,131 @@ func TestPartition(t *testing.T) {
 	})
 }
 
-func TestRemoveCycles(t *testing.T) {
+func TestTrimCycles(t *testing.T) {
 
-	t.Run("empty slices", func(t *testing.T) {
+	testCases := []struct {
+		name         string
+		oldWalk      []uint32
+		newWalk      []uint32
+		expectedWalk []uint32
+	}{
+		{
+			name:         "empty slices",
+			oldWalk:      []uint32{},
+			newWalk:      []uint32{},
+			expectedWalk: []uint32{},
+		},
+		{
+			name:         "immediate cycle",
+			oldWalk:      []uint32{0, 1, 2, 3},
+			newWalk:      []uint32{3, 4, 5, 6},
+			expectedWalk: []uint32{},
+		},
+		{
+			name:         "cycle",
+			oldWalk:      []uint32{0, 1, 2, 3},
+			newWalk:      []uint32{4, 2, 6},
+			expectedWalk: []uint32{4},
+		},
+		{
+			name:         "no cycle",
+			oldWalk:      []uint32{0, 1, 2},
+			newWalk:      []uint32{3, 4, 5},
+			expectedWalk: []uint32{3, 4, 5},
+		},
+	}
 
-		oldWalk := []uint32{}
-		newWalkSegment := []uint32{}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
 
-		got := RemoveCycles(oldWalk, newWalkSegment)
+			oldWalkCopy := make([]uint32, len(test.oldWalk))
+			newWalkCopy := make([]uint32, len(test.newWalk))
+			copy(oldWalkCopy, test.oldWalk)
+			copy(newWalkCopy, test.newWalk)
 
-		if got == nil || len(got) > 0 {
-			t.Errorf("RemoveCycles(): expected [], got %v", got)
-		}
-	})
+			walk := TrimCycles(test.oldWalk, test.newWalk)
+			if !reflect.DeepEqual(walk, test.expectedWalk) {
+				t.Fatalf("TrimCycles(): expected %v, got %v", test.expectedWalk, walk)
+			}
 
-	t.Run("immediate cycle", func(t *testing.T) {
+			// test the oldWalk and newWalk haven't changed
+			if !reflect.DeepEqual(oldWalkCopy, test.oldWalk) {
+				t.Errorf("TrimCycles(): oldWalk changed from %v to %v", oldWalkCopy, test.oldWalk)
+			}
 
-		oldWalk := []uint32{0, 1, 2, 3}
-		newWalkSegment := []uint32{3, 4, 5, 6}
+			if !reflect.DeepEqual(newWalkCopy, test.newWalk) {
+				t.Errorf("TrimCycles(): newWalk changed from %v to %v", newWalkCopy, test.newWalk)
+			}
+		})
+	}
+}
 
-		got := RemoveCycles(oldWalk, newWalkSegment)
+func TestDeleteCyclesInPlace(t *testing.T) {
 
-		if got == nil || len(got) > 0 {
-			t.Errorf("RemoveCycles(): expected [], got %v", got)
-		}
-	})
+	testCases := []struct {
+		name         string
+		oldWalk      []uint32
+		newWalk      []uint32
+		expectedWalk []uint32
+	}{
+		{
+			name:         "empty slices",
+			oldWalk:      []uint32{},
+			newWalk:      []uint32{},
+			expectedWalk: []uint32{},
+		},
+		{
+			name:         "immediate cycle",
+			oldWalk:      []uint32{0, 1, 2, 3},
+			newWalk:      []uint32{3, 4, 5, 6},
+			expectedWalk: []uint32{},
+		},
+		{
+			name:         "cycle",
+			oldWalk:      []uint32{0, 1, 2, 3},
+			newWalk:      []uint32{4, 2, 6},
+			expectedWalk: []uint32{4},
+		},
+		{
+			name:         "no cycle",
+			oldWalk:      []uint32{0, 1, 2},
+			newWalk:      []uint32{3, 4, 5},
+			expectedWalk: []uint32{3, 4, 5},
+		},
+	}
 
-	t.Run("cycle", func(t *testing.T) {
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
 
-		oldWalk := []uint32{0, 1, 2, 3}
-		newWalkSegment := []uint32{4, 2, 6}
+			oldWalkCopy := make([]uint32, len(test.oldWalk))
+			copy(oldWalkCopy, test.oldWalk)
 
-		want := []uint32{4}
-		got := RemoveCycles(oldWalk, newWalkSegment)
+			walk := DeleteCyclesInPlace(test.oldWalk, test.newWalk)
+			if !reflect.DeepEqual(walk, test.expectedWalk) {
+				t.Fatalf("DeleteCyclesInPlace(): expected %v, got %v", test.expectedWalk, walk)
+			}
 
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("RemoveCycles(): expected %v, got %v", want, got)
-		}
-	})
+			// test the oldWalk hasn't changed
+			if !reflect.DeepEqual(oldWalkCopy, test.oldWalk) {
+				t.Errorf("DeleteCyclesInPlace(): oldWalk changed from %v to %v", oldWalkCopy, test.oldWalk)
+			}
+
+			// test the newWalk has changed
+			// test.newWalk should be the same, but can have different lenght, for example
+			// test.newWalk = [4,0,0,0]; walk = [4] this is expected (0 is the default value in Go)
+			for i, el := range walk {
+				if el != test.newWalk[i] {
+					t.Errorf("DeleteCyclesInPlace(): walk: %v test.newWalk %v", walk, test.newWalk)
+				}
+			}
+
+			for _, el := range test.newWalk[len(walk):] {
+				if el != 0 {
+					t.Errorf("DeleteCyclesInPlace(): walk: %v test.newWalk %v", walk, test.newWalk)
+				}
+			}
+		})
+	}
 }
 
 func TestSortWalkSet(t *testing.T) {

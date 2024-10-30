@@ -2,9 +2,11 @@ package pagerank
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
@@ -495,7 +497,6 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 				distance := Distance(test.expectedPP, pp)
 				if distance > expectedError {
-
 					t.Errorf("Personalized(): expected distance %v, got %v\n", expectedError, distance)
 					t.Errorf("Personalized(): expected %v\n, got %v", test.expectedPP, pp)
 				}
@@ -505,12 +506,12 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 	t.Run("fuzzy test", func(t *testing.T) {
 
-		nodesNum := 20
-		edgesPerNode := 10
-		rng := rand.New(rand.NewSource(69))
+		nodesNum := 200
+		edgesPerNode := 100
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
-		RWM, _ := walks.NewRWM(0.85, 1)
+		RWM, _ := walks.NewRWM(0.85, 10)
 		RWM.GenerateAll(DB)
 
 		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
@@ -519,25 +520,28 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 		// doing it two times to check that it donesn't change the DB or RWM
 		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
-			t.Fatalf("Personalized() expected nil, got %v", err)
+			t.Errorf("Personalized() expected nil, got %v", err)
 		}
 	})
 }
 
 func BenchmarkPersonalized(b *testing.B) {
-
 	nodesNum := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-
 	DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
-	RWM, _ := walks.NewRWM(0.85, 10)
-	RWM.GenerateAll(DB)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
-			b.Fatalf("Benchmark Personalized() failed: %v", err)
-		}
+	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+		RWM, _ := walks.NewRWM(0.85, walksPerNode)
+		RWM.GenerateAll(DB)
+
+		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+					b.Fatalf("Benchmark failed: %v", err)
+				}
+			}
+		})
 	}
 }

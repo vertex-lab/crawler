@@ -123,7 +123,7 @@ func (p *PersonalizedWalk) AppendNode(nextNodeID uint32) {
 func (p *PersonalizedWalk) AppendWalk(walkSegment []uint32) {
 
 	// remove potential cycles
-	walkSegment = walks.RemoveCycles(p.currentWalk, walkSegment)
+	walkSegment = walks.TrimCycles(p.currentWalk, walkSegment)
 
 	// append
 	p.currentWalk = append(p.currentWalk, walkSegment...)
