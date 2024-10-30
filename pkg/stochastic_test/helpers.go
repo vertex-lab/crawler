@@ -1,6 +1,7 @@
 package stochastictest
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
@@ -49,6 +50,7 @@ func SetupOldState(DB *mock.MockDatabase,
 type TestSetup struct {
 	DB               *mock.MockDatabase
 	ExpectedPR       pagerank.PagerankMap
+	ExpectedPPR0     pagerank.PagerankMap
 	PotentialChanges map[uint32][]Change
 }
 
@@ -59,8 +61,8 @@ type Change struct {
 }
 
 /*
-SetupGraph prepares the database, expected Pagerank and potential changes
-based on the graph type.
+SetupGraph prepares the database, expected Pagerank, expected Personalized
+Pagerank (alpha = 0.85) of 0 and potential changes based on the graph type.
 
 # NOTE
 
@@ -72,6 +74,7 @@ potentialChanges should not include oldSuccessors that make the corrisponding gr
 func SetupGraph(graphType string) TestSetup {
 	DB := mock.NewMockDatabase()
 	var expectedPR pagerank.PagerankMap
+	var expectedPPR0 pagerank.PagerankMap
 	potentialChanges := make(map[uint32][]Change)
 
 	switch graphType {
@@ -88,7 +91,13 @@ func SetupGraph(graphType string) TestSetup {
 			3: 0.20,
 			4: 0.20,
 		}
-
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 1.0,
+			1: 0.0,
+			2: 0.0,
+			3: 0.0,
+			4: 0.0,
+		}
 		// because of symmetry, these are all the possible changes
 		potentialChanges[0] = []Change{
 			{OldSuccessors: []uint32{1}},
@@ -106,6 +115,12 @@ func SetupGraph(graphType string) TestSetup {
 			1: 0.3333,
 			2: 0.3333,
 		}
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 0.3955536,
+			1: 0.3300758,
+			2: 0.2743706,
+		}
+
 	case "cyclic1":
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 3}}
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{2}}
@@ -117,6 +132,13 @@ func SetupGraph(graphType string) TestSetup {
 			2: 0.2552206288779828,
 			3: 0.24161363319028237,
 		}
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 0.4562018,
+			1: 0.1907404,
+			2: 0.1591076,
+			3: 0.1939502,
+		}
+
 	case "acyclic1":
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{1, 2}}
 		DB.Nodes[1] = &graph.Node{ID: 1, SuccessorIDs: []uint32{}}
@@ -129,6 +151,13 @@ func SetupGraph(graphType string) TestSetup {
 			2: 0.15943176539450626,
 			3: 0.24735726099860061,
 			4: 0.11185368285521291,
+		}
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 0.39709199748768864,
+			1: 0.2906949630265446,
+			2: 0.16876345947470478,
+			3: 0.14344958001106195,
+			4: 0.0,
 		}
 
 		potentialChanges[0] = []Change{
@@ -170,6 +199,14 @@ func SetupGraph(graphType string) TestSetup {
 			3: 0.18506487372353833,
 			5: 0.18506487372353833,
 		}
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 0.5405393205897051,
+			1: 0.22973033970514745,
+			2: 0.22973033970514745,
+			4: 0.0,
+			3: 0.0,
+			5: 0.0,
+		}
 
 		potentialChanges[0] = []Change{
 			// simple additions
@@ -205,6 +242,12 @@ func SetupGraph(graphType string) TestSetup {
 			2: 0.32456160227748454,
 			3: 0.17543839772251532,
 		}
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 0.5405396591260619,
+			1: 0.22973017043696903,
+			2: 0.22973017043696903,
+			3: 0.0,
+		}
 
 		potentialChanges[0] = []Change{
 			// simple additions
@@ -229,6 +272,12 @@ func SetupGraph(graphType string) TestSetup {
 			2: 0.25,
 			3: 0.17543839772251535,
 		}
+		expectedPPR0 = pagerank.PagerankMap{
+			0: 0.5405396591260619,
+			1: 0.22973017043696903,
+			2: 0.22973017043696903,
+			3: 0.0,
+		}
 
 		potentialChanges[0] = []Change{
 			// simple additions
@@ -247,21 +296,22 @@ func SetupGraph(graphType string) TestSetup {
 	case "cyclicLong50":
 		// it implements the simple cyclic graph with 50 nodes.
 		// 0 --> 1 --> 2 --> ... --> 48 --> 49 --> 0
-
 		expectedPR = make(pagerank.PagerankMap, 50)
-
+		expectedPPR0 = make(pagerank.PagerankMap, 50)
 		for nodeID := uint32(0); nodeID < 49; nodeID++ {
 			DB.Nodes[nodeID] = &graph.Node{ID: nodeID, SuccessorIDs: []uint32{nodeID + 1}}
 
 			expectedPR[nodeID] = 1.0 / 50.0
+			expectedPPR0[nodeID] = 0.15 * math.Pow(0.85, float64(nodeID))
 		}
 
 		// closing the big cycle
 		DB.Nodes[49] = &graph.Node{ID: 49, SuccessorIDs: []uint32{0}}
 		expectedPR[49] = 1.0 / 50.0
+		expectedPPR0[49] = 0.15 * math.Pow(0.85, float64(49))
 
 		// because of symmetry, these are all the possible changes
-		// that produce cycles longer than 25
+		// that produce cycles non shorter than 25
 		potentialChanges[0] = []Change{
 			// simple additions
 			{OldSuccessors: []uint32{}},
@@ -276,14 +326,14 @@ func SetupGraph(graphType string) TestSetup {
 	default:
 		// just one node
 		DB.Nodes[0] = &graph.Node{ID: 0, SuccessorIDs: []uint32{}}
-		expectedPR = pagerank.PagerankMap{
-			0: 1.0,
-		}
+		expectedPR = pagerank.PagerankMap{0: 1.0}
+		expectedPPR0 = pagerank.PagerankMap{0: 1.0}
 	}
 
 	return TestSetup{
 		DB:               DB,
 		ExpectedPR:       expectedPR,
+		ExpectedPPR0:     expectedPPR0,
 		PotentialChanges: potentialChanges,
 	}
 }

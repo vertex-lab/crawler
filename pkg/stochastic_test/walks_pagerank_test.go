@@ -73,8 +73,9 @@ func TestPagerankStatic(t *testing.T) {
 			}
 
 			// compute the error
-			if pagerank.Distance(expectedPR, got) > maxExpectedDistance {
-				t.Errorf("Pagerank(): expected pagerank.Distance %v, got %v\n", maxExpectedDistance, pagerank.Distance(expectedPR, got))
+			distance := pagerank.Distance(expectedPR, got)
+			if distance > maxExpectedDistance {
+				t.Errorf("Pagerank(): expected distance %v, got %v\n", maxExpectedDistance, distance)
 				t.Errorf("expected %v \ngot %v", expectedPR, got)
 			}
 		})
@@ -160,8 +161,9 @@ func TestPagerankDynamic(t *testing.T) {
 			}
 
 			// check the error
-			if pagerank.Distance(expectedPR, got) > maxExpectedDistance {
-				t.Errorf("Pagerank(): expected pagerank.Distance %v, got %v\n\n", maxExpectedDistance, pagerank.Distance(expectedPR, got))
+			distance := pagerank.Distance(expectedPR, got)
+			if distance > maxExpectedDistance {
+				t.Errorf("Pagerank(): expected distance %v, got %v\n\n", maxExpectedDistance, distance)
 				t.Errorf("expected %v\n; got %v\n\n", expectedPR, got)
 
 				t.Errorf("nodeID: %v", nodeID)

@@ -447,66 +447,9 @@ func TestPersonalizedPagerank(t *testing.T) {
 		}
 	})
 
-	t.Run("simple graphs", func(t *testing.T) {
-
-		const alpha = 0.85
-		const walksPerNode = 1000
-		const expectedError = 0.01
-
-		testCases := []struct {
-			name       string
-			DBType     string
-			nodeID     uint32
-			topK       uint16
-			expectedPP PagerankMap
-		}{
-			{
-				name:       "dandling",
-				DBType:     "dandling",
-				nodeID:     0,
-				topK:       5,
-				expectedPP: PagerankMap{0: 1.0},
-			},
-			{
-				name:       "simple",
-				DBType:     "simple",
-				nodeID:     0,
-				topK:       5,
-				expectedPP: PagerankMap{0: 0.5405399037185797, 1: 0.4594600962814203, 2: 0.0},
-			},
-			{
-				name:       "triangle",
-				DBType:     "triangle",
-				nodeID:     0,
-				topK:       5,
-				expectedPP: PagerankMap{0: 0.3887264613719621, 1: 0.3304174921661678, 2: 0.28085604646187007},
-			},
-		}
-
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-
-				DB := mock.SetupDB(test.DBType)
-				RWM, _ := walks.NewRWM(alpha, walksPerNode)
-				RWM.GenerateAll(DB)
-
-				pp, err := Personalized(DB, RWM, test.nodeID, test.topK)
-				if err != nil {
-					t.Fatalf("Personalized(): expected nil, got %v", err)
-				}
-
-				distance := Distance(test.expectedPP, pp)
-				if distance > expectedError {
-					t.Errorf("Personalized(): expected distance %v, got %v\n", expectedError, distance)
-					t.Errorf("Personalized(): expected %v\n, got %v", test.expectedPP, pp)
-				}
-			})
-		}
-	})
-
 	t.Run("fuzzy test", func(t *testing.T) {
 
-		nodesNum := 200
+		nodesNum := 2000
 		edgesPerNode := 100
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -514,12 +457,12 @@ func TestPersonalizedPagerank(t *testing.T) {
 		RWM, _ := walks.NewRWM(0.85, 10)
 		RWM.GenerateAll(DB)
 
-		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+		if _, err := Personalized(DB, RWM, 0, 5); err != nil {
 			t.Fatalf("Personalized() expected nil, got %v", err)
 		}
 
 		// doing it two times to check that it donesn't change the DB or RWM
-		if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+		if _, err := Personalized(DB, RWM, 0, 5); err != nil {
 			t.Errorf("Personalized() expected nil, got %v", err)
 		}
 	})
