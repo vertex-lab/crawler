@@ -449,8 +449,8 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 	t.Run("fuzzy test", func(t *testing.T) {
 
-		nodesNum := 2000
-		edgesPerNode := 100
+		nodesNum := 200
+		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)

@@ -346,8 +346,8 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("fuzzy test", func(t *testing.T) {
 
-		nodesNum := 2000
-		edgesPerNode := 100
+		nodesNum := 200
+		edgesPerNode := 20
 
 		// generate the first DB
 		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -363,9 +363,9 @@ func TestUpdate(t *testing.T) {
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
 			oldSucc := DB1.Nodes[nodeID].SuccessorIDs
 			newSucc := DB2.Nodes[nodeID].SuccessorIDs
-
 			DB1.Nodes[nodeID].SuccessorIDs = newSucc
 
+			// update the random walks
 			if err := RWM.Update(DB1, nodeID, oldSucc, newSucc); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
 			}

@@ -187,9 +187,11 @@ func TestDeleteCyclesInPlace(t *testing.T) {
 				t.Errorf("DeleteCyclesInPlace(): oldWalk changed from %v to %v", oldWalkCopy, test.oldWalk)
 			}
 
-			// test the newWalk has changed
-			// test.newWalk should be the same, but can have different lenght, for example
-			// test.newWalk = [4,0,0,0]; walk = [4] this is expected (0 is the default value in Go)
+			/*
+				test.newWalk should be the same as walk, but can have a different
+				lenght. Example: test.newWalk = [4,0,0,0]; walk = [4]
+				this is expected (0 is the default value in Go)
+			*/
 			for i, el := range walk {
 				if el != test.newWalk[i] {
 					t.Errorf("DeleteCyclesInPlace(): walk: %v test.newWalk %v", walk, test.newWalk)
