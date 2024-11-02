@@ -29,7 +29,7 @@ func TestCheckInputs(t *testing.T) {
 			RWMType:       "one-node0",
 			nodeID:        0,
 			topK:          5,
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
@@ -37,7 +37,7 @@ func TestCheckInputs(t *testing.T) {
 			RWMType:       "one-node0",
 			nodeID:        0,
 			topK:          5,
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "nil RWM",
@@ -388,7 +388,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				RWMType:       "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: graph.ErrNilDatabasePointer,
+				expectedError: graph.ErrNilGraphDBPointer,
 			},
 			{
 				name:          "empty DB",
@@ -396,7 +396,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				RWMType:       "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: graph.ErrDatabaseIsEmpty,
+				expectedError: graph.ErrGraphDBIsEmpty,
 			},
 			{
 				name:          "nil RWM",

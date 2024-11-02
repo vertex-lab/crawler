@@ -59,7 +59,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 	alpha float32, rng *rand.Rand) ([]uint32, error) {
 
 	// check if startingNodeID is in the DB
-	if _, err := DB.NodeByID(startingNodeID); err != nil {
+	if _, err := DB.Node(startingNodeID); err != nil {
 		return nil, err
 	}
 
@@ -75,7 +75,7 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 
 		// get the successorIDs of the current node
 		// This can be improved by fetching directly a random successor
-		successorIDs, err := DB.NodeSuccessorIDs(currentNodeID)
+		successorIDs, err := DB.Successors(currentNodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +167,7 @@ func (RWM *RandomWalksManager) GenerateAll(DB graph.Database) error {
 		return err
 	}
 
-	nodeIDs, err := DB.AllNodeIDs()
+	nodeIDs, err := DB.AllIDs()
 	if err != nil {
 		return err
 	}

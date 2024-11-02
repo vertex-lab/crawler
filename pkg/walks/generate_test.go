@@ -75,13 +75,13 @@ func TestGenerateWalk(t *testing.T) {
 			name:          "nil DB",
 			DBType:        "nil",
 			expectedWalk:  nil,
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
 			expectedWalk:  nil,
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "node not found",
@@ -126,13 +126,13 @@ func TestGenerateRandomWalks(t *testing.T) {
 			name:          "nil DB",
 			DBType:        "nil",
 			expectedWalks: nil,
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
 			expectedWalks: nil,
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "node not found",
@@ -194,9 +194,9 @@ func TestGenerateRandomWalks(t *testing.T) {
 					break
 				}
 
-				walkSet, err := RWM.WalksByNodeID(nodeID)
+				walkSet, err := RWM.WalkSet(nodeID)
 				if err != nil {
-					t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
+					t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 				}
 
 				// dereference and sort walks in lexicographic order
@@ -224,13 +224,13 @@ func TestGenerate(t *testing.T) {
 			name:          "nil DB",
 			DBType:        "nil",
 			RWMType:       "one-node1",
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
 			RWMType:       "one-node1",
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "node not in DB",
@@ -274,9 +274,9 @@ func TestGenerate(t *testing.T) {
 
 			if test.expectedWalks != nil {
 
-				walkSet, err := RWM.WalksByNodeID(0)
+				walkSet, err := RWM.WalkSet(0)
 				if err != nil {
-					t.Fatalf("WalksByNodeID(0): expected nil, got %v", err)
+					t.Fatalf("WalkSet(0): expected nil, got %v", err)
 				}
 
 				// dereference and sort walks in lexicographic order
@@ -304,13 +304,13 @@ func TestGenerateAll(t *testing.T) {
 				name:          "nil DB",
 				DBType:        "nil",
 				RWMType:       "one-node1",
-				expectedError: graph.ErrNilDatabasePointer,
+				expectedError: graph.ErrNilGraphDBPointer,
 			},
 			{
 				name:          "empty DB",
 				DBType:        "empty",
 				RWMType:       "one-node1",
-				expectedError: graph.ErrDatabaseIsEmpty,
+				expectedError: graph.ErrGraphDBIsEmpty,
 			},
 			{
 				name:          "nil RWM",
@@ -354,9 +354,9 @@ func TestGenerateAll(t *testing.T) {
 		// check that each walk in the WalkSet of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
 
-			walkSet, err := RWM.WalksByNodeID(nodeID)
+			walkSet, err := RWM.WalkSet(nodeID)
 			if err != nil {
-				t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
+				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
 
 			for rWalk := range walkSet.Iter() {

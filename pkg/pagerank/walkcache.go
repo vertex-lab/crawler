@@ -100,7 +100,7 @@ func (WC *WalkCache) Load(RWM *walks.RandomWalksManager,
 		return ErrNodeAlreadyLoadedWC
 	}
 
-	walkSet, err := RWM.WalksByNodeID(nodeID)
+	walkSet, err := RWM.WalkSet(nodeID)
 	if err != nil {
 		return err
 	}

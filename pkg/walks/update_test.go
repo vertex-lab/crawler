@@ -28,14 +28,14 @@ func TestUpdateRemovedNodes(t *testing.T) {
 				DBType:        "nil",
 				RWMType:       "triangle",
 				removedSucc:   []uint32{1},
-				expectedError: graph.ErrNilDatabasePointer,
+				expectedError: graph.ErrNilGraphDBPointer,
 			},
 			{
 				name:          "empty DB",
 				DBType:        "empty",
 				RWMType:       "triangle",
 				removedSucc:   []uint32{1},
-				expectedError: graph.ErrDatabaseIsEmpty,
+				expectedError: graph.ErrGraphDBIsEmpty,
 			},
 			{
 				name:          "nil RWM",
@@ -95,7 +95,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		// update the DB
 		commonSucc := []uint32{2}
-		DB.Nodes[nodeID].SuccessorIDs = commonSucc
+		DB.Nodes[nodeID].Successors = commonSucc
 
 		rng := rand.New(rand.NewSource(5))
 		expectedWalks := map[uint32][][]uint32{
@@ -121,9 +121,9 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkSet, err := RWM.WalksByNodeID(nodeID)
+			walkSet, err := RWM.WalkSet(nodeID)
 			if err != nil {
-				t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
+				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
 
 			// dereference walks and sort them in lexicographic order
@@ -154,7 +154,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:       "triangle",
 				addedSucc:     []uint32{1},
 				newOutDegree:  1,
-				expectedError: graph.ErrNilDatabasePointer,
+				expectedError: graph.ErrNilGraphDBPointer,
 			},
 			{
 				name:          "empty DB",
@@ -162,7 +162,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:       "triangle",
 				addedSucc:     []uint32{1},
 				newOutDegree:  1,
-				expectedError: graph.ErrDatabaseIsEmpty,
+				expectedError: graph.ErrGraphDBIsEmpty,
 			},
 			{
 				name:          "nil RWM",
@@ -225,7 +225,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		// update the DB
 		currentSucc := []uint32{2}
-		DB.Nodes[nodeID].SuccessorIDs = currentSucc
+		DB.Nodes[nodeID].Successors = currentSucc
 
 		rng := rand.New(rand.NewSource(5))
 		expectedWalks := map[uint32][][]uint32{
@@ -245,9 +245,9 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkSet, err := RWM.WalksByNodeID(nodeID)
+			walkSet, err := RWM.WalkSet(nodeID)
 			if err != nil {
-				t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
+				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
 
 			// dereference walks and sort them in lexicographic order
@@ -278,14 +278,14 @@ func TestUpdate(t *testing.T) {
 				DBType:        "nil",
 				RWMType:       "triangle",
 				nodeID:        0,
-				expectedError: graph.ErrNilDatabasePointer,
+				expectedError: graph.ErrNilGraphDBPointer,
 			},
 			{
 				name:          "empty DB",
 				DBType:        "empty",
 				RWMType:       "triangle",
 				nodeID:        0,
-				expectedError: graph.ErrDatabaseIsEmpty,
+				expectedError: graph.ErrGraphDBIsEmpty,
 			},
 			{
 				name:          "nil RWM",
@@ -355,15 +355,15 @@ func TestUpdate(t *testing.T) {
 		RWM, _ := NewRWM(0.85, 10)
 		RWM.GenerateAll(DB1)
 
-		// generate another database
+		// generate another GraphDB
 		rng2 := rand.New(rand.NewSource(time.Now().UnixNano()))
 		DB2 := mock.GenerateMockDB(nodesNum, edgesPerNode, rng2)
 
 		// update one node at the time
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			oldSucc := DB1.Nodes[nodeID].SuccessorIDs
-			newSucc := DB2.Nodes[nodeID].SuccessorIDs
-			DB1.Nodes[nodeID].SuccessorIDs = newSucc
+			oldSucc := DB1.Nodes[nodeID].Successors
+			newSucc := DB2.Nodes[nodeID].Successors
+			DB1.Nodes[nodeID].Successors = newSucc
 
 			// update the random walks
 			if err := RWM.Update(DB1, nodeID, oldSucc, newSucc); err != nil {
@@ -374,9 +374,9 @@ func TestUpdate(t *testing.T) {
 		// check that each walk in the WalkSet of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
 
-			walkSet, err := RWM.WalksByNodeID(nodeID)
+			walkSet, err := RWM.WalkSet(nodeID)
 			if err != nil {
-				t.Fatalf("WalksByNodeID(%d): expected nil, got %v", nodeID, err)
+				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
 
 			for rWalk := range walkSet.Iter() {
@@ -410,19 +410,19 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 		// prepare the graph changes
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
 
-			oldSuccessorIDs, _ := DB.NodeSuccessorIDs(nodeID)
-			currentSuccessorIDs := make([]uint32, len(oldSuccessorIDs))
-			copy(currentSuccessorIDs, oldSuccessorIDs)
+			oldSuccessors, _ := DB.Successors(nodeID)
+			currentSuccessors := make([]uint32, len(oldSuccessors))
+			copy(currentSuccessors, oldSuccessors)
 
 			// add 10% new nodes
 			for i := 0; i < edgesPerNode/10; i++ {
 
 				newNode := uint32(rng.Intn(nodesSize))
-				currentSuccessorIDs = append(currentSuccessorIDs, newNode)
+				currentSuccessors = append(currentSuccessors, newNode)
 			}
 
-			oldSuccessorMap[nodeID] = oldSuccessorIDs
-			currentSuccessorMap[nodeID] = currentSuccessorIDs
+			oldSuccessorMap[nodeID] = oldSuccessors
+			currentSuccessorMap[nodeID] = currentSuccessors
 		}
 
 		b.ResetTimer()
@@ -431,10 +431,10 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 
 			nodeID := uint32(i % nodesSize)
-			oldSuccessorIDs := oldSuccessorMap[nodeID]
-			currentSuccessorIDs := currentSuccessorMap[nodeID]
+			oldSuccessors := oldSuccessorMap[nodeID]
+			currentSuccessors := currentSuccessorMap[nodeID]
 
-			err := RWM.Update(DB, nodeID, oldSuccessorIDs, currentSuccessorIDs)
+			err := RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors)
 			if err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}
@@ -472,14 +472,14 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		// prepare the graph changes
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
 
-			oldSuccessorIDs, _ := DB.NodeSuccessorIDs(nodeID)
-			currentSuccessorIDs := make([]uint32, len(oldSuccessorIDs)-edgesPerNode/10)
+			oldSuccessors, _ := DB.Successors(nodeID)
+			currentSuccessors := make([]uint32, len(oldSuccessors)-edgesPerNode/10)
 
 			// remove 10% of the nodes
-			copy(currentSuccessorIDs, oldSuccessorIDs[edgesPerNode/10:])
+			copy(currentSuccessors, oldSuccessors[edgesPerNode/10:])
 
-			oldSuccessorMap[nodeID] = oldSuccessorIDs
-			currentSuccessorMap[nodeID] = currentSuccessorIDs
+			oldSuccessorMap[nodeID] = oldSuccessors
+			currentSuccessorMap[nodeID] = currentSuccessors
 		}
 
 		b.ResetTimer()
@@ -488,10 +488,10 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 
 			nodeID := uint32(i % nodesSize)
-			oldSuccessorIDs := oldSuccessorMap[nodeID]
-			currentSuccessorIDs := currentSuccessorMap[nodeID]
+			oldSuccessors := oldSuccessorMap[nodeID]
+			currentSuccessors := currentSuccessorMap[nodeID]
 
-			err := RWM.Update(DB, nodeID, oldSuccessorIDs, currentSuccessorIDs)
+			err := RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors)
 			if err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}

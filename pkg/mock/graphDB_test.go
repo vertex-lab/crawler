@@ -23,12 +23,12 @@ func TestCheckEmpty(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "DB with node 0",
@@ -50,18 +50,18 @@ func TestCheckEmpty(t *testing.T) {
 	}
 }
 
-func TestNodeByID(t *testing.T) {
+func TestNode(t *testing.T) {
 
 	testCases := []testCases{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "DB with node 0",
@@ -72,7 +72,7 @@ func TestNodeByID(t *testing.T) {
 			name:          "DB with node 1",
 			DBType:        "one-node1",
 			expectedError: nil,
-			expectedNode:  &graph.Node{ID: 1, SuccessorIDs: []uint32{1}},
+			expectedNode:  &graph.Node{ID: 1, Successors: []uint32{1}},
 		},
 	}
 
@@ -80,43 +80,43 @@ func TestNodeByID(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			node, err := DB.NodeByID(1)
+			node, err := DB.Node(1)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NodeByID(1): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("Node(1): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check that the expected result is equal to the result
 			if test.expectedNode != nil {
 
 				if node == nil {
-					t.Errorf("NodeByID(1): expected node ID %d, got nil", test.expectedNode.ID)
+					t.Fatalf("Node(1): expected node ID %d, got nil", test.expectedNode.ID)
 				}
 
 				if node.ID != test.expectedNode.ID {
-					t.Errorf("NodeByID(1): expected node ID %d, got %d", test.expectedNode.ID, node.ID)
+					t.Errorf("Node(1): expected node ID %d, got %d", test.expectedNode.ID, node.ID)
 				}
 
-				if !reflect.DeepEqual(node.SuccessorIDs, test.expectedNode.SuccessorIDs) {
-					t.Errorf("NodeByID(1): expected successors %v, got %v", test.expectedNode.SuccessorIDs, node.SuccessorIDs)
+				if !reflect.DeepEqual(node.Successors, test.expectedNode.Successors) {
+					t.Errorf("Node(1): expected successors %v, got %v", test.expectedNode.Successors, node.Successors)
 				}
 			}
 		})
 	}
 }
 
-func TestNodeSuccessorIDs(t *testing.T) {
+func TestSuccessors(t *testing.T) {
 
 	testCases := []testCases{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "DB with node 0",
@@ -135,21 +135,21 @@ func TestNodeSuccessorIDs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			successorIDs, err := DB.NodeSuccessorIDs(1)
+			Successors, err := DB.Successors(1)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NodeSuccessorIDs(1): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("Successors(1): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check that the expected result is equal to the result
 			if test.expectedSlice != nil {
 
-				if successorIDs == nil {
-					t.Errorf("NodeSuccessorIDs(1): expected %v, got nil", test.expectedSlice)
+				if Successors == nil {
+					t.Errorf("Successors(1): expected %v, got nil", test.expectedSlice)
 				}
 
-				if !reflect.DeepEqual(successorIDs, test.expectedSlice) {
-					t.Errorf("NodeSuccessorIDs(1): expected %v, got %v", test.expectedSlice, successorIDs)
+				if !reflect.DeepEqual(Successors, test.expectedSlice) {
+					t.Errorf("Successors(1): expected %v, got %v", test.expectedSlice, Successors)
 				}
 			}
 		})
@@ -209,18 +209,18 @@ func TestIsDandling(t *testing.T) {
 	}
 }
 
-func TestAllNodeIDs(t *testing.T) {
+func TestAllIDs(t *testing.T) {
 
 	testCases := []testCases{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilDatabasePointer,
+			expectedError: graph.ErrNilGraphDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrDatabaseIsEmpty,
+			expectedError: graph.ErrGraphDBIsEmpty,
 		},
 		{
 			name:          "DB with node 0",
@@ -234,21 +234,21 @@ func TestAllNodeIDs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			nodeIDs, err := DB.AllNodeIDs()
+			nodeIDs, err := DB.AllIDs()
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("AllNodeIDs(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("AllIDs(): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check that the expected result is equal to the result
 			if test.expectedSlice != nil {
 
 				if nodeIDs == nil {
-					t.Errorf("AllNodeIDs(): expected %v, got nil", test.expectedSlice)
+					t.Errorf("AllIDs(): expected %v, got nil", test.expectedSlice)
 				}
 
 				if !reflect.DeepEqual(nodeIDs, test.expectedSlice) {
-					t.Errorf("AllNodeIDs(): expected %v, got %v", test.expectedSlice, nodeIDs)
+					t.Errorf("AllIDs(): expected %v, got %v", test.expectedSlice, nodeIDs)
 				}
 			}
 		})

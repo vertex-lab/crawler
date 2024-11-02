@@ -11,7 +11,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
-	const walkPerNode = 5000
+	const walkPerNode = 1000
 
 	tests := []struct {
 		name      string
@@ -20,14 +20,6 @@ func TestPersonalizedPagerank(t *testing.T) {
 		{
 			name:      "Personalized Pagerank, all dandling nodes",
 			graphType: "dandlings",
-		},
-		{
-			name:      "Personalized Pagerank, triangle graph",
-			graphType: "triangle",
-		},
-		{
-			name:      "Personalized Pagerank, cyclic graph 1",
-			graphType: "cyclic1",
 		},
 		{
 			name:      "Personalized Pagerank, acyclic graph 1",

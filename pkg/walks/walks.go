@@ -144,9 +144,9 @@ func (RWM *RandomWalksManager) CheckState(expectEmptyRWM bool) error {
 	return nil
 }
 
-// WalksByNodeID; pass a node ID, returns all the RandomWalks that pass
+// WalkSet; pass a node ID, returns all the RandomWalks that pass
 // through that node, as a WalkSet
-func (RWM *RandomWalksManager) WalksByNodeID(nodeID uint32) (WalkSet, error) {
+func (RWM *RandomWalksManager) WalkSet(nodeID uint32) (WalkSet, error) {
 
 	const expectEmptyRWM = false
 	err := RWM.CheckState(expectEmptyRWM)

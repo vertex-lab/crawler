@@ -28,7 +28,7 @@ func (RWM *RandomWalksManager) Update(DB graph.Database, nodeID uint32,
 	}
 
 	// checking that nodeID is in the DB
-	if _, err := DB.NodeByID(nodeID); err != nil {
+	if _, err := DB.Node(nodeID); err != nil {
 		return err
 	}
 
@@ -64,7 +64,7 @@ func (RWM *RandomWalksManager) updateRemovedNodes(DB graph.Database, nodeID uint
 		return nil
 	}
 
-	walkSet, err := RWM.WalksByNodeID(nodeID)
+	walkSet, err := RWM.WalkSet(nodeID)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (RWM *RandomWalksManager) updateAddedNodes(DB graph.Database, nodeID uint32
 		return nil
 	}
 
-	walkSet, err := RWM.WalksByNodeID(nodeID)
+	walkSet, err := RWM.WalkSet(nodeID)
 	if err != nil {
 		return err
 	}

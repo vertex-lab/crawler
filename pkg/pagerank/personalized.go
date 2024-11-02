@@ -173,7 +173,7 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 		// if all walks have been used, do a walk step
 		if WC.FullyUsed(pWalk.currentNodeID) {
 
-			successorIDs, err := DB.NodeSuccessorIDs(pWalk.currentNodeID)
+			successorIDs, err := DB.Successors(pWalk.currentNodeID)
 			if err != nil {
 				return nil, err
 			}
@@ -247,12 +247,12 @@ func checkInputs(DB graph.Database, RWM *walks.RandomWalksManager,
 	}
 
 	// check if nodeID is in the DB
-	if _, err := DB.NodeByID(nodeID); err != nil {
+	if _, err := DB.Node(nodeID); err != nil {
 		return err
 	}
 
 	// check if nodeID is in the RWM
-	if _, err := RWM.WalksByNodeID(nodeID); err != nil {
+	if _, err := RWM.WalkSet(nodeID); err != nil {
 		return err
 	}
 
