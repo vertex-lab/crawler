@@ -101,6 +101,10 @@ func (WC *WalkCache) Load(RWS models.RandomWalkStore, nodeID uint32, limit int) 
 		return err
 	}
 
+	if limit <= 0 {
+		limit = len(walkMap)
+	}
+
 	walks := make([]models.RandomWalk, 0, limit)
 	for walkID, walk := range walkMap {
 
@@ -152,7 +156,7 @@ It returns errors if:
 - no walks exist for nodeID
 - all walks for nodeID have been used
 */
-func (WC *WalkCache) NextWalk(nodeID uint32) ([]uint32, error) {
+func (WC *WalkCache) NextWalk(nodeID uint32) (models.RandomWalk, error) {
 
 	if err := WC.Validate(); err != nil {
 		return nil, err

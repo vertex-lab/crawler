@@ -60,23 +60,22 @@ func TestPagerankStatic(t *testing.T) {
 			expectedPR := setup.ExpectedPR
 
 			// generate walks
-			RWM, _ := walks.NewRWM(alpha, walkPerNode)
-			err := RWM.GenerateAll(DB)
-			if err != nil {
-				t.Fatalf("dynamic Pagerank: expected nil, got %v", err)
+			RWM, _ := walks.NewRWM("mock", alpha, walkPerNode)
+			if err := RWM.GenerateAll(DB); err != nil {
+				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
 			// compute pagerank
-			got, err := pagerank.Pagerank(RWM)
+			pr, err := pagerank.Pagerank(RWM.Store)
 			if err != nil {
-				t.Errorf("Pagerank(): expected nil, got %v", err)
+				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}
 
 			// compute the error
-			distance := pagerank.Distance(expectedPR, got)
+			distance := pagerank.Distance(expectedPR, pr)
 			if distance > maxExpectedDistance {
-				t.Errorf("Pagerank(): expected distance %v, got %v\n", maxExpectedDistance, distance)
-				t.Errorf("expected %v \ngot %v", expectedPR, got)
+				t.Errorf("Pagerank(): expected distance %v, pr %v\n", maxExpectedDistance, distance)
+				t.Errorf("expected %v \npr %v", expectedPR, pr)
 			}
 		})
 	}
@@ -139,32 +138,31 @@ func TestPagerankDynamic(t *testing.T) {
 			DB.Nodes[nodeID].Successors = oldSuccessors
 
 			// generate walks
-			RWM, _ := walks.NewRWM(alpha, walkPerNode)
+			RWM, _ := walks.NewRWM("mock", alpha, walkPerNode)
 			err := RWM.GenerateAll(DB)
 			if err != nil {
-				t.Fatalf("dynamic Pagerank: expected nil, got %v", err)
+				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
 			// update the graph to the current state
 			DB.Nodes[nodeID].Successors = currentSuccessors
 
 			// update the random walks
-			err = RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors)
-			if err != nil {
-				t.Fatalf("dynamic Pagerank: expected nil, got %v", err)
+			if err = RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors); err != nil {
+				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
 			// compute pagerank
-			got, err := pagerank.Pagerank(RWM)
+			pr, err := pagerank.Pagerank(RWM.Store)
 			if err != nil {
-				t.Errorf("Pagerank(): expected nil, got %v", err)
+				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}
 
 			// check the error
-			distance := pagerank.Distance(expectedPR, got)
+			distance := pagerank.Distance(expectedPR, pr)
 			if distance > maxExpectedDistance {
-				t.Errorf("Pagerank(): expected distance %v, got %v\n\n", maxExpectedDistance, distance)
-				t.Errorf("expected %v\n; got %v\n\n", expectedPR, got)
+				t.Errorf("Pagerank(): expected distance %v, pr %v\n\n", maxExpectedDistance, distance)
+				t.Errorf("expected %v\n; pr %v\n\n", expectedPR, pr)
 
 				t.Errorf("nodeID: %v", nodeID)
 				t.Errorf("oldSucc: %v", oldSuccessors)

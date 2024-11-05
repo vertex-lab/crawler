@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -16,10 +16,10 @@ random walks stored in the RandomWalkManager.
 
 # INPUTS
 
-	> DB graph.Database
+	> DB models.Database
 	The interface of the graph database
 
-	> RWM *walks.RandomWalksManager
+	> RWS *walks.RandomWalkStore
 	The structure that manages the random walks for each node
 
 	> nodeID uint32
@@ -35,34 +35,32 @@ random walks stored in the RandomWalkManager.
 [1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
-func Personalized(DB graph.Database, RWM *walks.RandomWalksManager,
+func Personalized(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, topK uint16) (PagerankMap, error) {
 
-	err := checkInputs(DB, RWM, nodeID, topK)
-	if err != nil {
+	if err := checkInputs(DB, RWS, nodeID, topK); err != nil {
 		return nil, err
 	}
 
 	// for reproducibility in tests
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return personalized(DB, RWM, nodeID, topK, rng)
+	return personalized(DB, RWS, nodeID, topK, rng)
 }
 
 // implement the internal logic of the Personalized Pagerank function
-func personalized(DB graph.Database, RWM *walks.RandomWalksManager,
+func personalized(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, topK uint16, rng *rand.Rand) (PagerankMap, error) {
 
 	if DB.IsDandling(nodeID) {
 		return PagerankMap{nodeID: 1.0}, nil
 	}
 
-	pWalk, err := personalizedWalk(DB, RWM, nodeID, requiredLenght(topK), rng)
+	pWalk, err := personalizedWalk(DB, RWS, nodeID, requiredLenght(topK), rng)
 	if err != nil {
 		return nil, err
 	}
 
-	pp := countAndNormalize(pWalk, RWM.Alpha)
-	return pp, nil
+	return countAndNormalize(pWalk), nil
 }
 
 /*
@@ -138,17 +136,19 @@ func (p *PersonalizedWalk) AppendWalk(walkSegment []uint32) {
 simulates a long personalized random walkSegment starting from nodeID with reset to itself.
 This personalized walkSegment is generated using the random walks stored in the in the RandomWalkManager.
 
-To avoid the overhead of continually fetching walks from the RWM, the requests
+To avoid the overhead of continually fetching walks from the RWS, the requests
 are batched and the walks are stored in the WalkCache struct.
 */
-func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
+func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, targetLength int, rng *rand.Rand) ([]uint32, error) {
 
 	WC := NewWalkCache()
 	pWalk := NewPersonalizedWalk(nodeID, targetLength)
+	alpha := RWS.Alpha()
+	estimateWalksToBeLoaded := estimateWalksNum(targetLength, alpha)
 
 	// load walks for nodeID
-	if err := WC.Load(RWM, nodeID, estimateWalksNum(targetLength, RWM.Alpha)); err != nil {
+	if err := WC.Load(RWS, nodeID, estimateWalksToBeLoaded); err != nil {
 		return nil, err
 	}
 
@@ -158,14 +158,14 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 			return pWalk.nodeIDs, nil
 		}
 
-		if rng.Float32() > RWM.Alpha {
+		if rng.Float32() > RWS.Alpha() {
 			pWalk.Reset()
 			continue
 		}
 
 		// if there are no walks, load them
-		if !WC.Contains(pWalk.currentNodeID) {
-			if err := WC.Load(RWM, pWalk.currentNodeID, 1000); err != nil {
+		if !WC.ContainsNode(pWalk.currentNodeID) {
+			if err := WC.Load(RWS, pWalk.currentNodeID, 1000); err != nil {
 				return nil, err
 			}
 		}
@@ -202,13 +202,10 @@ func personalizedWalk(DB graph.Database, RWM *walks.RandomWalksManager,
 
 // count the number of times each node is visited in the pWalk and computes their frequencies.
 // Returns an empty map if pWalk is nil or empty.
-// It panics if alpha = 1 (division by )
-func countAndNormalize(pWalk []uint32, alpha float32) PagerankMap {
-
-	estimateCapacity := int(float32(len(pWalk)) / (1 - alpha))
-	pp := make(PagerankMap, estimateCapacity)
+func countAndNormalize(pWalk []uint32) PagerankMap {
 
 	// count the frequency of each nodeID
+	pp := make(PagerankMap, (len(pWalk)))
 	for _, node := range pWalk {
 		pp[node]++
 	}
@@ -234,26 +231,23 @@ func requiredLenght(topK uint16) int {
 }
 
 // function that checks the inputs of Personalized Pagerank;
-func checkInputs(DB graph.Database, RWM *walks.RandomWalksManager,
+func checkInputs(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, topK uint16) error {
 
-	if err := DB.CheckEmpty(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return err
 	}
 
-	const expectedEmpty = false
-	if err := RWM.CheckState(expectedEmpty); err != nil {
+	if err := RWS.Validate(false); err != nil {
 		return err
 	}
 
-	// check if nodeID is in the DB
-	if _, err := DB.Node(nodeID); err != nil {
-		return err
+	if !DB.ContainsNode(nodeID) {
+		return models.ErrNodeNotFoundDB
 	}
 
-	// check if nodeID is in the RWM
-	if _, err := RWM.WalkSet(nodeID); err != nil {
-		return err
+	if !RWS.ContainsNode(nodeID) {
+		return models.ErrNodeNotFoundRWS
 	}
 
 	if topK <= 0 {

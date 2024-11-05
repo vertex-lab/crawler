@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
-func TestCheckEmpty(t *testing.T) {
-
+func TestValidate(t *testing.T) {
 	testCases := []struct {
 		name          string
 		WCType        string
@@ -34,20 +34,18 @@ func TestCheckEmpty(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-
 		t.Run(test.name, func(t *testing.T) {
-
 			WC := SetupWC(test.WCType)
-			err := WC.CheckEmpty()
+			err := WC.Validate()
 
 			if !errors.Is(err, test.expectedError) {
-				t.Errorf("CheckEmpty(): expected %v, got %v", test.expectedError, err)
+				t.Errorf("Validate(): expected %v, got %v", test.expectedError, err)
 			}
 		})
 	}
 }
 
-func TestContains(t *testing.T) {
+func TestContainsNode(t *testing.T) {
 	testCases := []struct {
 		name        string
 		WCType      string
@@ -82,9 +80,8 @@ func TestContains(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			WC := SetupWC(test.WCType)
-			contains := WC.Contains(test.nodeID)
+			contains := WC.ContainsNode(test.nodeID)
 
 			if contains != test.expectedRes {
 				t.Errorf("Contains(): expected %v, got %v", test.expectedRes, contains)
@@ -150,69 +147,69 @@ func TestLoad(t *testing.T) {
 	t.Run("simple cases", func(t *testing.T) {
 		testCases := []struct {
 			name          string
-			RWMType       string
+			RWSType       string
 			WCType        string
 			nodeID        uint32
-			walksNum      int
-			expectedWalks [][]uint32
+			limit         int
+			expectedWalks []models.RandomWalk
 			expectedError error
 		}{
 			{
-				name:          "nil RWM",
-				RWMType:       "nil",
+				name:          "nil RWS",
+				RWSType:       "nil",
 				WCType:        "empty",
 				nodeID:        0,
-				walksNum:      100,
-				expectedError: walks.ErrNilRWMPointer,
+				limit:         100,
+				expectedError: models.ErrNilRWSPointer,
 			},
 			{
-				name:          "empty RWM",
-				RWMType:       "empty",
+				name:          "empty RWS",
+				RWSType:       "empty",
 				WCType:        "empty",
 				nodeID:        0,
-				walksNum:      100,
-				expectedError: walks.ErrEmptyRWM,
+				limit:         100,
+				expectedError: models.ErrEmptyRWS,
 			},
 			{
-				name:          "node not found RWM",
-				RWMType:       "one-node1",
+				name:          "node not found RWS",
+				RWSType:       "one-node1",
 				WCType:        "empty",
 				nodeID:        0,
-				walksNum:      100,
-				expectedError: walks.ErrNodeNotFoundRWM,
+				limit:         100,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "nil WC",
-				RWMType:       "one-node1",
+				RWSType:       "one-node1",
 				WCType:        "nil",
 				nodeID:        0,
-				walksNum:      100,
+				limit:         100,
 				expectedError: ErrNilWCPointer,
 			},
 			{
 				name:          "node already in WC",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				WCType:        "one-node0",
 				nodeID:        0,
-				walksNum:      100,
+				limit:         100,
 				expectedError: ErrNodeAlreadyLoadedWC,
 			},
 			{
-				name:          "valid, negative walksNum",
-				RWMType:       "triangle",
+				name:          "valid, negative limit",
+				RWSType:       "triangle",
 				WCType:        "empty",
 				nodeID:        0,
-				walksNum:      -1,
-				expectedWalks: [][]uint32{{1}, {1, 2}},
+				limit:         -1,
+				expectedWalks: []models.RandomWalk{{1}, {1, 2}},
 				expectedError: nil,
 			},
 			{
 				name:          "valid",
-				RWMType:       "simple",
+				RWSType:       "simple",
 				WCType:        "empty",
 				nodeID:        0,
-				walksNum:      1,
-				expectedWalks: [][]uint32{{1}},
+				limit:         1,
+				expectedWalks: []models.RandomWalk{{1}},
 				expectedError: nil,
 			},
 		}
@@ -220,11 +217,9 @@ func TestLoad(t *testing.T) {
 		for _, test := range testCases {
 
 			t.Run(test.name, func(t *testing.T) {
-
-				RWM := walks.SetupRWM(test.RWMType)
+				RWS := mock.SetupRWS(test.RWSType)
 				WC := SetupWC(test.WCType)
-
-				err := WC.Load(RWM, test.nodeID, test.walksNum)
+				err := WC.Load(RWS, test.nodeID, test.limit)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("Load(): expected %v, got %v", test.expectedError, err)
@@ -233,12 +228,12 @@ func TestLoad(t *testing.T) {
 				// check if the walks have been correctly added to the WC
 				if expectedWalks := test.expectedWalks; expectedWalks != nil {
 
-					if WC.FetchedWalks.Cardinality() != len(expectedWalks) {
-						t.Errorf("Load(): expected %v, got len(%v)", len(expectedWalks), WC.FetchedWalks)
+					if WC.LoadedWalkIDs.Cardinality() != len(expectedWalks) {
+						t.Errorf("Load(): expected %v, got len(%v)", len(expectedWalks), WC.LoadedWalkIDs)
 					}
 
-					// dereference walks and sort them in lexographic order
-					walks := walks.SortWalks(WC.NodeWalkSlice[test.nodeID])
+					// sort walks in lexographic order
+					walks := walks.SortWalks(WC.NodeWalks[test.nodeID])
 
 					if !reflect.DeepEqual(walks, expectedWalks) {
 						t.Errorf("Load(): expected %v, got %v", expectedWalks, walks)
@@ -250,38 +245,34 @@ func TestLoad(t *testing.T) {
 
 	t.Run("multiple loads", func(t *testing.T) {
 		nodeIDs := []uint32{0, 1, 2}
-		expectedWalks := map[uint32][][]uint32{
+		expectedWalks := map[uint32][]models.RandomWalk{
 			0: {{1}, {1, 2}},
 			1: {{2, 0}},
 			2: {},
 		}
 
-		RWM := walks.SetupRWM("triangle")
+		RWS := mock.SetupRWS("triangle")
 		WC := SetupWC("empty")
 
 		// load for all the nodes
 		for _, nodeID := range nodeIDs {
-			if err := WC.Load(RWM, nodeID, 100); err != nil {
+			if err := WC.Load(RWS, nodeID, 100); err != nil {
 				t.Fatalf("Load(): nodeID = %d; expected nil, got %v", nodeID, err)
 			}
 		}
 
 		// checked the fetched walks
-		if WC.FetchedWalks.Cardinality() != 3 {
-			t.Errorf("Load(): expected %v, got len(%v)", 3, WC.FetchedWalks)
+		if WC.LoadedWalkIDs.Cardinality() != 3 {
+			t.Errorf("Load(): expected %v, got len(%v)", 3, WC.LoadedWalkIDs)
 		}
 
 		// check each walkSlice (sorted in lexographic order)
 		for _, nodeID := range nodeIDs {
-			walkSlice := walks.SortWalks(WC.NodeWalkSlice[nodeID])
+			walkSlice := walks.SortWalks(WC.NodeWalks[nodeID])
 			if !reflect.DeepEqual(walkSlice, expectedWalks[nodeID]) {
 				t.Errorf("Load(): nodeID = %v, expected %v, got %v", nodeID, expectedWalks[nodeID], walkSlice)
 			}
 		}
-
-		// for _, nodeID := range nodeIDs {
-		// 	t.Errorf("walkSet(%d): %v", nodeID, RWM.NodeWalkSet[nodeID])
-		// }
 	})
 }
 
@@ -291,7 +282,7 @@ func TestNextWalk(t *testing.T) {
 		name          string
 		WCType        string
 		nodeID        uint32
-		expectedWalk  []uint32
+		expectedWalk  models.RandomWalk
 		expectedIndex int
 		expectedError error
 	}{
@@ -322,7 +313,7 @@ func TestNextWalk(t *testing.T) {
 			WCType:        "triangle",
 			nodeID:        0,
 			expectedIndex: 1,
-			expectedWalk:  []uint32{1, 2},
+			expectedWalk:  models.RandomWalk{0, 1, 2},
 			expectedError: nil,
 		},
 	}
@@ -349,68 +340,55 @@ func TestNextWalk(t *testing.T) {
 	}
 }
 
-func TestLoadNextWalk(t *testing.T) {
+func TestCropWalk(t *testing.T) {
+	testCases := []struct {
+		name          string
+		walk          models.RandomWalk
+		nodeID        uint32
+		expectedWalk  models.RandomWalk
+		expectedError error
+	}{
+		{
+			name:          "empty random walk",
+			walk:          models.RandomWalk{},
+			nodeID:        0,
+			expectedError: ErrNodeNotInWalk,
+		},
+		{
+			name:          "node not in random walk",
+			walk:          models.RandomWalk{1, 2, 3, 4},
+			nodeID:        0,
+			expectedError: ErrNodeNotInWalk,
+		},
+		{
+			name:          "node in random walk",
+			walk:          models.RandomWalk{0, 1, 2, 3},
+			nodeID:        0,
+			expectedError: nil,
+			expectedWalk:  models.RandomWalk{1, 2, 3},
+		},
+	}
 
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			croppedWalk, err := CropWalk(test.walk, test.nodeID)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("CropWalk(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(croppedWalk, test.expectedWalk) {
+				t.Errorf("CropWalk(): expected %v, got %v", test.expectedWalk, croppedWalk)
+			}
+		})
+	}
 }
-
-// func TestCropWalk(t *testing.T) {
-
-// 	testCases := []struct {
-// 		name          string
-// 		rWalk         *walks.RandomWalk
-// 		nodeID        uint32
-// 		expectedWalk  []uint32
-// 		expectedError error
-// 	}{
-// 		{
-// 			name:          "empty random walk",
-// 			rWalk:         &walks.RandomWalk{},
-// 			nodeID:        0,
-// 			expectedError: ErrNodeNotInWalk,
-// 		},
-// 		{
-// 			name:          "node not in random walk",
-// 			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{1, 2, 3, 4}},
-// 			nodeID:        0,
-// 			expectedError: ErrNodeNotInWalk,
-// 		},
-// 		{
-// 			name:          "node in random walk",
-// 			rWalk:         &walks.RandomWalk{NodeIDs: []uint32{0, 1, 2, 3}},
-// 			nodeID:        0,
-// 			expectedError: nil,
-// 			expectedWalk:  []uint32{1, 2, 3},
-// 		},
-// 	}
-
-// 	for _, test := range testCases {
-// 		t.Run(test.name, func(t *testing.T) {
-
-// 			nodeIDs := test.rWalk.NodeIDs
-// 			walk, err := CropWalk(test.rWalk, test.nodeID)
-
-// 			if !errors.Is(err, test.expectedError) {
-// 				t.Fatalf("CropWalk(): expected %v, got %v", test.expectedError, err)
-// 			}
-
-// 			if !reflect.DeepEqual(walk, test.expectedWalk) {
-// 				t.Errorf("CropWalk(): expected %v, got %v", test.expectedWalk, walk)
-// 			}
-
-// 			// check that it didn't modify the walks
-// 			if !reflect.DeepEqual(nodeIDs, test.rWalk.NodeIDs) {
-// 				t.Errorf("CropWalk(): expected %v, got %v", nodeIDs, test.rWalk.NodeIDs)
-// 			}
-
-// 		})
-// 	}
-// }
 
 // ---------------------------------BENCHMARKS---------------------------------
 
 func BenchmarkLoad(b *testing.B) {
 	DB := mock.SetupDB("triangle")
-	RWM, _ := walks.NewRWM(0.85, 1000)
+	RWM, _ := walks.NewRWM("mock", 0.85, 1000)
 	RWM.GenerateAll(DB)
 
 	b.ResetTimer()
@@ -418,18 +396,18 @@ func BenchmarkLoad(b *testing.B) {
 
 		WC := NewWalkCache()
 		nodeID := uint32(i % 3)
-		if err := WC.Load(RWM, nodeID, 1000); err != nil {
+		if err := WC.Load(RWM.Store, nodeID, 1000); err != nil {
 			b.Fatalf("Benchmark Load() failed: %v", err)
 		}
 	}
 }
 
 func BenchmarkNextWalk(b *testing.B) {
-
-	RWM := walks.SetupRWM("triangle")
+	RWS := mock.SetupRWS("triangle")
 	WC := NewWalkCache()
-	WC.Load(RWM, 0, 10)
+	WC.Load(RWS, 0, 10)
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := WC.NextWalk(0); err != nil {
 			b.Fatalf("Benchmark NextWalk(0) failed: %v", err)

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -18,7 +18,7 @@ func TestCheckInputs(t *testing.T) {
 	testCases := []struct {
 		name          string
 		DBType        string
-		RWMType       string
+		RWSType       string
 		nodeID        uint32
 		topK          uint16
 		expectedError error
@@ -26,55 +26,55 @@ func TestCheckInputs(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			RWMType:       "one-node0",
+			RWSType:       "one-node0",
 			nodeID:        0,
 			topK:          5,
-			expectedError: graph.ErrNilGraphDBPointer,
+			expectedError: models.ErrNilDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			RWMType:       "one-node0",
+			RWSType:       "one-node0",
 			nodeID:        0,
 			topK:          5,
-			expectedError: graph.ErrGraphDBIsEmpty,
+			expectedError: models.ErrEmptyDB,
 		},
 		{
-			name:          "nil RWM",
+			name:          "nil RWS",
 			DBType:        "one-node0",
-			RWMType:       "nil",
+			RWSType:       "nil",
 			nodeID:        0,
 			topK:          5,
-			expectedError: walks.ErrNilRWMPointer,
+			expectedError: models.ErrNilRWSPointer,
 		},
 		{
-			name:          "empty RWM",
+			name:          "empty RWS",
 			DBType:        "one-node0",
-			RWMType:       "empty",
+			RWSType:       "empty",
 			nodeID:        0,
 			topK:          5,
-			expectedError: walks.ErrEmptyRWM,
+			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "node not in DB",
 			DBType:        "one-node0",
-			RWMType:       "one-node1",
+			RWSType:       "one-node1",
 			nodeID:        1,
 			topK:          5,
-			expectedError: graph.ErrNodeNotFoundDB,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
-			name:          "node not in RWM",
+			name:          "node not in RWS",
 			DBType:        "one-node1",
-			RWMType:       "one-node0",
+			RWSType:       "one-node0",
 			nodeID:        1,
 			topK:          5,
-			expectedError: walks.ErrNodeNotFoundRWM,
+			expectedError: models.ErrNodeNotFoundRWS,
 		},
 		{
 			name:          "invalid topK",
 			DBType:        "one-node0",
-			RWMType:       "one-node0",
+			RWSType:       "one-node0",
 			topK:          0,
 			expectedError: ErrInvalidTopN,
 		},
@@ -84,9 +84,9 @@ func TestCheckInputs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := mock.SetupDB(test.DBType)
-			RWM := walks.SetupRWM(test.RWMType)
+			RWS := mock.SetupRWS(test.RWSType)
 
-			err := checkInputs(DB, RWM, test.nodeID, test.topK)
+			err := checkInputs(DB, RWS, test.nodeID, test.topK)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
@@ -99,25 +99,21 @@ func TestCountAndNormalize(t *testing.T) {
 	testCases := []struct {
 		name       string
 		longWalk   []uint32
-		alpha      float32
 		expectedPP PagerankMap
 	}{
 		{
 			name:       "nil walk",
 			longWalk:   nil,
-			alpha:      0.85,
 			expectedPP: PagerankMap{},
 		},
 		{
 			name:       "empty walk",
 			longWalk:   []uint32{},
-			alpha:      0.85,
 			expectedPP: PagerankMap{},
 		},
 		{
 			name:     "normal walk",
 			longWalk: []uint32{0, 1, 2, 0, 1},
-			alpha:    0.85,
 			expectedPP: PagerankMap{
 				0: 2.0 / 5.0,
 				1: 2.0 / 5.0,
@@ -129,8 +125,7 @@ func TestCountAndNormalize(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			pp := countAndNormalize(test.longWalk, test.alpha)
-
+			pp := countAndNormalize(test.longWalk)
 			if Distance(test.expectedPP, pp) > 1e-10 {
 				t.Fatalf("countAndNormalize(): expected %v, got %v", test.expectedPP, pp)
 			}
@@ -287,32 +282,32 @@ func TestPersonalizedWalk(t *testing.T) {
 	testCases := []struct {
 		name           string
 		DBType         string
-		RWMType        string
+		RWSType        string
 		startingNodeID uint32
 		requiredLenght int
 		expectedVisits map[uint32]int
 		expectedError  error
 	}{
 		{
-			name:           "empty RWM",
+			name:           "empty RWS",
 			DBType:         "one-node0",
-			RWMType:        "empty",
+			RWSType:        "empty",
 			startingNodeID: 0,
 			requiredLenght: 5,
-			expectedError:  walks.ErrEmptyRWM,
+			expectedError:  models.ErrEmptyRWS,
 		},
 		{
-			name:           "node not found RWM",
+			name:           "node not found RWS",
 			DBType:         "one-node0",
-			RWMType:        "one-node1",
+			RWSType:        "one-node1",
 			startingNodeID: 0,
 			requiredLenght: 5,
-			expectedError:  walks.ErrNodeNotFoundRWM,
+			expectedError:  models.ErrNodeNotFoundRWS,
 		},
 		{
 			name:           "required Lenght = 0; empty slice returned",
 			DBType:         "one-node0",
-			RWMType:        "one-node0",
+			RWSType:        "one-node0",
 			startingNodeID: 0,
 			requiredLenght: 0,
 			expectedError:  nil,
@@ -320,7 +315,7 @@ func TestPersonalizedWalk(t *testing.T) {
 		{
 			name:           "single walk added",
 			DBType:         "simple",
-			RWMType:        "simple",
+			RWSType:        "simple",
 			startingNodeID: 0,
 			requiredLenght: 1,
 			expectedVisits: map[uint32]int{0: 1, 1: 1},
@@ -329,7 +324,7 @@ func TestPersonalizedWalk(t *testing.T) {
 		{
 			name:           "multiple walks added",
 			DBType:         "triangle",
-			RWMType:        "triangle",
+			RWSType:        "triangle",
 			startingNodeID: 0,
 			requiredLenght: 11,
 			expectedVisits: map[uint32]int{0: 4, 1: 4, 2: 3},
@@ -341,10 +336,10 @@ func TestPersonalizedWalk(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := mock.SetupDB(test.DBType)
-			RWM := walks.SetupRWM(test.RWMType)
+			RWS := mock.SetupRWS(test.RWSType)
 			rng := rand.New(rand.NewSource(42))
 
-			pWalk, err := personalizedWalk(DB, RWM, test.startingNodeID, test.requiredLenght, rng)
+			pWalk, err := personalizedWalk(DB, RWS, test.startingNodeID, test.requiredLenght, rng)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
@@ -377,7 +372,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 		testCases := []struct {
 			name          string
 			DBType        string
-			RWMType       string
+			RWSType       string
 			nodeID        uint32
 			topK          uint16
 			expectedError error
@@ -385,47 +380,47 @@ func TestPersonalizedPagerank(t *testing.T) {
 			{
 				name:          "nil DB",
 				DBType:        "nil",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: graph.ErrNilGraphDBPointer,
+				expectedError: models.ErrNilDBPointer,
 			},
 			{
 				name:          "empty DB",
 				DBType:        "empty",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: graph.ErrGraphDBIsEmpty,
+				expectedError: models.ErrEmptyDB,
 			},
 			{
-				name:          "nil RWM",
+				name:          "nil RWS",
 				DBType:        "one-node0",
-				RWMType:       "nil",
+				RWSType:       "nil",
 				nodeID:        0,
 				topK:          5,
-				expectedError: walks.ErrNilRWMPointer,
+				expectedError: models.ErrNilRWSPointer,
 			},
 			{
-				name:          "empty RWM",
-				RWMType:       "empty",
+				name:          "empty RWS",
+				RWSType:       "empty",
 				DBType:        "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: walks.ErrEmptyRWM,
+				expectedError: models.ErrEmptyRWS,
 			},
 			{
-				name:          "node not in the RWM",
+				name:          "node not in the RWS",
 				DBType:        "triangle",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				nodeID:        1,
 				topK:          5,
-				expectedError: walks.ErrNodeNotFoundRWM,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "invalid topK",
 				DBType:        "one-node0",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				nodeID:        0,
 				topK:          0,
 				expectedError: ErrInvalidTopN,
@@ -436,9 +431,9 @@ func TestPersonalizedPagerank(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				DB := mock.SetupDB(test.DBType)
-				RWM := walks.SetupRWM(test.RWMType)
+				RWS := mock.SetupRWS(test.RWSType)
 
-				_, err := Personalized(DB, RWM, test.nodeID, test.topK)
+				_, err := Personalized(DB, RWS, test.nodeID, test.topK)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("Personalized(): expected %v, got %v", test.expectedError, err)
@@ -448,21 +443,20 @@ func TestPersonalizedPagerank(t *testing.T) {
 	})
 
 	t.Run("fuzzy test", func(t *testing.T) {
-
 		nodesNum := 200
 		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
-		RWM, _ := walks.NewRWM(0.85, 10)
+		RWM, _ := walks.NewRWM("mock", 0.85, 10)
 		RWM.GenerateAll(DB)
 
-		if _, err := Personalized(DB, RWM, 0, 5); err != nil {
+		if _, err := Personalized(DB, RWM.Store, 0, 5); err != nil {
 			t.Fatalf("Personalized() expected nil, got %v", err)
 		}
 
-		// doing it two times to check that it donesn't change the DB or RWM
-		if _, err := Personalized(DB, RWM, 0, 5); err != nil {
+		// doing it two times to check that it donesn't change the DB or RWS
+		if _, err := Personalized(DB, RWM.Store, 0, 5); err != nil {
 			t.Errorf("Personalized() expected nil, got %v", err)
 		}
 	})
@@ -475,13 +469,13 @@ func BenchmarkPersonalized(b *testing.B) {
 	DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
 
 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewRWM(0.85, walksPerNode)
+		RWM, _ := walks.NewRWM("mock", 0.85, walksPerNode)
 		RWM.GenerateAll(DB)
 
 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := Personalized(DB, RWM, 0, 100); err != nil {
+				if _, err := Personalized(DB, RWM.Store, 0, 100); err != nil {
 					b.Fatalf("Benchmark failed: %v", err)
 				}
 			}
