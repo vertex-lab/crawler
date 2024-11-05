@@ -65,7 +65,7 @@ func (RWS *RandomWalkStore) NodeCount() int {
 }
 
 // All() returns a slice with all the nodeIDs in the RWS.
-func (RWS *RandomWalkStore) All() []uint32 {
+func (RWS *RandomWalkStore) AllNodes() []uint32 {
 	if RWS.IsEmpty() {
 		return []uint32{}
 	}
@@ -138,7 +138,7 @@ func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
 }
 
 // WalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
-func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (models.WalkIDSet, error) {
+func (RWS *RandomWalkStore) NodeWalkIDs(nodeID uint32) (models.WalkIDSet, error) {
 
 	if err := RWS.Validate(false); err != nil {
 		return nil, err
@@ -152,9 +152,9 @@ func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (models.WalkIDSet, error) {
 }
 
 // Walks() returns a map of walks by walkID that visit nodeID.
-func (RWS *RandomWalkStore) Walks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
+func (RWS *RandomWalkStore) NodeWalks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
 
-	walkIDs, err := RWS.WalkIDs(nodeID)
+	walkIDs, err := RWS.NodeWalkIDs(nodeID)
 	if err != nil {
 		return nil, err
 	}

@@ -47,13 +47,13 @@ type RandomWalkStore interface {
 	NodeCount() int
 
 	// All() returns a slice with all the nodeIDs in the RWS.
-	All() []uint32
+	AllNodes() []uint32
 
 	// VisitCount() returns the number of times nodeID has been visited by a walk
 	VisitCount(nodeID uint32) int
 
 	// Walks() returns a map of walks by walksID that visit nodeID.
-	Walks(nodeID uint32) (map[uint32]RandomWalk, error)
+	NodeWalks(nodeID uint32) (map[uint32]RandomWalk, error)
 
 	// AddWalk() adds the walk to the WalkIndex. It also adds the walkID to the
 	// WalkIDSet of each node the walk visited. This means that for each node

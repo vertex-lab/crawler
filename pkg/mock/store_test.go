@@ -139,7 +139,7 @@ func TestNodeCount(t *testing.T) {
 	}
 }
 
-func TestAll(t *testing.T) {
+func TestAllNodes(t *testing.T) {
 	testCases := []struct {
 		name            string
 		RWSType         string
@@ -170,7 +170,7 @@ func TestAll(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			nodeIDs := RWS.All()
+			nodeIDs := RWS.AllNodes()
 			slices.Sort(nodeIDs)
 
 			if !reflect.DeepEqual(nodeIDs, test.expectedNodeIDs) {
@@ -396,7 +396,7 @@ func TestVisitCount(t *testing.T) {
 	}
 }
 
-func TestWalkIDs(t *testing.T) {
+func TestNodeWalkIDs(t *testing.T) {
 
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
@@ -425,7 +425,7 @@ func TestWalkIDs(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				RWS := SetupRWS(test.RWSType)
 
-				_, err := RWS.WalkIDs(1)
+				_, err := RWS.NodeWalkIDs(1)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("WalkIDs(1): expected %v, got %v", test.expectedError, err)
 				}
@@ -436,7 +436,7 @@ func TestWalkIDs(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		RWS := SetupRWS("one-node1")
 
-		walkSet, err := RWS.WalkIDs(1)
+		walkSet, err := RWS.NodeWalkIDs(1)
 		if err != nil {
 			t.Fatalf("WalkIDs(1): expected nil, got %v", err)
 		}
@@ -446,7 +446,7 @@ func TestWalkIDs(t *testing.T) {
 	})
 }
 
-func TestWalks(t *testing.T) {
+func TestNodeWalks(t *testing.T) {
 	testCases := []struct {
 		name            string
 		RWSType         string
@@ -487,7 +487,7 @@ func TestWalks(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			walkMap, err := RWS.Walks(test.nodeID)
+			walkMap, err := RWS.NodeWalks(test.nodeID)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("CandidateWalksRemove(): expected %v, got %v", test.expectedError, err)
@@ -556,7 +556,7 @@ func TestAddWalk(t *testing.T) {
 
 		// check that each node is associated with the walkID = 0
 		for _, nodeID := range walk {
-			walkSet, err := RWS.WalkIDs(nodeID)
+			walkSet, err := RWS.NodeWalkIDs(nodeID)
 			if err != nil {
 				t.Fatalf("WalkIDs(%d): expected nil, got %v", nodeID, err)
 			}
@@ -630,7 +630,7 @@ func TestPruneWalk(t *testing.T) {
 		}
 
 		// check the walk remains
-		walkSet0, err := RWS.WalkIDs(0)
+		walkSet0, err := RWS.NodeWalkIDs(0)
 		if err != nil {
 			t.Fatalf("WalkIDs(0): expected nil, got %v", err)
 		}
@@ -640,7 +640,7 @@ func TestPruneWalk(t *testing.T) {
 		}
 
 		// check the walks was removed
-		walkSet2, err := RWS.WalkIDs(1)
+		walkSet2, err := RWS.NodeWalkIDs(1)
 		if err != nil {
 			t.Fatalf("WalkIDs(1): expected nil, got %v", err)
 		}
@@ -712,7 +712,7 @@ func TestGraftWalk(t *testing.T) {
 		// check if the walk is present in all walkSets
 		for _, nodeID := range expectedGraftedWalk {
 
-			walkSet, err := RWS.WalkIDs(nodeID)
+			walkSet, err := RWS.NodeWalkIDs(nodeID)
 			if err != nil {
 				t.Fatalf("WalkIDs(): expected nil, got %v", err)
 			}

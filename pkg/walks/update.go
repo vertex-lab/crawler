@@ -64,7 +64,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 		return nil
 	}
 
-	walkMap, err := RWM.Store.Walks(nodeID)
+	walkMap, err := RWM.Store.NodeWalks(nodeID)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32
 		return nil
 	}
 
-	walkMap, err := RWM.Store.Walks(nodeID)
+	walkMap, err := RWM.Store.NodeWalks(nodeID)
 	if err != nil {
 		return err
 	}

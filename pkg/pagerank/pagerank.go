@@ -18,7 +18,7 @@ func Pagerank(RWS models.RandomWalkStore) (PagerankMap, error) {
 	totalVisits := 0.0
 
 	// iterate over the RWS
-	for _, nodeID := range RWS.All() {
+	for _, nodeID := range RWS.AllNodes() {
 		nodeVisits := float64(RWS.VisitCount(nodeID))
 		pagerank[nodeID] = nodeVisits
 		totalVisits += nodeVisits
