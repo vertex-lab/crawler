@@ -6,41 +6,89 @@ import (
 	"slices"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
 /*
-performs a walk step nodeID --> nextNodeID in successorIDs and returns
-`nextNodeID` and `shouldStop`.
-
-`shouldStop` is true if and only if:
-
-- successorIDs is empty
-
-- nextNodeID was already visited in one of the previous steps (walk)
+Generate() generates `walksPerNode` random walks for a single node using dampening
+factor `alpha`. The walkIDs are added to the RandomWalkStore.
 */
-func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
+func (RWM *RandomWalkManager) Generate(DB models.Database, nodeID uint32) error {
 
-	// if it is a dandling node, stop
-	succLenght := len(successorIDs)
-	if succLenght == 0 {
-		return math.MaxUint32, true
+	if err := checkInputs(RWM, DB, false); err != nil {
+		return err
 	}
 
-	// randomly select the next node
-	randomIndex := rng.Intn(succLenght)
-	nextNodeID := successorIDs[randomIndex]
-
-	// if there is a cycle, stop
-	if slices.Contains(walk, nextNodeID) {
-		return math.MaxUint32, true
+	// if the node is already in the RWS, don't do anything
+	if RWM.Store.ContainsNode(nodeID) {
+		return nil
 	}
 
-	return nextNodeID, false
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return RWM.generateWalks(DB, []uint32{nodeID}, rng)
 }
 
 /*
-generates a single walk []uint32 from a specified starting node.
+GenerateAll() generates `walksPerNode` random walks for ALL nodes in the database
+using dampening factor `alpha`. The walk pointers are added to the RandomWalkStore.
+
+NOTE:
+
+This function is computationally expensive and should be called only when
+the RandomWalkManager is empty. During the normal execution of the program,
+there should always be random walks, so we should not re-do them from scratch,
+but just update them when necessary (e.g. when there is a graph update), using
+the Update() method.
+*/
+func (RWM *RandomWalkManager) GenerateAll(DB models.Database) error {
+
+	if err := checkInputs(RWM, DB, true); err != nil {
+		return err
+	}
+
+	nodeIDs, err := DB.All()
+	if err != nil {
+		return err
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return RWM.generateWalks(DB, nodeIDs, rng)
+}
+
+/*
+generateRandomWalks implement the logic that generates `walksPerNode` random walks,
+starting from each node in the slice nodeIDs. The walks are added to the RandomWalkStore.
+
+It accepts a random number generator for reproducibility in tests.
+*/
+func (RWM *RandomWalkManager) generateWalks(DB models.Database,
+	nodeIDs []uint32, rng *rand.Rand) error {
+
+	// unpack the parameters
+	alpha := RWM.Store.Alpha()
+	walksPerNode := RWM.Store.WalksPerNode()
+
+	// for each node, perform `walksPerNode` random walks
+	for _, nodeID := range nodeIDs {
+		for i := uint16(0); i < walksPerNode; i++ {
+
+			walk, err := generateWalk(DB, nodeID, alpha, rng)
+			if err != nil {
+				return err
+			}
+
+			// add the RandomWalk to the RWS
+			if err := RWM.Store.AddWalk(walk); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+/*
+generateWalk() generates a single walk from a specified starting node.
 The function returns an error if the DB cannot find the successorIDs of a node.
 
 It's important to note that the walk breaks early when a cycle is encountered.
@@ -54,18 +102,19 @@ since a cycle occurance is very improbable.
 
 [1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
-*/
-func generateWalk(DB graph.Database, startingNodeID uint32,
-	alpha float32, rng *rand.Rand) ([]uint32, error) {
 
-	// check if startingNodeID is in the DB
-	if _, err := DB.Node(startingNodeID); err != nil {
-		return nil, err
+[2] Pippellia; To-be-written-paper on acyclic Monte-Carlo Pagerank
+*/
+func generateWalk(DB models.Database, startingNodeID uint32,
+	alpha float32, rng *rand.Rand) (models.RandomWalk, error) {
+
+	if !DB.ContainsNode(startingNodeID) {
+		return nil, models.ErrNodeNotFoundDB
 	}
 
 	var shouldBreak bool
 	currentNodeID := startingNodeID
-	walk := []uint32{currentNodeID}
+	walk := models.RandomWalk{currentNodeID}
 
 	for {
 		// stop with probability 1-alpha
@@ -94,100 +143,48 @@ func generateWalk(DB graph.Database, startingNodeID uint32,
 }
 
 /*
-generateRandomWalks implement the logic that generates `walksPerNode` random walks,
-starting from each node in the slice nodeIDs. The walk pointers are added to the RandomWalksManager.
+performs a walk step nodeID --> nextNodeID in successorIDs and returns
+`nextNodeID` and `shouldStop`.
 
-It accepts a random number generator for reproducibility in tests.
+`shouldStop` is true if and only if:
+
+- successorIDs is empty
+
+- nextNodeID was already visited in one of the previous steps (walk). In other
+words, when a cycle is found.
 */
-func (RWM *RandomWalksManager) generateRandomWalks(DB graph.Database,
-	nodeIDs []uint32, rng *rand.Rand) error {
+func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
 
-	// unpack the parameters
-	alpha := RWM.Alpha
-	walksPerNode := RWM.WalksPerNode
-
-	// for each node, perform `walksPerNode` random walks
-	for _, nodeID := range nodeIDs {
-		for i := uint16(0); i < walksPerNode; i++ {
-
-			walk, err := generateWalk(DB, nodeID, alpha, rng)
-			if err != nil {
-				return err
-			}
-
-			// add the RandomWalk's pointer to the RWM
-			RWM.AddWalk(&RandomWalk{NodeIDs: walk})
-		}
+	// if it is a dandling node, stop
+	succLenght := len(successorIDs)
+	if succLenght == 0 {
+		return math.MaxUint32, true
 	}
 
-	return nil
-}
+	// randomly select the next node
+	randomIndex := rng.Intn(succLenght)
+	nextNodeID := successorIDs[randomIndex]
 
-/*
-generates `walksPerNode` random walks for a single node using dampening
-factor `alpha`. The walk pointers are added to the RandomWalksManager.
-*/
-func (RWM *RandomWalksManager) Generate(DB graph.Database, nodeID uint32) error {
-
-	// checking the inputs
-	const expectEmptyRWM = false
-	err := checkInputs(RWM, DB, expectEmptyRWM)
-	if err != nil {
-		return err
+	// if there is a cycle, stop
+	if slices.Contains(walk, nextNodeID) {
+		return math.MaxUint32, true
 	}
 
-	// if nodeID is already in the RWM, exit
-	if _, exist := RWM.NodeWalkSet[nodeID]; exist {
-		return nil
-	}
-
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	err = RWM.generateRandomWalks(DB, []uint32{nodeID}, rng)
-
-	return err
-}
-
-/*
-generates `walksPerNode` random walks for ALL nodes in the database using dampening
-factor `alpha`. The walk pointers are added to the RandomWalksManager.
-
-NOTE:
-
-This function is computationally expensive and should be called only when
-the RandomWalksManager is empty. During the normal execution of the program,
-there should always be random walks, so we should not re-do them from scratch,
-but just update them when necessary (e.g. when there is a graph update), using
-the Update() method.
-*/
-func (RWM *RandomWalksManager) GenerateAll(DB graph.Database) error {
-
-	const expectEmptyRWM = true
-	err := checkInputs(RWM, DB, expectEmptyRWM)
-	if err != nil {
-		return err
-	}
-
-	nodeIDs, err := DB.AllIDs()
-	if err != nil {
-		return err
-	}
-
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return RWM.generateRandomWalks(DB, nodeIDs, rng)
+	return nextNodeID, false
 }
 
 // checkInputs function is used to check whether the inputs are valid.
 // If not, an appropriate error is returned
-func checkInputs(RWM *RandomWalksManager, DB graph.Database, expectEmptyRWM bool) error {
+func checkInputs(RWM *RandomWalkManager, DB models.Database, expectEmptyRWM bool) error {
 
 	// checks if DB is nil or an empty database
-	err := DB.CheckEmpty()
+	err := DB.Validate()
 	if err != nil {
 		return err
 	}
 
 	// checks if RWM is not nil and whether it should be empty or not
-	err = RWM.CheckState(expectEmptyRWM)
+	err = RWM.Store.Validate(expectEmptyRWM)
 	if err != nil {
 		return err
 	}

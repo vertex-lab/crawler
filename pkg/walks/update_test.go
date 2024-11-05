@@ -8,14 +8,69 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
+func TestNeedsUpdate(t *testing.T) {
+	testCases := []struct {
+		name             string
+		walk             models.RandomWalk
+		expectedUpdate   bool
+		expectedCutIndex int
+		expectedError    error
+	}{
+		{
+			name:             "nil random walk",
+			walk:             nil,
+			expectedError:    models.ErrNilWalkPointer,
+			expectedUpdate:   true,
+			expectedCutIndex: -1,
+		},
+		{
+			name:             "empty random walk",
+			walk:             models.RandomWalk{},
+			expectedError:    models.ErrEmptyWalk,
+			expectedUpdate:   true,
+			expectedCutIndex: -1,
+		},
+		{
+			name:             "normal random walk, no updates",
+			walk:             models.RandomWalk{1},
+			expectedError:    nil,
+			expectedUpdate:   false,
+			expectedCutIndex: -1,
+		},
+		{
+			name:             "normal random walk, updates",
+			walk:             models.RandomWalk{1, 2, 3},
+			expectedError:    nil,
+			expectedUpdate:   true,
+			expectedCutIndex: 1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			cutIndex, update, err := NeedsUpdate(test.walk, 1, []uint32{2})
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NeedsUpdate(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if update != test.expectedUpdate {
+				t.Errorf("NeedsUpdate(): expected %v, got %v", test.expectedUpdate, update)
+			}
+
+			if cutIndex != test.expectedCutIndex {
+				t.Errorf("NeedsUpdate(): expected %v, got %v", test.expectedCutIndex, cutIndex)
+			}
+		})
+	}
+}
+
 func TestUpdateRemovedNodes(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
-
 		testCases := []struct {
 			name          string
 			DBType        string
@@ -24,39 +79,25 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			expectedError error
 		}{
 			{
-				name:          "nil DB",
-				DBType:        "nil",
-				RWMType:       "triangle",
-				removedSucc:   []uint32{1},
-				expectedError: graph.ErrNilGraphDBPointer,
-			},
-			{
-				name:          "empty DB",
-				DBType:        "empty",
-				RWMType:       "triangle",
-				removedSucc:   []uint32{1},
-				expectedError: graph.ErrGraphDBIsEmpty,
-			},
-			{
 				name:          "nil RWM",
 				DBType:        "one-node0",
 				RWMType:       "nil",
-				removedSucc:   []uint32{3},
-				expectedError: ErrNilRWMPointer,
+				removedSucc:   []uint32{0},
+				expectedError: models.ErrNilRWSPointer,
 			},
 			{
 				name:          "empty RWM",
 				DBType:        "one-node0",
 				RWMType:       "empty",
-				removedSucc:   []uint32{3},
-				expectedError: ErrEmptyRWM,
+				removedSucc:   []uint32{0},
+				expectedError: models.ErrEmptyRWS,
 			},
 			{
 				name:          "node not found in the RWM",
 				DBType:        "one-node0",
 				RWMType:       "one-node1",
-				removedSucc:   []uint32{3},
-				expectedError: ErrNodeNotFoundRWM,
+				removedSucc:   []uint32{1},
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "empty removedSucc",
@@ -68,13 +109,10 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		}
 
 		for _, test := range testCases {
-
 			t.Run(test.name, func(t *testing.T) {
-
 				DB := mock.SetupDB(test.DBType)
 				RWM := SetupRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 				err := RWM.updateRemovedNodes(DB, 0, test.removedSucc, []uint32{2}, rng)
 
 				if !errors.Is(err, test.expectedError) {
@@ -86,7 +124,6 @@ func TestUpdateRemovedNodes(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-
 		DB := mock.SetupDB("triangle")
 		RWM := SetupRWM("triangle")
 
@@ -98,48 +135,42 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		DB.Nodes[nodeID].Successors = commonSucc
 
 		rng := rand.New(rand.NewSource(5))
-		expectedWalks := map[uint32][][]uint32{
+		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
 			0: {
-				{0, 2},
-				{1, 2, 0},
-				{2, 0},
+				0: {0, 2},
+				1: {1, 2, 0},
+				2: {2, 0},
 			},
 			1: {
-				{1, 2, 0},
+				1: {1, 2, 0},
 			},
 			2: {
-				{0, 2},
-				{1, 2, 0},
-				{2, 0},
+				0: {0, 2},
+				1: {1, 2, 0},
+				2: {2, 0},
 			},
 		}
 
-		err := RWM.updateRemovedNodes(DB, nodeID, removeSucc, commonSucc, rng)
-		if err != nil {
+		if err := RWM.updateRemovedNodes(DB, nodeID, removeSucc, commonSucc, rng); err != nil {
 			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkSet, err := RWM.WalkSet(nodeID)
+			walkMap, err := RWM.Store.Walks(nodeID)
 			if err != nil {
 				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
 
-			// dereference walks and sort them in lexicographic order
-			walks := SortWalkSet(walkSet)
-
-			if !reflect.DeepEqual(walks, expectedWalk) {
-				t.Errorf("updateRemovedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walks)
+			if !reflect.DeepEqual(walkMap, expectedWalk) {
+				t.Errorf("updateRemovedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walkMap)
 			}
 		}
 	})
 }
 
 func TestUpdateAddedNodes(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
-
 		testCases := []struct {
 			name          string
 			DBType        string
@@ -149,28 +180,12 @@ func TestUpdateAddedNodes(t *testing.T) {
 			expectedError error
 		}{
 			{
-				name:          "nil DB",
-				DBType:        "nil",
-				RWMType:       "triangle",
-				addedSucc:     []uint32{1},
-				newOutDegree:  1,
-				expectedError: graph.ErrNilGraphDBPointer,
-			},
-			{
-				name:          "empty DB",
-				DBType:        "empty",
-				RWMType:       "triangle",
-				addedSucc:     []uint32{1},
-				newOutDegree:  1,
-				expectedError: graph.ErrGraphDBIsEmpty,
-			},
-			{
 				name:          "nil RWM",
 				DBType:        "one-node0",
 				RWMType:       "nil",
 				addedSucc:     []uint32{3},
 				newOutDegree:  1,
-				expectedError: ErrNilRWMPointer,
+				expectedError: models.ErrNilRWSPointer,
 			},
 			{
 				name:          "empty RWM",
@@ -178,7 +193,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:       "empty",
 				addedSucc:     []uint32{3},
 				newOutDegree:  1,
-				expectedError: ErrEmptyRWM,
+				expectedError: models.ErrEmptyRWS,
 			},
 			{
 				name:          "node not found in the RWM",
@@ -186,7 +201,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:       "one-node1",
 				addedSucc:     []uint32{3},
 				newOutDegree:  1,
-				expectedError: ErrNodeNotFoundRWM,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "empty addedSucc",
@@ -199,15 +214,12 @@ func TestUpdateAddedNodes(t *testing.T) {
 		}
 
 		for _, test := range testCases {
-
 			t.Run(test.name, func(t *testing.T) {
-
 				DB := mock.SetupDB(test.DBType)
 				RWM := SetupRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 				err := RWM.updateRemovedNodes(DB, 0, test.addedSucc, []uint32{2}, rng)
-
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateAddedNodes(): expected %v, got %v", test.expectedError, err)
 				}
@@ -216,10 +228,8 @@ func TestUpdateAddedNodes(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-
 		DB := mock.SetupDB("simple")
 		RWM := SetupRWM("simple")
-
 		nodeID := uint32(0)
 		addedSucc := []uint32{2}
 
@@ -228,33 +238,28 @@ func TestUpdateAddedNodes(t *testing.T) {
 		DB.Nodes[nodeID].Successors = currentSucc
 
 		rng := rand.New(rand.NewSource(5))
-		expectedWalks := map[uint32][][]uint32{
+		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
 			0: {
-				{0, 2},
+				0: {0, 2},
 			},
 			1: {},
 			2: {
-				{0, 2},
+				0: {0, 2},
 			},
 		}
 
-		err := RWM.updateAddedNodes(DB, nodeID, addedSucc, len(currentSucc), rng)
-		if err != nil {
+		if err := RWM.updateAddedNodes(DB, nodeID, addedSucc, len(currentSucc), rng); err != nil {
 			t.Errorf("updateAddedNodes(): expected nil, got %v", err)
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkSet, err := RWM.WalkSet(nodeID)
+			walkMap, err := RWM.Store.Walks(nodeID)
 			if err != nil {
 				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
-
-			// dereference walks and sort them in lexicographic order
-			walks := SortWalkSet(walkSet)
-
-			if !reflect.DeepEqual(walks, expectedWalk) {
-				t.Errorf("updateAddedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walks)
+			if !reflect.DeepEqual(walkMap, expectedWalk) {
+				t.Errorf("updateAddedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walkMap)
 			}
 		}
 	})
@@ -278,35 +283,35 @@ func TestUpdate(t *testing.T) {
 				DBType:        "nil",
 				RWMType:       "triangle",
 				nodeID:        0,
-				expectedError: graph.ErrNilGraphDBPointer,
+				expectedError: models.ErrNilDBPointer,
 			},
 			{
 				name:          "empty DB",
 				DBType:        "empty",
 				RWMType:       "triangle",
 				nodeID:        0,
-				expectedError: graph.ErrGraphDBIsEmpty,
+				expectedError: models.ErrEmptyDB,
 			},
 			{
 				name:          "nil RWM",
 				DBType:        "one-node0",
 				RWMType:       "nil",
 				nodeID:        0,
-				expectedError: ErrNilRWMPointer,
+				expectedError: models.ErrNilRWSPointer,
 			},
 			{
 				name:          "empty RWM",
 				DBType:        "one-node0",
 				RWMType:       "empty",
 				nodeID:        0,
-				expectedError: ErrEmptyRWM,
+				expectedError: models.ErrEmptyRWS,
 			},
 			{
 				name:          "node not found in the DB",
 				DBType:        "one-node1",
 				RWMType:       "one-node1",
 				nodeID:        0,
-				expectedError: graph.ErrNodeNotFoundDB,
+				expectedError: models.ErrNodeNotFoundDB,
 			},
 			{
 				name:          "node not found in the RWM",
@@ -315,7 +320,7 @@ func TestUpdate(t *testing.T) {
 				nodeID:        0,
 				oldSucc:       []uint32{0},
 				currentSucc:   []uint32{1},
-				expectedError: ErrNodeNotFoundRWM,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "oldSucc == currentSucc",
@@ -336,7 +341,6 @@ func TestUpdate(t *testing.T) {
 				RWM := SetupRWM(test.RWMType)
 
 				err := RWM.Update(DB, test.nodeID, test.oldSucc, test.currentSucc)
-
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateAddedNodes(): expected %v, got %v", test.expectedError, err)
 				}
@@ -352,7 +356,7 @@ func TestUpdate(t *testing.T) {
 		// generate the first DB
 		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
 		DB1 := mock.GenerateMockDB(nodesNum, edgesPerNode, rng1)
-		RWM, _ := NewRWM(0.85, 10)
+		RWM, _ := NewRWM("mock", 0.85, 10)
 		RWM.GenerateAll(DB1)
 
 		// generate another GraphDB
@@ -374,14 +378,14 @@ func TestUpdate(t *testing.T) {
 		// check that each walk in the WalkSet of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
 
-			walkSet, err := RWM.WalkSet(nodeID)
+			walks, err := RWM.Store.Walks(nodeID)
 			if err != nil {
 				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}
 
-			for rWalk := range walkSet.Iter() {
-				if !slices.Contains(rWalk.NodeIDs, nodeID) {
-					t.Fatalf("walk %v should contain nodeID = %d", rWalk.NodeIDs, nodeID)
+			for _, walk := range walks {
+				if !slices.Contains(walk, nodeID) {
+					t.Fatalf("walk %v should contain nodeID = %d", walk, nodeID)
 				}
 			}
 		}
@@ -398,10 +402,10 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
 
-	RWM, _ := NewRWM(0.85, 10)
+	RWM, _ := NewRWM("mock", 0.85, 10)
 	RWM.GenerateAll(DB)
 
-	// store the changes here
+	// Store the changes here
 	oldSuccessorMap := make(map[uint32][]uint32, nodesSize)
 	currentSuccessorMap := make(map[uint32][]uint32, nodesSize)
 
@@ -460,10 +464,10 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
 
-	RWM, _ := NewRWM(0.85, 10)
+	RWM, _ := NewRWM("mock", 0.85, 10)
 	RWM.GenerateAll(DB)
 
-	// store the changes here
+	// Store the changes here
 	oldSuccessorMap := make(map[uint32][]uint32, nodesSize)
 	currentSuccessorMap := make(map[uint32][]uint32, nodesSize)
 

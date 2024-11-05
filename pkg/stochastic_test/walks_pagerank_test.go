@@ -11,7 +11,7 @@ func TestPagerankStatic(t *testing.T) {
 
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
-	const walkPerNode = 5000
+	const walkPerNode = 10000
 
 	tests := []struct {
 		name      string
@@ -93,7 +93,7 @@ func TestPagerankDynamic(t *testing.T) {
 
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
-	const walkPerNode = 5000
+	const walkPerNode = 10000
 
 	tests := []struct {
 		name      string

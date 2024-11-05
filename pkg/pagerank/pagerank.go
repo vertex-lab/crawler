@@ -1,31 +1,27 @@
 package pagerank
 
 import (
-	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
 // a map that associates each nodeID with its corrisponding pagerank value
 type PagerankMap map[uint32]float64
 
-func Pagerank(RWM *walks.RandomWalksManager) (PagerankMap, error) {
+func Pagerank(RWS models.RandomWalkStore) (PagerankMap, error) {
 
-	const expectEmptyRWM = false
-	if err := RWM.CheckState(expectEmptyRWM); err != nil {
+	if err := RWS.Validate(false); err != nil {
 		return nil, err
 	}
 
 	// initialize
-	pagerank := make(PagerankMap, len(RWM.NodeWalkSet))
+	pagerank := make(PagerankMap, RWS.NodeCount())
 	totalVisits := 0.0
 
-	// iterate over the RWM
-	for nodeID, walkSet := range RWM.NodeWalkSet {
-
-		// this can be made more efficient by fetching the nodeVisits directly
-		nodeVisits := float64(walkSet.Cardinality())
-		totalVisits += nodeVisits
-
+	// iterate over the RWS
+	for _, nodeID := range RWS.All() {
+		nodeVisits := float64(RWS.VisitCount(nodeID))
 		pagerank[nodeID] = nodeVisits
+		totalVisits += nodeVisits
 	}
 
 	// normalize

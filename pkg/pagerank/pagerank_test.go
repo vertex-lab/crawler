@@ -7,38 +7,38 @@ import (
 	"testing"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
 func TestPagerank(t *testing.T) {
-
 	testCases := []struct {
 		name             string
-		RWMType          string
+		RWSType          string
 		expectedPagerank PagerankMap
 		expectedError    error
 	}{
 		{
-			name:          "nil RWM",
-			RWMType:       "nil",
-			expectedError: walks.ErrNilRWMPointer,
+			name:          "nil RWS",
+			RWSType:       "nil",
+			expectedError: models.ErrNilRWSPointer,
 		},
 		{
-			name:          "empty RWM",
-			RWMType:       "empty",
-			expectedError: walks.ErrEmptyRWM,
+			name:          "empty RWS",
+			RWSType:       "empty",
+			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "just one node",
-			RWMType:       "one-node0",
+			RWSType:       "one-node0",
 			expectedError: nil,
 			expectedPagerank: PagerankMap{
 				0: 1.0,
 			},
 		},
 		{
-			name:          "simple RWM",
-			RWMType:       "simple",
+			name:          "simple RWS",
+			RWSType:       "simple",
 			expectedError: nil,
 			expectedPagerank: PagerankMap{
 				0: 0.5,
@@ -47,8 +47,8 @@ func TestPagerank(t *testing.T) {
 			},
 		},
 		{
-			name:          "triangle RWM",
-			RWMType:       "triangle",
+			name:          "triangle RWS",
+			RWSType:       "triangle",
 			expectedError: nil,
 			expectedPagerank: PagerankMap{
 				0: 1.0 / 3.0,
@@ -59,11 +59,10 @@ func TestPagerank(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-
 		t.Run(test.name, func(t *testing.T) {
 
-			RWM := walks.SetupRWM(test.RWMType)
-			pagerank, err := Pagerank(RWM)
+			RWS := mock.SetupRWS(test.RWSType)
+			pagerank, err := Pagerank(RWS)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
@@ -71,7 +70,6 @@ func TestPagerank(t *testing.T) {
 
 			// if provided, check the pagerank is equal to the expected
 			if test.expectedPagerank != nil {
-
 				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
 					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
 				}
@@ -93,16 +91,14 @@ func BenchmarkPagerank(b *testing.B) {
 
 		// Different walksPerNode
 		for _, walksPerNode := range []uint16{1, 10, 100} {
-
 			b.Run(fmt.Sprintf("walksPerNode=%d", walksPerNode), func(b *testing.B) {
-
-				RWM, _ := walks.NewRWM(0.85, walksPerNode)
+				RWM, _ := walks.NewRWM("mock", 0.85, walksPerNode)
 				RWM.GenerateAll(DB)
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(RWM)
+					_, err := Pagerank(RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}
@@ -117,18 +113,16 @@ func BenchmarkPagerank(b *testing.B) {
 
 		// Different DB sizes
 		for _, nodesSize := range []int{1000, 2000, 5000} {
-
 			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
 
 				DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
-				RWM, _ := walks.NewRWM(0.85, 10)
+				RWM, _ := walks.NewRWM("mock", 0.85, 10)
 				RWM.GenerateAll(DB)
 
 				b.ResetTimer()
-
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(RWM)
+					_, err := Pagerank(RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}

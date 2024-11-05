@@ -1,11 +1,10 @@
 package walks
 
 import (
-	"math/rand"
 	"slices"
 	"sort"
 
-	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
 /*
@@ -129,7 +128,7 @@ func DeleteCyclesInPlace(oldWalk []uint32, newWalk []uint32) []uint32 {
 	return newWalk
 }
 
-func SortWalks(walks [][]uint32) [][]uint32 {
+func SortWalks(walks []models.RandomWalk) []models.RandomWalk {
 
 	// Sort the walks lexicographically
 	sort.Slice(walks, func(i, j int) bool {
@@ -146,81 +145,4 @@ func SortWalks(walks [][]uint32) [][]uint32 {
 	})
 
 	return walks
-}
-
-// dereferences the random walks and sorts them in lexicographic order
-func SortRandomWalks(rWalks []*RandomWalk) [][]uint32 {
-
-	walks := [][]uint32{}
-
-	// dereference the pointers
-	for _, rWalk := range rWalks {
-		walks = append(walks, rWalk.NodeIDs)
-	}
-
-	return SortWalks(walks)
-}
-
-// dereferences the random walks in the walkSet and sorts them in lexicographic order
-func SortWalkSet(walkSet WalkSet) [][]uint32 {
-	return SortRandomWalks(walkSet.ToSlice())
-}
-
-// function that returns a RWM setup based on the RWMType
-func SetupRWM(RWMType string) *RandomWalksManager {
-	switch RWMType {
-
-	case "nil":
-		return nil
-
-	case "empty":
-		RWM, _ := NewRWM(0.85, 1)
-		return RWM
-
-	case "invalid-alpha":
-		invalidAlphas := []float32{1.01, 1.0, -0.1, -2}
-		size := len(invalidAlphas)
-
-		RWM, _ := NewRWM(0.85, 1)
-		RWM.Alpha = invalidAlphas[rand.Intn(size)]
-		return RWM
-
-	case "invalid-walksPerNode":
-		RWM, _ := NewRWM(0.85, 1)
-		RWM.WalksPerNode = 0
-		return RWM
-
-	case "one-node0":
-		RWM, _ := NewRWM(0.85, 1)
-		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{0}})
-		RWM.NodeWalkSet[0] = walkSet
-		return RWM
-
-	case "one-node1":
-		RWM, _ := NewRWM(0.85, 1)
-		walkSet := mapset.NewSet(&RandomWalk{NodeIDs: []uint32{1}})
-		RWM.NodeWalkSet[1] = walkSet
-		return RWM
-
-	case "triangle":
-		RWM, _ := NewRWM(0.85, 1)
-		rWalk0 := &RandomWalk{NodeIDs: []uint32{0, 1, 2}}
-		rWalk1 := &RandomWalk{NodeIDs: []uint32{1, 2, 0}}
-		rWalk2 := &RandomWalk{NodeIDs: []uint32{2, 0, 1}}
-
-		RWM.AddWalk(rWalk0)
-		RWM.AddWalk(rWalk1)
-		RWM.AddWalk(rWalk2)
-		return RWM
-
-	case "simple":
-		RWM, _ := NewRWM(0.85, 1)
-		rWalk := &RandomWalk{NodeIDs: []uint32{0, 1}}
-		RWM.AddWalk(rWalk)
-
-		return RWM
-
-	default:
-		return nil // Default to nil for unrecognized scenarios
-	}
 }

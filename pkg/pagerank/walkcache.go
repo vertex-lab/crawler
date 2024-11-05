@@ -4,11 +4,8 @@ import (
 	"errors"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
-
-// a slice of walks
-type WalkSlice [][]uint32
 
 /*
 WalkCache keeps track of the walks associated with each node and the walks that
@@ -16,117 +13,108 @@ have been used in the personalized walk.
 
 # FIELDS
 
-	> NodeWalkSlice map[uint32]WalkSlice
+	> NodeWalks map[uint32][]models.RandomWalk
 	A map that associates each nodeID with a slice of walks that go through that node
 
 	> NodeWalkIndex map[uint32]int
 	A map that associates each nodeID with the last used walk index.
-	The personalized walk will use the first walk in NodeWalkSlice[nodeID] (index = 0),
+	The personalized walk will use the first walk in NodeWalks[nodeID] (index = 0),
 	then the second (index = 1) and so on. When the index reaches the lenght of
 	the walkSlice, all walks have been used.
 
-	> FetchedWalks walks.WalkSet
-	A set of walk IDs that have been already fetched from the RWM. Because walks
+	> LoadedWalkIDs models.WalkIDSet
+	A set of walk IDs that have been already fetched from the RWS. Because walks
 	should not be reused in the personalized walk, we won't fetch walks that
 	have already been fetched (even if not yet used).
 */
 type WalkCache struct {
-	NodeWalkSlice map[uint32]WalkSlice
+	NodeWalks     map[uint32][]models.RandomWalk
 	NodeWalkIndex map[uint32]int
-	FetchedWalks  walks.WalkSet
+	LoadedWalkIDs models.WalkIDSet
 }
 
 // initializes an empty WC
 func NewWalkCache() *WalkCache {
 	return &WalkCache{
-		NodeWalkSlice: make(map[uint32]WalkSlice),
+		NodeWalks:     make(map[uint32][]models.RandomWalk),
 		NodeWalkIndex: make(map[uint32]int),
-		FetchedWalks:  mapset.NewSet[*walks.RandomWalk](),
+		LoadedWalkIDs: mapset.NewSet[uint32](),
 	}
 }
 
-// returns the appropriate error if WC is nil or empty
-func (WC *WalkCache) CheckEmpty() error {
+// Validate() returns the appropriate error if WC is nil or empty
+func (WC *WalkCache) Validate() error {
 
 	if WC == nil {
 		return ErrNilWCPointer
 	}
 
-	if len(WC.NodeWalkSlice) == 0 {
+	if len(WC.NodeWalks) == 0 {
 		return ErrEmptyWC
 	}
 
 	return nil
 }
 
-// returns whether WC contains walks associated with nodeID
-func (WC *WalkCache) Contains(nodeID uint32) bool {
+// ContainsNode returns whether WC contains walks associated with nodeID
+func (WC *WalkCache) ContainsNode(nodeID uint32) bool {
 
 	if WC == nil {
 		return false
 	}
 
-	_, exist := WC.NodeWalkSlice[nodeID]
+	_, exist := WC.NodeWalks[nodeID]
 	return exist
 }
 
-// returns whether all walks of nodeID have been used. if WC is nil, returns true
+// FullyUsed() returns whether all walks of nodeID have been used. if WC is nil, returns true
 func (WC *WalkCache) FullyUsed(nodeID uint32) bool {
 
-	if !WC.Contains(nodeID) {
+	if !WC.ContainsNode(nodeID) {
 		return true
 	}
 
-	return WC.NodeWalkIndex[nodeID] >= len(WC.NodeWalkSlice[nodeID])
+	return WC.NodeWalkIndex[nodeID] >= len(WC.NodeWalks[nodeID])
 }
 
 /*
-fetches the WalkSet of nodeID from the RWM and stores up to `walkNum` walks
-in the WalkCache. It avoid storing walks that have already been fetched (by other nodes).
+fetches the WalkIDSet of nodeID from the RWS and stores up to `limit` walks
+in the WalkCache. It avoid storing walks that have already been fetched from other nodes.
 
 The Load method will fetch the walks for nodeID only once.
 Subsequent fetching will result in an error.
 
-If walkNum is <= 0, all walks will be fetched.
+If limit is <= 0, all walks will be fetched.
 */
-func (WC *WalkCache) Load(RWM *walks.RandomWalksManager,
-	nodeID uint32, walksNum int) error {
+func (WC *WalkCache) Load(RWS models.RandomWalkStore, nodeID uint32, limit int) error {
 
 	if WC == nil {
 		return ErrNilWCPointer
 	}
 
-	if WC.Contains(nodeID) {
+	if WC.ContainsNode(nodeID) {
 		return ErrNodeAlreadyLoadedWC
 	}
 
-	walkSet, err := RWM.WalkSet(nodeID)
+	walkMap, err := RWS.Walks(nodeID)
 	if err != nil {
 		return err
 	}
 
-	// remove previously fetched walks
-	walkDiffSet := walkSet.Difference(WC.FetchedWalks)
+	walks := make([]models.RandomWalk, 0, limit)
+	for walkID, walk := range walkMap {
 
-	totalWalks := walkDiffSet.Cardinality()
-	if totalWalks == 0 {
-		// adding an empty slice signals that it was Loaded
-		WC.NodeWalkSlice[nodeID] = [][]uint32{}
-		return nil
-	}
-
-	// determine the number of walks to be fetched
-	if walksNum <= 0 || walksNum > totalWalks {
-		walksNum = totalWalks
-	}
-
-	walkSlice := make([][]uint32, 0, walksNum)
-	for rWalk := range walkDiffSet.Iter() {
-		if len(walkSlice) == walksNum {
+		// the exit condition
+		if len(walks) == limit {
 			break
 		}
 
-		walkSegment, err := CropWalk(rWalk, nodeID)
+		// skip walks already loaded
+		if WC.LoadedWalkIDs.ContainsOne(walkID) {
+			continue
+		}
+
+		walkSegment, err := CropWalk(walk, nodeID)
 		if err != nil {
 			return err
 		}
@@ -136,21 +124,21 @@ func (WC *WalkCache) Load(RWM *walks.RandomWalksManager,
 			continue
 		}
 
-		WC.FetchedWalks.Add(rWalk)
-		walkSlice = append(walkSlice, walkSegment)
+		WC.LoadedWalkIDs.Add(walkID)
+		walks = append(walks, walkSegment)
 	}
 
-	WC.NodeWalkSlice[nodeID] = walkSlice
+	WC.NodeWalks[nodeID] = walks
 	return nil
 }
 
 // returns the walk from nodeID onward (excluded). If nodeID is not found, returns an error
-func CropWalk(rWalk *walks.RandomWalk, nodeID uint32) ([]uint32, error) {
+func CropWalk(walk models.RandomWalk, nodeID uint32) (models.RandomWalk, error) {
 
 	// return the walk after nodeID (excluded)
-	for i, ID := range rWalk.NodeIDs {
+	for i, ID := range walk {
 		if ID == nodeID {
-			return rWalk.NodeIDs[i+1:], nil
+			return walk[i+1:], nil
 		}
 	}
 
@@ -166,22 +154,21 @@ It returns errors if:
 */
 func (WC *WalkCache) NextWalk(nodeID uint32) ([]uint32, error) {
 
-	if err := WC.CheckEmpty(); err != nil {
+	if err := WC.Validate(); err != nil {
 		return nil, err
 	}
 
-	if !WC.Contains(nodeID) {
+	if !WC.ContainsNode(nodeID) {
 		return nil, ErrNodeNotFoundWC
 	}
 
-	if WC.NodeWalkIndex[nodeID] >= len(WC.NodeWalkSlice[nodeID]) {
+	if WC.NodeWalkIndex[nodeID] >= len(WC.NodeWalks[nodeID]) {
 		return nil, ErrAllWalksUsedWC
 	}
 
 	index := WC.NodeWalkIndex[nodeID]
-	nextWalk := WC.NodeWalkSlice[nodeID][index]
+	nextWalk := WC.NodeWalks[nodeID][index]
 	WC.NodeWalkIndex[nodeID]++
-
 	return nextWalk, nil
 }
 

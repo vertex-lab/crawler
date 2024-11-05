@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/graph"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
 // grouping properties of a test together
@@ -13,22 +13,22 @@ type testCases struct {
 	name          string
 	DBType        string
 	expectedError error
-	expectedNode  *graph.Node
+	expectedNode  *models.Node
 	expectedSlice []uint32
 }
 
-func TestCheckEmpty(t *testing.T) {
+func TestValidateDB(t *testing.T) {
 
 	testCases := []testCases{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilGraphDBPointer,
+			expectedError: models.ErrNilDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrGraphDBIsEmpty,
+			expectedError: models.ErrEmptyDB,
 		},
 		{
 			name:          "DB with node 0",
@@ -41,10 +41,50 @@ func TestCheckEmpty(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			err := DB.CheckEmpty()
+			err := DB.Validate()
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("CheckEmpty(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("Validate(): expected %v, got %v", test.expectedError, err)
+			}
+		})
+	}
+}
+
+func TestContainsNodeDB(t *testing.T) {
+	testCases := []struct {
+		name             string
+		DBType           string
+		expectedContains bool
+	}{
+		{
+			name:             "nil DB",
+			DBType:           "nil",
+			expectedContains: false,
+		},
+		{
+			name:             "empty DB",
+			DBType:           "empty",
+			expectedContains: false,
+		},
+		{
+			name:             "node not found in DB",
+			DBType:           "one-node0",
+			expectedContains: false,
+		},
+		{
+			name:             "node found in DB",
+			DBType:           "one-node1",
+			expectedContains: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := SetupDB(test.DBType)
+
+			contains := DB.ContainsNode(1)
+			if contains != test.expectedContains {
+				t.Errorf("ContainsNode(1): expected %v, got %v", test.expectedContains, contains)
 			}
 		})
 	}
@@ -56,23 +96,23 @@ func TestNode(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilGraphDBPointer,
+			expectedError: models.ErrNilDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrGraphDBIsEmpty,
+			expectedError: models.ErrEmptyDB,
 		},
 		{
 			name:          "DB with node 0",
 			DBType:        "one-node0",
-			expectedError: graph.ErrNodeNotFoundDB,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:          "DB with node 1",
 			DBType:        "one-node1",
 			expectedError: nil,
-			expectedNode:  &graph.Node{ID: 1, Successors: []uint32{1}},
+			expectedNode:  &models.Node{ID: 1, Successors: []uint32{1}},
 		},
 	}
 
@@ -111,17 +151,17 @@ func TestSuccessors(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilGraphDBPointer,
+			expectedError: models.ErrNilDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrGraphDBIsEmpty,
+			expectedError: models.ErrEmptyDB,
 		},
 		{
 			name:          "DB with node 0",
 			DBType:        "one-node0",
-			expectedError: graph.ErrNodeNotFoundDB,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:          "DB with node 1",
@@ -209,18 +249,18 @@ func TestIsDandling(t *testing.T) {
 	}
 }
 
-func TestAllIDs(t *testing.T) {
+func TestAllDB(t *testing.T) {
 
 	testCases := []testCases{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: graph.ErrNilGraphDBPointer,
+			expectedError: models.ErrNilDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
-			expectedError: graph.ErrGraphDBIsEmpty,
+			expectedError: models.ErrEmptyDB,
 		},
 		{
 			name:          "DB with node 0",
@@ -234,21 +274,21 @@ func TestAllIDs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			nodeIDs, err := DB.AllIDs()
+			nodeIDs, err := DB.All()
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("AllIDs(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("All(): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check that the expected result is equal to the result
 			if test.expectedSlice != nil {
 
 				if nodeIDs == nil {
-					t.Errorf("AllIDs(): expected %v, got nil", test.expectedSlice)
+					t.Errorf("All(): expected %v, got nil", test.expectedSlice)
 				}
 
 				if !reflect.DeepEqual(nodeIDs, test.expectedSlice) {
-					t.Errorf("AllIDs(): expected %v, got %v", test.expectedSlice, nodeIDs)
+					t.Errorf("All(): expected %v, got %v", test.expectedSlice, nodeIDs)
 				}
 			}
 		})

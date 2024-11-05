@@ -3,7 +3,7 @@ package pagerank
 import (
 	"math"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
 // computes the L1 distance between two maps who are supposed to have the same keys.
@@ -32,28 +32,21 @@ func SetupWC(WCType string) *WalkCache {
 
 	case "one-node0":
 		WC := NewWalkCache()
-		rWalk := walks.RandomWalk{NodeIDs: []uint32{0}}
-		WC.NodeWalkSlice[0] = [][]uint32{rWalk.NodeIDs}
-		WC.FetchedWalks.Add(&rWalk)
+		WC.NodeWalks[0] = []models.RandomWalk{{0}}
+		WC.LoadedWalkIDs.Add(0)
 		return WC
 
 	case "all-used":
 		WC := NewWalkCache()
-		rWalk := walks.RandomWalk{NodeIDs: []uint32{0}}
-		WC.NodeWalkSlice[0] = [][]uint32{rWalk.NodeIDs}
-		WC.FetchedWalks.Add(&rWalk)
-
+		WC.NodeWalks[0] = []models.RandomWalk{{0}}
+		WC.LoadedWalkIDs.Add(0)
 		WC.NodeWalkIndex[0] = 1 // all used
 		return WC
 
 	case "triangle":
 		WC := NewWalkCache()
-		rWalk0 := walks.RandomWalk{NodeIDs: []uint32{0, 1, 2}}
-		rWalk1 := walks.RandomWalk{NodeIDs: []uint32{1, 2, 0}}
-		rWalk2 := walks.RandomWalk{NodeIDs: []uint32{2, 0, 1}}
-
-		WC.NodeWalkSlice[0] = [][]uint32{rWalk0.NodeIDs[1:], rWalk2.NodeIDs[2:]}
-		WC.FetchedWalks.Append(&rWalk0, &rWalk1, &rWalk2)
+		WC.NodeWalks[0] = []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
+		WC.LoadedWalkIDs.Append(0, 1, 2)
 		return WC
 
 	default:

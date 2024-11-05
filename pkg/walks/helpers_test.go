@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
+// REFACTOR
 func TestDifference(t *testing.T) {
 
 	t.Run("empty slices", func(t *testing.T) {
@@ -35,6 +37,7 @@ func TestDifference(t *testing.T) {
 	})
 }
 
+// REFACTOR
 func TestPartition(t *testing.T) {
 
 	t.Run("empty slices", func(t *testing.T) {
@@ -207,40 +210,70 @@ func TestDeleteCyclesInPlace(t *testing.T) {
 	}
 }
 
-func TestSortWalkSet(t *testing.T) {
+func TestSortWalks2(t *testing.T) {
+	testCases := []struct {
+		name                string
+		walks               []models.RandomWalk
+		expectedSortedWalks []models.RandomWalk
+	}{
+		{
+			name:                "empty walks",
+			walks:               []models.RandomWalk{},
+			expectedSortedWalks: []models.RandomWalk{},
+		},
+		{
+			name:                "normal walks",
+			walks:               []models.RandomWalk{{0, 1}, {2, 0}, {1, 2}},
+			expectedSortedWalks: []models.RandomWalk{{0, 1}, {1, 2}, {2, 0}},
+		},
+	}
 
-	t.Run("empty walkSet", func(t *testing.T) {
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
 
-		walkSet := mapset.NewSet[*RandomWalk]()
-		walks := SortWalkSet(walkSet)
-
-		if !reflect.DeepEqual(walks, [][]uint32{}) {
-			t.Errorf("SortWalkSet(): expected %v, got %v", [][]uint32{}, walks)
-		}
-	})
-
-	t.Run("normal", func(t *testing.T) {
-
-		expected := map[uint32][]uint32{
-			0: {0, 1},
-			1: {0, 2},
-			2: {1, 0},
-		}
-
-		rWalk1 := &RandomWalk{NodeIDs: expected[1]}
-		rWalk2 := &RandomWalk{NodeIDs: expected[0]}
-		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
-
-		walkSet := mapset.NewSet(rWalk1, rWalk2, rWalk3)
-		got := SortWalkSet(walkSet)
-
-		for key, val := range expected {
-			if !reflect.DeepEqual(got[key], val) {
-				t.Errorf("SortWalkSet(): expected %v, got %v", val, got[key])
+			sortedWalks := SortWalks(test.walks)
+			if !reflect.DeepEqual(sortedWalks, test.expectedSortedWalks) {
+				t.Errorf("SortWalks(): expected %v, got %v", test.expectedSortedWalks, sortedWalks)
 			}
-		}
-	})
+		})
+	}
+
 }
+
+// func TestSortWalks(t *testing.T) {
+
+// 	t.Run("empty walks", func(t *testing.T) {
+
+// 		walkSet := mapset.NewSet[*RandomWalk]()
+// 		walks := SortWalkSet(walkSet)
+
+// 		if !reflect.DeepEqual(walks, [][]uint32{}) {
+// 			t.Errorf("SortWalkSet(): expected %v, got %v", [][]uint32{}, walks)
+// 		}
+// 	})
+
+// 	t.Run("normal", func(t *testing.T) {
+
+// 		expected := map[uint32][]uint32{
+// 			0: {0, 1},
+// 			1: {0, 2},
+// 			2: {1, 0},
+// 		}
+
+// 		rWalk1 := &RandomWalk{NodeIDs: expected[1]}
+// 		rWalk2 := &RandomWalk{NodeIDs: expected[0]}
+// 		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
+
+// 		walkSet := mapset.NewSet(rWalk1, rWalk2, rWalk3)
+// 		got := SortWalkSet(walkSet)
+
+// 		for key, val := range expected {
+// 			if !reflect.DeepEqual(got[key], val) {
+// 				t.Errorf("SortWalkSet(): expected %v, got %v", val, got[key])
+// 			}
+// 		}
+// 	})
+// }
 
 // ---------------------------------BENCHMARKS---------------------------------
 
