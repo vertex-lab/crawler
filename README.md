@@ -14,18 +14,18 @@ This project implements the algorithms described in [this paper](http://snap.sta
 
 ## Structure
 
-`/cmd/app/main.go`: the main function, which should
+`/cmd/app/main.go`: the main function, which should:
 - generate the random walks on restart
 - listen for graph updates (e.g. a node is added, or a node has changed it's out-edges)
 - update the random walks
 
 `/pkg/models/`: defines the fundamental interfaces and structures.
 
-`/pkg/store/`: contains two implementations of the `RandomWalkStore` interface.
+`/pkg/store/`: contains two implementations of the `RandomWalkStore` interface, which deals with saving and fetching random walks from an in-memory database.
 - `/pkg/store/redis/`: Implementation using redis, for production use (WIP).
 - `/pkg/store/mock/`: Implementation in-memory, for tests.
 
-`/pkg/database/`: contains two implementations of the `Database` interface.
+`/pkg/database/`: contains two implementations of the `Database` interface, which deals with saving and fetching nodes and edges from a persistent database.
 - `/pkg/database/redis/`: Implementation using redis, for production use (WIP).
 - `/pkg/database/mock/`: Implementation in-memory, for tests.
 
