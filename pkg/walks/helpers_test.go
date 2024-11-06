@@ -9,76 +9,81 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
-// REFACTOR
 func TestDifference(t *testing.T) {
+	testCases := []struct {
+		name          string
+		slice1        []uint32
+		slice2        []uint32
+		expectedSlice []uint32
+	}{
+		{
+			name:          "empty slices",
+			slice1:        []uint32{},
+			slice2:        []uint32{},
+			expectedSlice: []uint32{},
+		},
+		{
+			name:          "normal",
+			slice1:        []uint32{0, 1, 2, 4},
+			slice2:        []uint32{1, 2, 3},
+			expectedSlice: []uint32{0, 4},
+		},
+	}
 
-	t.Run("empty slices", func(t *testing.T) {
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
 
-		slice1 := []uint32{}
-		slice2 := []uint32{}
-
-		difference := Difference(slice1, slice2)
-
-		if !reflect.DeepEqual(difference, []uint32{}) {
-			t.Errorf("Partition(): expected [], got %v", difference)
-		}
-	})
-
-	t.Run("normal", func(t *testing.T) {
-
-		slice1 := []uint32{0, 1, 2, 4}
-		slice2 := []uint32{1, 2, 3}
-
-		difference := Difference(slice1, slice2)
-
-		if !reflect.DeepEqual(difference, []uint32{0, 4}) {
-			t.Errorf("Partition(): expected [], got %v", difference)
-		}
-	})
+			diff := Difference(test.slice1, test.slice2)
+			if !reflect.DeepEqual(diff, test.expectedSlice) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedSlice, diff)
+			}
+		})
+	}
 }
 
-// REFACTOR
 func TestPartition(t *testing.T) {
+	testCases := []struct {
+		name            string
+		slice1          []uint32
+		slice2          []uint32
+		expectedRemoved []uint32
+		expectedCommon  []uint32
+		expectedAdded   []uint32
+	}{
+		{
+			name:            "empty slices",
+			slice1:          []uint32{},
+			slice2:          []uint32{},
+			expectedRemoved: []uint32{},
+			expectedCommon:  []uint32{},
+			expectedAdded:   []uint32{},
+		},
+		{
+			name:            "normal",
+			slice1:          []uint32{0, 1, 2, 4},
+			slice2:          []uint32{1, 2, 3},
+			expectedRemoved: []uint32{0, 4},
+			expectedCommon:  []uint32{1, 2},
+			expectedAdded:   []uint32{3},
+		},
+	}
 
-	t.Run("empty slices", func(t *testing.T) {
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			removed, common, added := Partition(test.slice1, test.slice2)
+			if !reflect.DeepEqual(removed, test.expectedRemoved) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedRemoved, removed)
+			}
 
-		oldSlice := []uint32{}
-		newSlice := []uint32{}
+			if !reflect.DeepEqual(common, test.expectedCommon) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedCommon, common)
+			}
 
-		removed, common, added := Partition(oldSlice, newSlice)
-
-		if removed == nil || len(removed) > 0 {
-			t.Errorf("Partition(): expected [], got %v", removed)
-		}
-
-		if common == nil || len(common) > 0 {
-			t.Errorf("Partition(): expected [], got %v", common)
-		}
-
-		if added == nil || len(added) > 0 {
-			t.Errorf("Partition(): expected [], got %v", added)
-		}
-	})
-
-	t.Run("normal", func(t *testing.T) {
-
-		oldSlice := []uint32{0, 1, 2, 4}
-		newSlice := []uint32{1, 2, 3}
-
-		removed, common, added := Partition(oldSlice, newSlice)
-
-		if removed[0] != 0 || removed[1] != 4 {
-			t.Errorf("expected [0, 4], got %v", removed)
-		}
-
-		if !reflect.DeepEqual(common, []uint32{1, 2}) {
-			t.Errorf("expected [1, 2], got %v", common)
-		}
-
-		if added[0] != 3 {
-			t.Errorf("expected 3, got %v", added[3])
-		}
-	})
+			if !reflect.DeepEqual(added, test.expectedAdded) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedAdded, added)
+			}
+		})
+	}
 }
 
 func TestTrimCycles(t *testing.T) {
