@@ -5,8 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	mockdb "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	mockstore "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -217,7 +218,7 @@ func TestLoad(t *testing.T) {
 		for _, test := range testCases {
 
 			t.Run(test.name, func(t *testing.T) {
-				RWS := mock.SetupRWS(test.RWSType)
+				RWS := mockstore.SetupRWS(test.RWSType)
 				WC := SetupWC(test.WCType)
 				err := WC.Load(RWS, test.nodeID, test.limit)
 
@@ -251,7 +252,7 @@ func TestLoad(t *testing.T) {
 			2: {},
 		}
 
-		RWS := mock.SetupRWS("triangle")
+		RWS := mockstore.SetupRWS("triangle")
 		WC := SetupWC("empty")
 
 		// load for all the nodes
@@ -387,7 +388,7 @@ func TestCropWalk(t *testing.T) {
 // ---------------------------------BENCHMARKS---------------------------------
 
 func BenchmarkLoad(b *testing.B) {
-	DB := mock.SetupDB("triangle")
+	DB := mockdb.SetupDB("triangle")
 	RWM, _ := walks.NewRWM("mock", 0.85, 1000)
 	RWM.GenerateAll(DB)
 
@@ -403,7 +404,7 @@ func BenchmarkLoad(b *testing.B) {
 }
 
 func BenchmarkNextWalk(b *testing.B) {
-	RWS := mock.SetupRWS("triangle")
+	RWS := mockstore.SetupRWS("triangle")
 	WC := NewWalkCache()
 	WC.Load(RWS, 0, 10)
 

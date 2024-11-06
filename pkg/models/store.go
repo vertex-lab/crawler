@@ -26,7 +26,6 @@ type WalkIDSet mapset.Set[uint32]
 
 // RandomWalkStore handles atomic operations to create, update, and remove RandomWalks.
 type RandomWalkStore interface {
-
 	// Validate() checks whether the RWS is nil, empty or non-empty and returns
 	// an appropriate error based on the requirement.
 	Validate(expectEmptyRWS bool) error

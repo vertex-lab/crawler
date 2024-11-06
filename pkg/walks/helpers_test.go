@@ -210,7 +210,7 @@ func TestDeleteCyclesInPlace(t *testing.T) {
 	}
 }
 
-func TestSortWalks2(t *testing.T) {
+func TestSortWalks(t *testing.T) {
 	testCases := []struct {
 		name                string
 		walks               []models.RandomWalk
@@ -237,43 +237,7 @@ func TestSortWalks2(t *testing.T) {
 			}
 		})
 	}
-
 }
-
-// func TestSortWalks(t *testing.T) {
-
-// 	t.Run("empty walks", func(t *testing.T) {
-
-// 		walkSet := mapset.NewSet[*RandomWalk]()
-// 		walks := SortWalkSet(walkSet)
-
-// 		if !reflect.DeepEqual(walks, [][]uint32{}) {
-// 			t.Errorf("SortWalkSet(): expected %v, got %v", [][]uint32{}, walks)
-// 		}
-// 	})
-
-// 	t.Run("normal", func(t *testing.T) {
-
-// 		expected := map[uint32][]uint32{
-// 			0: {0, 1},
-// 			1: {0, 2},
-// 			2: {1, 0},
-// 		}
-
-// 		rWalk1 := &RandomWalk{NodeIDs: expected[1]}
-// 		rWalk2 := &RandomWalk{NodeIDs: expected[0]}
-// 		rWalk3 := &RandomWalk{NodeIDs: expected[2]}
-
-// 		walkSet := mapset.NewSet(rWalk1, rWalk2, rWalk3)
-// 		got := SortWalkSet(walkSet)
-
-// 		for key, val := range expected {
-// 			if !reflect.DeepEqual(got[key], val) {
-// 				t.Errorf("SortWalkSet(): expected %v, got %v", val, got[key])
-// 			}
-// 		}
-// 	})
-// }
 
 // ---------------------------------BENCHMARKS---------------------------------
 

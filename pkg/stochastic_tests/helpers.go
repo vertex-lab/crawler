@@ -4,7 +4,7 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/pagerank"
 )
@@ -18,7 +18,7 @@ randomly selects one of the potentialChanges, and returns:
 
 - currentSucc: the current state of the successors of nodeID
 */
-func SetupOldState(DB *mock.MockGraphDB,
+func SetupOldState(DB *mock.Database,
 	potentialChanges map[uint32][]Change) (uint32, []uint32, []uint32) {
 
 	numChanges := len(potentialChanges)
@@ -48,7 +48,7 @@ func SetupOldState(DB *mock.MockGraphDB,
 
 // TestSetup now includes potential changes that you can randomly select from.
 type TestSetup struct {
-	DB               *mock.MockGraphDB
+	DB               *mock.Database
 	ExpectedPR       pagerank.PagerankMap
 	ExpectedPPR0     pagerank.PagerankMap
 	PotentialChanges map[uint32][]Change
@@ -72,7 +72,7 @@ of cycles involving nodeID --> removedNode is high. For the same reason,
 potentialChanges should not include oldSuccessors that make the corrisponding graph cyclic.
 */
 func SetupGraph(graphType string) TestSetup {
-	DB := mock.NewMockGraphDB()
+	DB := mock.NewDatabase()
 	var expectedPR pagerank.PagerankMap
 	var expectedPPR0 pagerank.PagerankMap
 	potentialChanges := make(map[uint32][]Change)

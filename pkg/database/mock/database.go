@@ -8,19 +8,19 @@ import (
 )
 
 // simulates a simple GraphDB for testing.
-type MockGraphDB struct {
+type Database struct {
 	Nodes map[uint32]*models.Node
 }
 
-// NewMockGraphDB creates and returns a new MockGraphDB instance.
-func NewMockGraphDB() *MockGraphDB {
-	return &MockGraphDB{
+// NewDatabase creates and returns a new Database instance.
+func NewDatabase() *Database {
+	return &Database{
 		Nodes: make(map[uint32]*models.Node), // Initialize an empty map to store nodes.
 	}
 }
 
 // Validate returns an error if the DB is nil or has no nodes
-func (DB *MockGraphDB) Validate() error {
+func (DB *Database) Validate() error {
 
 	// handle nil pointer
 	if DB == nil {
@@ -35,7 +35,7 @@ func (DB *MockGraphDB) Validate() error {
 }
 
 // ContainsNode returns whether nodeID is found in the DB
-func (DB *MockGraphDB) ContainsNode(nodeID uint32) bool {
+func (DB *Database) ContainsNode(nodeID uint32) bool {
 
 	if err := DB.Validate(); err != nil {
 		return false
@@ -46,7 +46,7 @@ func (DB *MockGraphDB) ContainsNode(nodeID uint32) bool {
 }
 
 // Node retrieves a node by ID from the mock GraphDB.
-func (DB *MockGraphDB) Node(nodeID uint32) (*models.Node, error) {
+func (DB *Database) Node(nodeID uint32) (*models.Node, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (DB *MockGraphDB) Node(nodeID uint32) (*models.Node, error) {
 }
 
 // Successors returns the successors of a node from the mock GraphDB.
-func (DB *MockGraphDB) Successors(nodeID uint32) ([]uint32, error) {
+func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (DB *MockGraphDB) Successors(nodeID uint32) ([]uint32, error) {
 
 // IsDandling returns whether a node has no successors (dandling).
 // In case of errors, returns the default true.
-func (DB *MockGraphDB) IsDandling(nodeID uint32) bool {
+func (DB *Database) IsDandling(nodeID uint32) bool {
 
 	Successors, err := DB.Successors(nodeID)
 	if err != nil {
@@ -86,7 +86,7 @@ func (DB *MockGraphDB) IsDandling(nodeID uint32) bool {
 }
 
 // All returns a slice with the IDs of all nodes in the mock GraphDB
-func (DB *MockGraphDB) All() ([]uint32, error) {
+func (DB *Database) All() ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -103,41 +103,41 @@ func (DB *MockGraphDB) All() ([]uint32, error) {
 // ------------------------------------HELPERS----------------------------------
 
 // function that returns a DB setup based on the DBType
-func SetupDB(DBType string) *MockGraphDB {
+func SetupDB(DBType string) *Database {
 	switch DBType {
 
 	case "nil":
 		return nil
 
 	case "empty":
-		return NewMockGraphDB()
+		return NewDatabase()
 
 	case "dandling":
-		DB := NewMockGraphDB()
+		DB := NewDatabase()
 		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{}}
 		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{2}}
 		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{1}}
 		return DB
 
 	case "one-node0":
-		DB := NewMockGraphDB()
+		DB := NewDatabase()
 		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{0}}
 		return DB
 
 	case "one-node1":
-		DB := NewMockGraphDB()
+		DB := NewDatabase()
 		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{1}}
 		return DB
 
 	case "triangle":
-		DB := NewMockGraphDB()
+		DB := NewDatabase()
 		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1}}
 		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{2}}
 		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{0}}
 		return DB
 
 	case "simple":
-		DB := NewMockGraphDB()
+		DB := NewDatabase()
 		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1}}
 		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
 		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{}}
@@ -148,11 +148,11 @@ func SetupDB(DBType string) *MockGraphDB {
 	}
 }
 
-// generates a random GraphDB of a specified number of nodes and successors per node
+// generates a random mock database of a specified number of nodes and successors per node
 // the successor of a node won't include itself, and won't have repetitions
-func GenerateMockDB(nodesNum, successorsPerNode int, rng *rand.Rand) *MockGraphDB {
+func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 
-	DB := NewMockGraphDB()
+	DB := NewDatabase()
 	if successorsPerNode > nodesNum {
 		return nil
 	}

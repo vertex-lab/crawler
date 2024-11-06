@@ -13,7 +13,6 @@ func Pagerank(RWS models.RandomWalkStore) (PagerankMap, error) {
 		return nil, err
 	}
 
-	// initialize
 	pagerank := make(PagerankMap, RWS.NodeCount())
 	totalVisits := 0.0
 

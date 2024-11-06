@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	mockdb "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	mockstore "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -83,8 +84,8 @@ func TestCheckInputs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := mock.SetupDB(test.DBType)
-			RWS := mock.SetupRWS(test.RWSType)
+			DB := mockdb.SetupDB(test.DBType)
+			RWS := mockstore.SetupRWS(test.RWSType)
 
 			err := checkInputs(DB, RWS, test.nodeID, test.topK)
 
@@ -197,8 +198,8 @@ func TestReset(t *testing.T) {
 				t.Errorf("Reset(): expected %v, got %v", []uint32{pWalk.startingNodeID}, pWalk.currentWalk)
 			}
 
-			if !reflect.DeepEqual(pWalk.nodeIDs, test.expectedNodeIDs) {
-				t.Errorf("Reset(): expected %v, got %v", test.expectedNodeIDs, pWalk.nodeIDs)
+			if !reflect.DeepEqual(pWalk.walk, test.expectedNodeIDs) {
+				t.Errorf("Reset(): expected %v, got %v", test.expectedNodeIDs, pWalk.walk)
 			}
 		})
 	}
@@ -243,7 +244,7 @@ func TestAppendNode(t *testing.T) {
 	}
 }
 
-func TestAppendWalkSegment(t *testing.T) {
+func TestAppendWalk(t *testing.T) {
 
 	testCases := []struct {
 		name            string
@@ -271,7 +272,7 @@ func TestAppendWalkSegment(t *testing.T) {
 			pWalk := SetupPWalk(test.pWalkType, 10)
 			pWalk.AppendWalk(test.walkSegment)
 
-			if !reflect.DeepEqual(pWalk.nodeIDs, test.expectedNodeIDs) {
+			if !reflect.DeepEqual(pWalk.walk, test.expectedNodeIDs) {
 				t.Errorf("AppendNode(): expected %v, got %v", test.expectedNodeIDs, pWalk.currentWalk)
 			}
 		})
@@ -335,8 +336,8 @@ func TestPersonalizedWalk(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := mock.SetupDB(test.DBType)
-			RWS := mock.SetupRWS(test.RWSType)
+			DB := mockdb.SetupDB(test.DBType)
+			RWS := mockstore.SetupRWS(test.RWSType)
 			rng := rand.New(rand.NewSource(42))
 
 			pWalk, err := personalizedWalk(DB, RWS, test.startingNodeID, test.requiredLenght, rng)
@@ -430,8 +431,8 @@ func TestPersonalizedPagerank(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 
-				DB := mock.SetupDB(test.DBType)
-				RWS := mock.SetupRWS(test.RWSType)
+				DB := mockdb.SetupDB(test.DBType)
+				RWS := mockstore.SetupRWS(test.RWSType)
 
 				_, err := Personalized(DB, RWS, test.nodeID, test.topK)
 
@@ -447,7 +448,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
+		DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 		RWM, _ := walks.NewRWM("mock", 0.85, 10)
 		RWM.GenerateAll(DB)
 
@@ -466,7 +467,7 @@ func BenchmarkPersonalized(b *testing.B) {
 	nodesNum := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
+	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
 		RWM, _ := walks.NewRWM("mock", 0.85, walksPerNode)

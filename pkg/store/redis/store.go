@@ -1,4 +1,4 @@
-package walks
+package redisstore
 
 // type redisRandomWalkStore struct {
 // }

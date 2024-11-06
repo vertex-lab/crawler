@@ -6,8 +6,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	mockdb "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	mockstore "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -61,7 +62,7 @@ func TestPagerank(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			RWS := mock.SetupRWS(test.RWSType)
+			RWS := mockstore.SetupRWS(test.RWSType)
 			pagerank, err := Pagerank(RWS)
 
 			if !errors.Is(err, test.expectedError) {
@@ -87,7 +88,7 @@ func BenchmarkPagerank(b *testing.B) {
 		nodesSize := 2000
 		edgesPerNode := 100
 		rng := rand.New(rand.NewSource(69))
-		DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+		DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
 
 		// Different walksPerNode
 		for _, walksPerNode := range []uint16{1, 10, 100} {
@@ -115,7 +116,7 @@ func BenchmarkPagerank(b *testing.B) {
 		for _, nodesSize := range []int{1000, 2000, 5000} {
 			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
 
-				DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+				DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
 				RWM, _ := walks.NewRWM("mock", 0.85, 10)
 				RWM.GenerateAll(DB)
 

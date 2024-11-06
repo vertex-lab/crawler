@@ -5,7 +5,13 @@ import (
 	"sort"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	mock "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 )
+
+// function that returns a RWM setup based on the RWMType.
+func SetupRWM(RWMType string) *RandomWalkManager {
+	return &RandomWalkManager{Store: mock.SetupRWS(RWMType)}
+}
 
 /*
 returns the difference between slice1 and slice2; in set notation:

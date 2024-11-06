@@ -78,7 +78,7 @@ encapsulates the data around the personalized walk.
 	The slice of node IDs that have been visited in the current walk. The current walk
 	is needed to check for cycles.
 
-	> nodeIDs: []uint32
+	> walk: []uint32
 	The slice containing all node IDs of the personalized walk.
 	It's the sum of all current walks.
 */
@@ -86,7 +86,7 @@ type PersonalizedWalk struct {
 	startingNodeID uint32
 	currentNodeID  uint32
 	currentWalk    []uint32
-	nodeIDs        []uint32
+	walk           []uint32
 }
 
 // initialize a new personalized walk with a specified targetLenght
@@ -95,18 +95,18 @@ func NewPersonalizedWalk(nodeID uint32, targetLength int) *PersonalizedWalk {
 		startingNodeID: nodeID,
 		currentNodeID:  nodeID,
 		currentWalk:    []uint32{nodeID},
-		nodeIDs:        make([]uint32, 0, targetLength),
+		walk:           make([]uint32, 0, targetLength),
 	}
 }
 
 // returns whether the personalized walk is long enough
 func (p *PersonalizedWalk) Reached(targetLength int) bool {
-	return len(p.nodeIDs) >= targetLength
+	return len(p.walk) >= targetLength
 }
 
 // appends the current walk and goes back to the starting node
 func (p *PersonalizedWalk) Reset() {
-	p.nodeIDs = append(p.nodeIDs, p.currentWalk...)
+	p.walk = append(p.walk, p.currentWalk...)
 	p.currentNodeID = p.startingNodeID
 	p.currentWalk = []uint32{p.startingNodeID}
 }
@@ -125,7 +125,7 @@ func (p *PersonalizedWalk) AppendWalk(walkSegment []uint32) {
 
 	// append
 	p.currentWalk = append(p.currentWalk, walkSegment...)
-	p.nodeIDs = append(p.nodeIDs, p.currentWalk...)
+	p.walk = append(p.walk, p.currentWalk...)
 
 	// reset
 	p.currentNodeID = p.startingNodeID
@@ -155,10 +155,10 @@ func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
 	for {
 		// the exit condition
 		if pWalk.Reached(targetLength) {
-			return pWalk.nodeIDs, nil
+			return pWalk.walk, nil
 		}
 
-		if rng.Float32() > RWS.Alpha() {
+		if rng.Float32() > alpha {
 			pWalk.Reset()
 			continue
 		}

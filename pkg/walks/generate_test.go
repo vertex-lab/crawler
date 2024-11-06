@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	mock "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
@@ -86,19 +86,21 @@ func TestGenerateWalk(t *testing.T) {
 	}
 
 	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
 
-		DB := mock.SetupDB(test.DBType)
-		rng := rand.New(rand.NewSource(42))
+			DB := mock.SetupDB(test.DBType)
+			rng := rand.New(rand.NewSource(42))
 
-		walk, err := generateWalk(DB, 1, 0.85, rng)
+			walk, err := generateWalk(DB, 1, 0.85, rng)
 
-		if !errors.Is(err, test.expectedError) {
-			t.Errorf("generateWalk(): expected %v, got %v", test.expectedError, err)
-		}
+			if !errors.Is(err, test.expectedError) {
+				t.Errorf("generateWalk(): expected %v, got %v", test.expectedError, err)
+			}
 
-		if !reflect.DeepEqual(walk, test.expectedWalk) {
-			t.Errorf("generateWalk(): expected %v, got %v", test.expectedWalk, walk)
-		}
+			if !reflect.DeepEqual(walk, test.expectedWalk) {
+				t.Errorf("generateWalk(): expected %v, got %v", test.expectedWalk, walk)
+			}
+		})
 	}
 }
 
@@ -309,7 +311,7 @@ func TestGenerateAll(t *testing.T) {
 		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-		DB := mock.GenerateMockDB(nodesNum, edgesPerNode, rng)
+		DB := mock.GenerateDB(nodesNum, edgesPerNode, rng)
 		RWM, _ := NewRWM("mock", 0.85, 10)
 		RWM.GenerateAll(DB)
 
@@ -338,7 +340,7 @@ func BenchmarkGenerateWalk(b *testing.B) {
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -356,7 +358,7 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 	RWM, _ := NewRWM("mock", 0.85, 10)
 
 	b.ResetTimer()
@@ -376,7 +378,7 @@ func BenchmarkGenerateAll(b *testing.B) {
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 
 	b.ResetTimer()
 

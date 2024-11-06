@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
+	mock "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
@@ -355,13 +355,13 @@ func TestUpdate(t *testing.T) {
 
 		// generate the first DB
 		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
-		DB1 := mock.GenerateMockDB(nodesNum, edgesPerNode, rng1)
+		DB1 := mock.GenerateDB(nodesNum, edgesPerNode, rng1)
 		RWM, _ := NewRWM("mock", 0.85, 10)
 		RWM.GenerateAll(DB1)
 
 		// generate another GraphDB
 		rng2 := rand.New(rand.NewSource(time.Now().UnixNano()))
-		DB2 := mock.GenerateMockDB(nodesNum, edgesPerNode, rng2)
+		DB2 := mock.GenerateDB(nodesNum, edgesPerNode, rng2)
 
 		// update one node at the time
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
@@ -400,7 +400,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 
 	RWM, _ := NewRWM("mock", 0.85, 10)
 	RWM.GenerateAll(DB)
@@ -462,7 +462,7 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
+	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 
 	RWM, _ := NewRWM("mock", 0.85, 10)
 	RWM.GenerateAll(DB)

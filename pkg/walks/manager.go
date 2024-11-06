@@ -1,12 +1,14 @@
 package walks
 
 import (
-	"github.com/pippellia-btc/Nostrcrawler/pkg/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	mock "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 )
 
-// The RandomWalkManager, which wraps the RandomWalkStore and extends its
-// functionalities with complex methods like Update() and Generate().
+/*
+RandomWalkManager wraps the RandomWalkStore and extends its functionalities
+with complex methods like Update() and Generate().
+*/
 type RandomWalkManager struct {
 	Store models.RandomWalkStore
 }
@@ -27,11 +29,4 @@ func NewRWM(storeType string,
 		}
 		return &RandomWalkManager{Store: RWS}, nil
 	}
-}
-
-// ------------------------------------HELPERS----------------------------------
-
-// function that returns a RWM setup based on the RWMType.
-func SetupRWM(RWMType string) *RandomWalkManager {
-	return &RandomWalkManager{Store: mock.SetupRWS(RWMType)}
 }
