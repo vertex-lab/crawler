@@ -8,9 +8,9 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
-func TestNewRandomWalksStore(t *testing.T) {
+func TestNewRWS(t *testing.T) {
 
-	cl := SetupRedis()
+	cl := SetupClient()
 	defer CleanupRedis(cl)
 
 	testCases := []struct {
@@ -66,19 +66,9 @@ func TestNewRandomWalksStore(t *testing.T) {
 	}
 }
 
-func TestLoadRandomWalksStore(t *testing.T) {
-
-	cl := SetupRedis()
+func TestLoadRWS(t *testing.T) {
+	cl := SetupClient()
 	defer CleanupRedis(cl)
-
-	var alpha float32 = 0.85
-	var walksPerNode uint16 = 10
-	if err := cl.Set(context.Background(), "alpha", alpha, 0).Err(); err != nil {
-		t.Fatalf("failed to set: %v", err)
-	}
-	if err := cl.Set(context.Background(), "walksPerNode", walksPerNode, 0).Err(); err != nil {
-		t.Fatalf("failed to set: %v", err)
-	}
 
 	testCases := []struct {
 		name          string
@@ -94,6 +84,7 @@ func TestLoadRandomWalksStore(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
+			SetupRWS(cl, "empty")
 			RWS, err := LoadRWS(context.Background(), cl)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("LoadRWS(): expected %v, got %v", test.expectedError, err)
@@ -101,14 +92,53 @@ func TestLoadRandomWalksStore(t *testing.T) {
 
 			// check if the parameters have been added correctly
 			if RWS != nil {
-				if RWS.Alpha() != alpha {
-					t.Errorf("LoadRWS(): expected %v, got %v", alpha, RWS.Alpha())
+				if RWS.Alpha() != float32(0.85) {
+					t.Errorf("LoadRWS(): expected %v, got %v", 0.85, RWS.Alpha())
 				}
 
-				if RWS.WalksPerNode() != walksPerNode {
-					t.Errorf("LoadRWS(): expected %v, got %v", walksPerNode, RWS.WalksPerNode())
+				if RWS.WalksPerNode() != uint16(1) {
+					t.Errorf("LoadRWS(): expected %v, got %v", 1, RWS.WalksPerNode())
 				}
 			}
 		})
 	}
 }
+
+// func TestIsEmpty(t *testing.T) {
+// 	cl := SetupClient()
+// 	defer CleanupRedis(cl)
+
+// 	testCases := []struct {
+// 		name          string
+// 		RWSType       string
+// 		expectedEmpty bool
+// 	}{
+// 		{
+// 			name:          "nil RWS",
+// 			RWSType:       "nil",
+// 			expectedEmpty: true,
+// 		},
+// 		{
+// 			name:          "empty RWS",
+// 			RWSType:       "empty",
+// 			expectedEmpty: true,
+// 		},
+// 		{
+// 			name:          "non-empty RWS",
+// 			RWSType:       "one-node0",
+// 			expectedEmpty: false,
+// 		},
+// 	}
+
+// 	for _, test := range testCases {
+// 		t.Run(test.name, func(t *testing.T) {
+
+// 			RWS := SetupRWS(cl, test.RWSType)
+// 			empty := RWS.IsEmpty()
+
+// 			if empty != test.expectedEmpty {
+// 				t.Errorf("IsEmpty(): expected %v, got %v", test.expectedEmpty, empty)
+// 			}
+// 		})
+// 	}
+// }

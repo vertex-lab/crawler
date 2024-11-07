@@ -62,7 +62,7 @@ func NewRWS(ctx context.Context, cl *redis.Client,
 // LoadRWS() loads the instance of RandomWalkStore using the provided Redis client
 func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 
-	alpha, err := GetAndParse(ctx, cl, "alpha", "float32")
+	alpha, err := GetStringAndParse(ctx, cl, "alpha", "float32")
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 		return nil, models.ErrInvalidAlpha
 	}
 
-	walksPerNode, err := GetAndParse(ctx, cl, "walksPerNode", "uint16")
+	walksPerNode, err := GetStringAndParse(ctx, cl, "walksPerNode", "uint16")
 	if err != nil {
 		return nil, err
 	}
@@ -87,4 +87,26 @@ func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 		walksPerNode: walksPerNode.(uint16),
 	}
 	return RWS, nil
+}
+
+func (RWS *RandomWalkStore) IsEmpty() bool {
+	if RWS == nil {
+		return true
+	}
+
+	return false
+}
+
+func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
+
+	if RWS == nil {
+		return models.ErrNilRWSPointer
+	}
+
+	if err := models.Validate(walk); err != nil {
+		return err
+	}
+
+	// add the walk to the WalkIndex
+	return nil
 }

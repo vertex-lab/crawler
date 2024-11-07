@@ -10,7 +10,7 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
-func TestNewRandomWalksStore(t *testing.T) {
+func TestNewRWS(t *testing.T) {
 	testCases := []struct {
 		name          string
 		alphas        []float32
