@@ -114,11 +114,12 @@ func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
 		return models.ErrInvalidWalksPerNode
 	}
 
-	if len(RWS.WalkIndex) == 0 && !expectEmptyRWS {
+	empty := RWS.IsEmpty()
+	if empty && !expectEmptyRWS {
 		return models.ErrEmptyRWS
 	}
 
-	if len(RWS.WalkIndex) > 0 && expectEmptyRWS {
+	if !empty && expectEmptyRWS {
 		return models.ErrNonEmptyRWS
 	}
 

@@ -4,11 +4,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/store/redistore"
-	redis "github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -22,14 +21,14 @@ func main() {
 	})
 
 	ctx := context.Background()
-	expectedWalk := models.RandomWalk{0, 1, 2, 3, 4, 5, 6, 111}
 
-	walk, err := redistore.GetStringAndParse(ctx, cl, "walk:0", "RandomWalk")
+	RWS, err := redistore.NewRWS(ctx, cl, 0.85, 10)
 	if err != nil {
 		panic(err)
 	}
 
-	if !reflect.DeepEqual(expectedWalk, walk) {
-		fmt.Printf("expected %v, got %v", expectedWalk, walk)
+	err = RWS.AddWalk(models.RandomWalk{0, 1, 2, 3})
+	if err != nil {
+		panic(err)
 	}
 }

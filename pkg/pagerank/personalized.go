@@ -47,7 +47,7 @@ func Personalized(DB models.Database, RWS models.RandomWalkStore,
 	return personalized(DB, RWS, nodeID, topK, rng)
 }
 
-// implement the internal logic of the Personalized Pagerank function
+// personalized() implements the internal logic of the Personalized Pagerank function
 func personalized(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, topK uint16, rng *rand.Rand) (PagerankMap, error) {
 
@@ -61,6 +61,7 @@ func personalized(DB models.Database, RWS models.RandomWalkStore,
 	}
 
 	return countAndNormalize(pWalk), nil
+	// TODO: SEND ONLY TARGET NODES
 }
 
 /*
