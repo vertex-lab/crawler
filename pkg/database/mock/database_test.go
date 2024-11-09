@@ -2,6 +2,7 @@ package mock
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 
@@ -17,7 +18,7 @@ type testCases struct {
 	expectedSlice []uint32
 }
 
-func TestValidateDB(t *testing.T) {
+func TestValidate(t *testing.T) {
 
 	testCases := []testCases{
 		{
@@ -50,7 +51,7 @@ func TestValidateDB(t *testing.T) {
 	}
 }
 
-func TestContainsNodeDB(t *testing.T) {
+func TestContainsNode(t *testing.T) {
 	testCases := []struct {
 		name             string
 		DBType           string
@@ -140,6 +141,62 @@ func TestNode(t *testing.T) {
 				if !reflect.DeepEqual(node.Successors, test.expectedNode.Successors) {
 					t.Errorf("Node(1): expected successors %v, got %v", test.expectedNode.Successors, node.Successors)
 				}
+			}
+		})
+	}
+}
+
+func TestRandomSuccessor(t *testing.T) {
+	testCases := []struct {
+		name           string
+		DBType         string
+		expectedError  error
+		expectedNodeID uint32
+	}{
+		{
+			name:           "nil DB",
+			DBType:         "nil",
+			expectedError:  models.ErrNilDBPointer,
+			expectedNodeID: math.MaxUint32,
+		},
+		{
+			name:           "empty DB",
+			DBType:         "empty",
+			expectedError:  models.ErrEmptyDB,
+			expectedNodeID: math.MaxUint32,
+		},
+		{
+			name:           "node not found",
+			DBType:         "one-node1",
+			expectedError:  models.ErrNodeNotFoundDB,
+			expectedNodeID: math.MaxUint32,
+		},
+		{
+			name:           "dandling",
+			DBType:         "dandling",
+			expectedError:  nil,
+			expectedNodeID: math.MaxUint32,
+		},
+		{
+			name:           "valid",
+			DBType:         "one-node0",
+			expectedError:  nil,
+			expectedNodeID: 0,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			DB := SetupDB(test.DBType)
+			nodeID, err := DB.RandomSuccessor(0)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("RandomSuccessor(0): expected %v, got %v", test.expectedError, err)
+			}
+
+			if nodeID != test.expectedNodeID {
+				t.Errorf("RandomSuccessor(0): expected %v, got %v", test.expectedNodeID, nodeID)
 			}
 		})
 	}

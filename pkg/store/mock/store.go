@@ -1,6 +1,9 @@
 package mock
 
 import (
+	"math"
+	"math/rand"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
@@ -60,7 +63,6 @@ func (RWS *RandomWalkStore) NodeCount() int {
 	if RWS.IsEmpty() {
 		return 0
 	}
-
 	return len(RWS.NodeWalkIDSet)
 }
 
@@ -138,7 +140,7 @@ func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
 	return 0
 }
 
-// WalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
+// NodeWalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
 func (RWS *RandomWalkStore) NodeWalkIDs(nodeID uint32) (models.WalkIDSet, error) {
 
 	if err := RWS.Validate(false); err != nil {
@@ -152,7 +154,7 @@ func (RWS *RandomWalkStore) NodeWalkIDs(nodeID uint32) (models.WalkIDSet, error)
 	return walkIDs, nil
 }
 
-// Walks() returns a map of walks by walkID that visit nodeID.
+// NodeWalks() returns a map of walks by walkID that visit nodeID.
 func (RWS *RandomWalkStore) NodeWalks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
 
 	walkIDs, err := RWS.NodeWalkIDs(nodeID)
@@ -160,6 +162,7 @@ func (RWS *RandomWalkStore) NodeWalks(nodeID uint32) (map[uint32]models.RandomWa
 		return nil, err
 	}
 
+	// extract into the map format
 	walkMap := make(map[uint32]models.RandomWalk, walkIDs.Cardinality())
 	for walkID := range walkIDs.Iter() {
 		walkMap[walkID] = RWS.WalkIndex[walkID]
@@ -260,9 +263,113 @@ func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error
 	return nil
 }
 
+/*
+PruneGraftWalk() encapsulates the functions of Pruning and Grafting a walk.
+These functions need to be coupled together to leverage the atomicity of
+Redis transactions. This ensures that a walk is either uneffected or is both
+pruned and grafted successfully.
+*/
+func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int,
+	walkSegment models.RandomWalk) error {
+
+	// prune the walk
+	if err := RWS.PruneWalk(walkID, cutIndex); err != nil {
+		return err
+	}
+
+	// graft the walk with the new walk segment
+	if err := RWS.GraftWalk(walkID, walkSegment); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*
+WalksForUpdateRemoved returns a map of candidate walks by walkID that MIGHT
+be updated inside the method RWM.updateRemovedNodes().
+
+These candidate walks are the one that contain both nodeID and at least one
+of the removed node in removedNodes.
+*/
+func (RWS *RandomWalkStore) WalksForUpdateRemoved(nodeID uint32,
+	removedNodes []uint32) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.Validate(false); err != nil {
+		return nil, err
+	}
+
+	// get the IDs of the walks that visit nodeID
+	nodeWalkIDs, err := RWS.NodeWalkIDs(nodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the IDs of the walks that visit one of the removedNodes
+	unionRemovedNodesWalkIDs := mapset.NewSet[uint32]()
+	for _, removedNode := range removedNodes {
+
+		removedNodeWalkIDs, err := RWS.NodeWalkIDs(removedNode)
+		if err != nil {
+			return nil, err
+		}
+
+		unionRemovedNodesWalkIDs.Append(removedNodeWalkIDs.ToSlice()...)
+	}
+
+	// get the walks that contain both nodeID and one of the removedNodes
+	candidateWalkIDs := nodeWalkIDs.Intersect(unionRemovedNodesWalkIDs)
+
+	// extract into the map format
+	walkMap := make(map[uint32]models.RandomWalk, candidateWalkIDs.Cardinality())
+	for walkID := range candidateWalkIDs.Iter() {
+		walkMap[walkID] = RWS.WalkIndex[walkID]
+	}
+
+	return walkMap, nil
+}
+
+/*
+WalksForUpdateAdded returns a slice of random walks that WILL be updated
+inside the method RWM.updateAddedNodes().
+These walks will be chosen at random from the walks that visit nodeID, according to
+a specified probability of selection.
+*/
+func (RWS *RandomWalkStore) WalksForUpdateAdded(nodeID uint32,
+	probabilityOfSelection float32, rng *rand.Rand) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.Validate(false); err != nil {
+		return nil, err
+	}
+
+	// get the IDs of the walks that visit nodeID
+	walkIDs, err := RWS.NodeWalkIDs(nodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	expectedSize := expectedSize(walkIDs.Cardinality(), probabilityOfSelection)
+	walkMap := make(map[uint32]models.RandomWalk, expectedSize)
+
+	for walkID := range walkIDs.Iter() {
+		if rng.Float32() > probabilityOfSelection {
+			continue
+		}
+
+		walkMap[walkID] = RWS.WalkIndex[walkID]
+	}
+
+	return walkMap, nil
+}
+
 // ------------------------------------HELPERS----------------------------------
 
-// function that returns a RWS setup based on the RWSType.
+// expectedSize() returns the nearest integer of cardinality * probability
+func expectedSize(cardinality int, probability float32) int {
+	return int(math.Round(float64(cardinality) * float64(probability)))
+}
+
+// SetupRWS() returns a RWS setup based on the RWSType.
 func SetupRWS(RWSType string) *RandomWalkStore {
 	switch RWSType {
 	case "nil":
@@ -284,7 +391,15 @@ func SetupRWS(RWSType string) *RandomWalkStore {
 		RWS.NodeWalkIDSet[1] = mapset.NewSet[uint32](0)
 		return RWS
 
+	case "simple":
+		RWS, _ := NewRWS(0.85, 1)
+		RWS.WalkIndex[0] = models.RandomWalk{0, 1}
+		RWS.NodeWalkIDSet[0] = mapset.NewSet[uint32](0)
+		RWS.NodeWalkIDSet[1] = mapset.NewSet[uint32](0)
+		return RWS
+
 	case "triangle":
+		// 0 --> 1 --> 2 --> 0
 		RWS, _ := NewRWS(0.85, 1)
 		RWS.WalkIndex[0] = models.RandomWalk{0, 1, 2}
 		RWS.WalkIndex[1] = models.RandomWalk{1, 2, 0}
@@ -294,11 +409,17 @@ func SetupRWS(RWSType string) *RandomWalkStore {
 		RWS.NodeWalkIDSet[2] = mapset.NewSet[uint32](0, 1, 2)
 		return RWS
 
-	case "simple":
+	case "complex":
+		// 0 --> 1 --> 2
+		// 0 --> 3
 		RWS, _ := NewRWS(0.85, 1)
-		RWS.WalkIndex[0] = models.RandomWalk{0, 1}
-		RWS.NodeWalkIDSet[0] = mapset.NewSet[uint32](0)
-		RWS.NodeWalkIDSet[1] = mapset.NewSet[uint32](0)
+		RWS.WalkIndex[0] = models.RandomWalk{0, 1, 2}
+		RWS.WalkIndex[1] = models.RandomWalk{0, 3}
+		RWS.WalkIndex[2] = models.RandomWalk{1, 2}
+		RWS.NodeWalkIDSet[0] = mapset.NewSet[uint32](0, 1)
+		RWS.NodeWalkIDSet[1] = mapset.NewSet[uint32](0, 2)
+		RWS.NodeWalkIDSet[2] = mapset.NewSet[uint32](0, 2)
+		RWS.NodeWalkIDSet[3] = mapset.NewSet[uint32](1)
 		return RWS
 
 	default:

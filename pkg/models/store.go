@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"math/rand"
 
 	mapset "github.com/deckarep/golang-set/v2"
 )
@@ -26,9 +27,6 @@ type WalkIDSet mapset.Set[uint32]
 
 // RandomWalkStore handles atomic operations to create, update, and remove RandomWalks.
 type RandomWalkStore interface {
-	// Validate() checks whether the RWS is nil, empty or non-empty and returns
-	// an appropriate error based on the requirement.
-	Validate(expectEmptyRWS bool) error
 
 	// Alpha() returns the dampening factor used for the RandomWalks
 	Alpha() float32
@@ -38,6 +36,10 @@ type RandomWalkStore interface {
 
 	// IsEmpty() returns whether RWS is empty (ignores errors).
 	IsEmpty() bool
+
+	// Validate() checks whether the RWS is nil, empty or non-empty and returns
+	// an appropriate error based on the requirement.
+	Validate(expectEmptyRWS bool) error
 
 	// ContainsNode() returns whether RWS contains a given nodeID (ignores errors)
 	ContainsNode(nodeID uint32) bool
@@ -51,22 +53,32 @@ type RandomWalkStore interface {
 	// VisitCount() returns the number of times nodeID has been visited by a walk
 	VisitCount(nodeID uint32) int
 
-	// Walks() returns a map of walks by walksID that visit nodeID.
+	// NodeWalks() returns a map of walks by walksID that visit nodeID.
 	NodeWalks(nodeID uint32) (map[uint32]RandomWalk, error)
 
-	// AddWalk() adds the walk to the WalkIndex. It also adds the walkID to the
-	// WalkIDSet of each node the walk visited. This means that for each node
-	// visited by the walk, the walk ID will be added to its WalkSet.
+	// AddWalk() adds a walk to the RandomWalkStore.
 	AddWalk(walk RandomWalk) error
 
-	// PruneWalk() removes the walkID from each node in the walk after cutIndex.
-	// This means that for each prunedNode in walk[cutIndex:], the walk ID will
-	// be removed from its WalkSet.
-	PruneWalk(walkID uint32, cutIndex int) error
+	// PruneGraftWalk() encapsulates the functions of Pruning and
+	// Grafting ( = appending to) a walk.
+	// These functions need to be coupled together to leverage the atomicity of
+	// Redis transactions. This ensures that a walk is either uneffected or is both
+	// pruned and grafted successfully.
+	PruneGraftWalk(walkID uint32, cutIndex int, walkSegment RandomWalk) error
 
-	// GraftWalk() grafts (extends) the walk with the walkSegment, and adds
-	// the walkID to the WalkSet of each node in the new walkSegment.
-	GraftWalk(walkID uint32, walkSegment []uint32) error
+	// WalksForUpdateRemoved returns a map of candidate walks by walkID that MIGHT
+	// be updated inside the method RWM.updateRemovedNodes().
+	// These candidate walks are the one that contain both nodeID and at least one
+	// of the removed node in removedNodes.
+	WalksForUpdateRemoved(nodeID uint32,
+		removedNodes []uint32) (map[uint32]RandomWalk, error)
+
+	// WalksForUpdateAdded returns a slice of random walks that WILL be updated
+	// inside the method RWM.updateAddedNodes().
+	// These walks will be chosen at random from the walks that visit nodeID, according to
+	// a specified probability of selection.
+	WalksForUpdateAdded(nodeID uint32,
+		probabilityOfSelection float32, rng *rand.Rand) (map[uint32]RandomWalk, error)
 }
 
 //---------------------------------ERROR-CODES---------------------------------

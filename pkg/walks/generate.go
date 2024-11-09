@@ -122,8 +122,8 @@ func generateWalk(DB models.Database, startingNodeID uint32,
 			break
 		}
 
-		// get the successorIDs of the current node
-		// This can be improved by fetching directly a random successor
+		// get the successorIDs of the current node. This can be improved by checking
+		// a successor cache first, and eventually store it there.
 		successorIDs, err := DB.Successors(currentNodeID)
 		if err != nil {
 			return nil, err

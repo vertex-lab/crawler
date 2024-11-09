@@ -64,46 +64,31 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 		return nil
 	}
 
-	walkMap, err := RWM.Store.NodeWalks(nodeID)
+	walkMap, err := RWM.Store.WalksForUpdateRemoved(nodeID, removedSucc)
 	if err != nil {
 		return err
 	}
 
 	for walkID, walk := range walkMap {
-
-		cutIndex, update, err := NeedsUpdate(walk, nodeID, removedSucc)
+		cutIndex, err := NeedsUpdate(walk, nodeID, removedSucc)
 		if err != nil {
 			return err
 		}
 
 		// if it doesn't need an update, skip
-		if !update {
+		if cutIndex < 0 {
 			continue
 		}
 
-		// prune the walk REFACTOR
-		walk = walk[:cutIndex]
-		if err = RWM.Store.PruneWalk(walkID, cutIndex); err != nil {
-			return err
-		}
-
-		// select the new next node among the common successors
-		successorID, shouldStop := WalkStep(commonSucc, walk, rng)
-		if shouldStop {
-			continue
-		}
-
-		// generate the new walk segment
-		newWalkSegment, err := generateWalk(DB, successorID, RWM.Store.Alpha(), rng)
+		// generate a new walk segment that will replace the invalid segment of the walk
+		newWalkSegment, err := generateWalkSegment(DB, commonSucc,
+			walk[:cutIndex], RWM.Store.Alpha(), rng)
 		if err != nil {
 			return err
 		}
 
-		// remove potential cycles
-		newWalkSegment = DeleteCyclesInPlace(walk, newWalkSegment)
-
-		// graft the walk with the new walk segment
-		if err := RWM.Store.GraftWalk(walkID, newWalkSegment); err != nil {
+		// prune and graft the walk with the new walk segment
+		if err = RWM.Store.PruneGraftWalk(walkID, cutIndex, newWalkSegment); err != nil {
 			return err
 		}
 	}
@@ -116,56 +101,41 @@ a method that updates the RWM by "pruning" some randomly selected walks of nodeI
 and by "grafting" them using the newly added nodes
 */
 func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32,
-	addesSucc []uint32, newOutDegree int, rng *rand.Rand) error {
+	addesSucc []uint32, currentSuccSize int, rng *rand.Rand) error {
 
 	if len(addesSucc) == 0 {
 		return nil
 	}
 
-	walkMap, err := RWM.Store.NodeWalks(nodeID)
+	// fetch the walks that will be updated
+	probability := probabilityOfSelection(len(addesSucc), currentSuccSize)
+	walkMap, err := RWM.Store.WalksForUpdateAdded(nodeID, probability, rng)
 	if err != nil {
 		return err
 	}
 
-	// probabilistic update check
-	probabilityThreshold := float32(len(addesSucc)) / float32(newOutDegree)
-
-	// iterate over the walks
 	for walkID, walk := range walkMap {
-
-		if rng.Float32() > probabilityThreshold {
-			continue
-		}
-
 		// prune the walk AFTER the position of nodeID
 		cutIndex := slices.Index(walk, nodeID) + 1
-		walk = walk[:cutIndex]
-		if err := RWM.Store.PruneWalk(walkID, cutIndex); err != nil {
-			return err
-		}
 
-		// stop with probability 1-alpha
+		// with probability 1-alpha, prune only
 		if rng.Float32() > RWM.Store.Alpha() {
+
+			if err := RWM.Store.PruneGraftWalk(walkID, cutIndex, models.RandomWalk{}); err != nil {
+				return err
+			}
 			continue
 		}
 
-		// select the new next node
-		addedID, shouldStop := WalkStep(addesSucc, walk, rng)
-		if shouldStop {
-			continue
-		}
-
-		// generate a new walk from the successor
-		newWalkSegment, err := generateWalk(DB, addedID, RWM.Store.Alpha(), rng)
+		// generate a new walk segment that will replace the old segment of the walk
+		newWalkSegment, err := generateWalkSegment(DB, addesSucc,
+			walk[:cutIndex], RWM.Store.Alpha(), rng)
 		if err != nil {
 			return err
 		}
 
-		// remove potential cycles
-		newWalkSegment = DeleteCyclesInPlace(walk, newWalkSegment)
-
-		// graft the walk with the new walk segment
-		if err = RWM.Store.GraftWalk(walkID, newWalkSegment); err != nil {
+		// prune and graft the walk with the new walk segment
+		if err := RWM.Store.PruneGraftWalk(walkID, cutIndex, newWalkSegment); err != nil {
 			return err
 		}
 	}
@@ -174,31 +144,62 @@ func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32
 }
 
 /*
-NeedsUpdate returns whether the RandomWalk needs to be updated, and the index
-where to implement the update (pruning and grafting).
-
-This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes.
-The average lenght of removedNodes is supposed to be quite small, meaning that
-sets are less performing than slices.
-
-cutIndex = -1 signals avoid proceeding
+generateWalkSegment() is responsible for generating a walk segment that will be
+grafted (appended) to the currentWalk. It selectes the next node from a slice of
+candidateNodes, and ensures that the currentWalk + newWalkSegment doesn't contain any cycle.
 */
-func NeedsUpdate(walk models.RandomWalk, nodeID uint32,
-	removedNodes []uint32) (cutIndex int, needsUpdate bool, err error) {
+func generateWalkSegment(DB models.Database, candidateNodes []uint32, currentWalk models.RandomWalk,
+	alpha float32, rng *rand.Rand) (models.RandomWalk, error) {
 
-	if err := models.Validate(walk); err != nil {
-		return -1, true, err
+	// select the next node
+	successorID, shouldStop := WalkStep(candidateNodes, currentWalk, rng)
+	if shouldStop {
+		return models.RandomWalk{}, nil
 	}
 
-	// iterate over the elements of the walk
-	for i := 0; i < len(walk)-1; i++ {
+	// generate the new walk segment
+	newWalkSegment, err := generateWalk(DB, successorID, alpha, rng)
+	if err != nil {
+		return nil, err
+	}
 
+	// remove potential cycles
+	return DeleteCyclesInPlace(currentWalk, newWalkSegment), nil
+}
+
+/*
+NeedsUpdate returns the index or position where the RandomWalk needs to be
+Pruned and Grafted.
+
+This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes.
+
+cutIndex = -1 signals to don't update
+*/
+func NeedsUpdate(walk models.RandomWalk, nodeID uint32,
+	removedNodes []uint32) (int, error) {
+
+	if err := models.Validate(walk); err != nil {
+		return -1, err
+	}
+
+	for i := 0; i < len(walk)-1; i++ {
 		// if it contains a hop (nodeID --> removedNode)
 		if walk[i] == nodeID && slices.Contains(removedNodes, walk[i+1]) {
 			// it needs to be updated from (i+1)th element (included) onwards
 			cutIndex := i + 1
-			return cutIndex, true, nil
+			return cutIndex, nil
 		}
 	}
-	return -1, false, nil
+	return -1, nil
+}
+
+// probabilityOfSelection() returns the probability of a walk to be updated by
+// the method RWM.updateAddedNodes().
+func probabilityOfSelection(addedSuccSize int, currentSuccSize int) float32 {
+	p := float32(addedSuccSize) / float32(currentSuccSize)
+	if p > 1 {
+		return 1
+	}
+
+	return p
 }

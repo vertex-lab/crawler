@@ -1,25 +1,26 @@
 package mock
 
 import (
+	"math"
 	"math/rand"
 	"slices"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
-// simulates a simple GraphDB for testing.
+// simulates a simple graph databas for testing.
 type Database struct {
 	Nodes map[uint32]*models.Node
 }
 
-// NewDatabase creates and returns a new Database instance.
+// NewDatabase() creates and returns a new Database instance.
 func NewDatabase() *Database {
 	return &Database{
 		Nodes: make(map[uint32]*models.Node), // Initialize an empty map to store nodes.
 	}
 }
 
-// Validate returns an error if the DB is nil or has no nodes
+// Validate() returns an error if the DB is nil or has no nodes
 func (DB *Database) Validate() error {
 
 	// handle nil pointer
@@ -34,7 +35,7 @@ func (DB *Database) Validate() error {
 	return nil
 }
 
-// ContainsNode returns whether nodeID is found in the DB
+// ContainsNode() returns whether nodeID is found in the DB
 func (DB *Database) ContainsNode(nodeID uint32) bool {
 
 	if err := DB.Validate(); err != nil {
@@ -45,7 +46,7 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 	return exist
 }
 
-// Node retrieves a node by ID from the mock GraphDB.
+// Node() retrieves a node by ID.
 func (DB *Database) Node(nodeID uint32) (*models.Node, error) {
 
 	if err := DB.Validate(); err != nil {
@@ -59,7 +60,42 @@ func (DB *Database) Node(nodeID uint32) (*models.Node, error) {
 	return node, nil
 }
 
-// Successors returns the successors of a node from the mock GraphDB.
+// IsDandling returns whether a node has no successors (dandling).
+// In case of errors, returns the default true.
+func (DB *Database) IsDandling(nodeID uint32) bool {
+
+	Successors, err := DB.Successors(nodeID)
+	if err != nil {
+		return true
+	}
+
+	return len(Successors) == 0
+}
+
+// RandomSuccessor() returns a random successor of nodeID. In case of error
+// it returns maxUint32.
+func (DB *Database) RandomSuccessor(nodeID uint32) (uint32, error) {
+
+	if err := DB.Validate(); err != nil {
+		return math.MaxUint32, err
+	}
+
+	node, exists := DB.Nodes[nodeID]
+	if !exists {
+		return math.MaxUint32, models.ErrNodeNotFoundDB
+	}
+
+	// if it is a dandling node
+	if len(node.Successors) == 0 {
+		return math.MaxUint32, nil
+	}
+
+	randomIndex := rand.Intn((len(node.Successors)))
+	return node.Successors[randomIndex], nil
+
+}
+
+// Successors() returns the slice of successors of nodeID.
 func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
@@ -71,18 +107,6 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 		return nil, models.ErrNodeNotFoundDB
 	}
 	return node.Successors, nil
-}
-
-// IsDandling returns whether a node has no successors (dandling).
-// In case of errors, returns the default true.
-func (DB *Database) IsDandling(nodeID uint32) bool {
-
-	Successors, err := DB.Successors(nodeID)
-	if err != nil {
-		return true
-	}
-
-	return len(Successors) == 0
 }
 
 // All returns a slice with the IDs of all nodes in the mock GraphDB

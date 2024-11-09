@@ -16,7 +16,6 @@ func TestNeedsUpdate(t *testing.T) {
 	testCases := []struct {
 		name             string
 		walk             models.RandomWalk
-		expectedUpdate   bool
 		expectedCutIndex int
 		expectedError    error
 	}{
@@ -24,42 +23,34 @@ func TestNeedsUpdate(t *testing.T) {
 			name:             "nil random walk",
 			walk:             nil,
 			expectedError:    models.ErrNilWalkPointer,
-			expectedUpdate:   true,
 			expectedCutIndex: -1,
 		},
 		{
 			name:             "empty random walk",
 			walk:             models.RandomWalk{},
 			expectedError:    models.ErrEmptyWalk,
-			expectedUpdate:   true,
 			expectedCutIndex: -1,
 		},
 		{
 			name:             "normal random walk, no updates",
 			walk:             models.RandomWalk{1},
 			expectedError:    nil,
-			expectedUpdate:   false,
 			expectedCutIndex: -1,
 		},
 		{
 			name:             "normal random walk, updates",
 			walk:             models.RandomWalk{1, 2, 3},
 			expectedError:    nil,
-			expectedUpdate:   true,
 			expectedCutIndex: 1,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			cutIndex, update, err := NeedsUpdate(test.walk, 1, []uint32{2})
+			cutIndex, err := NeedsUpdate(test.walk, 1, []uint32{2})
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NeedsUpdate(): expected %v, got %v", test.expectedError, err)
-			}
-
-			if update != test.expectedUpdate {
-				t.Errorf("NeedsUpdate(): expected %v, got %v", test.expectedUpdate, update)
 			}
 
 			if cutIndex != test.expectedCutIndex {
