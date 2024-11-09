@@ -70,6 +70,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 	}
 
 	for walkID, walk := range walkMap {
+
 		cutIndex, err := NeedsUpdate(walk, nodeID, removedSucc)
 		if err != nil {
 			return err
@@ -81,8 +82,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 		}
 
 		// generate a new walk segment that will replace the invalid segment of the walk
-		newWalkSegment, err := generateWalkSegment(DB, commonSucc,
-			walk[:cutIndex], RWM.Store.Alpha(), rng)
+		newWalkSegment, err := generateWalkSegment(DB, commonSucc, walk[:cutIndex], RWM.Store.Alpha(), rng)
 		if err != nil {
 			return err
 		}
@@ -115,23 +115,18 @@ func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32
 	}
 
 	for walkID, walk := range walkMap {
+
 		// prune the walk AFTER the position of nodeID
 		cutIndex := slices.Index(walk, nodeID) + 1
 
-		// with probability 1-alpha, prune only
-		if rng.Float32() > RWM.Store.Alpha() {
+		// with probability alpha, generate a new walk segment that will replace the old segment
+		var newWalkSegment models.RandomWalk
+		if rng.Float32() < RWM.Store.Alpha() {
 
-			if err := RWM.Store.PruneGraftWalk(walkID, cutIndex, models.RandomWalk{}); err != nil {
+			newWalkSegment, err = generateWalkSegment(DB, addesSucc, walk[:cutIndex], RWM.Store.Alpha(), rng)
+			if err != nil {
 				return err
 			}
-			continue
-		}
-
-		// generate a new walk segment that will replace the old segment of the walk
-		newWalkSegment, err := generateWalkSegment(DB, addesSucc,
-			walk[:cutIndex], RWM.Store.Alpha(), rng)
-		if err != nil {
-			return err
 		}
 
 		// prune and graft the walk with the new walk segment
