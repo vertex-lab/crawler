@@ -70,15 +70,13 @@ type RandomWalkStore interface {
 	// be updated inside the method RWM.updateRemovedNodes().
 	// These candidate walks are the one that contain both nodeID and at least one
 	// of the removed node in removedNodes.
-	WalksForUpdateRemoved(nodeID uint32,
-		removedNodes []uint32) (map[uint32]RandomWalk, error)
+	WalksForUpdateRemoved(nodeID uint32, removedNodes []uint32) (map[uint32]RandomWalk, error)
 
 	// WalksForUpdateAdded returns a slice of random walks that WILL be updated
 	// inside the method RWM.updateAddedNodes().
 	// These walks will be chosen at random from the walks that visit nodeID, according to
 	// a specified probability of selection.
-	WalksForUpdateAdded(nodeID uint32,
-		probabilityOfSelection float32, rng *rand.Rand) (map[uint32]RandomWalk, error)
+	WalksForUpdateAdded(nodeID uint32, probabilityOfSelection float32, rng *rand.Rand) (map[uint32]RandomWalk, error)
 }
 
 //---------------------------------ERROR-CODES---------------------------------

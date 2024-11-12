@@ -2,10 +2,8 @@
 package main
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/store/redistore"
 	"github.com/redis/go-redis/v9"
 )
@@ -20,15 +18,7 @@ func main() {
 		Protocol: 2,  // Connection protocol
 	})
 
-	ctx := context.Background()
-
-	RWS, err := redistore.NewRWS(ctx, cl, 0.85, 10)
-	if err != nil {
-		panic(err)
-	}
-
-	err = RWS.AddWalk(models.RandomWalk{0, 1, 2, 3})
-	if err != nil {
-		panic(err)
-	}
+	RWS, err := redistore.SetupRWS(cl, "triangle")
+	_ = RWS
+	_ = err
 }

@@ -3,7 +3,8 @@ package walks
 import (
 	"errors"
 	"math"
-	"math/rand"
+	rand "math/rand"
+	randv2 "math/rand/v2"
 	"reflect"
 	"slices"
 	"testing"
@@ -333,6 +334,25 @@ func TestGenerateAll(t *testing.T) {
 }
 
 // ---------------------------------BENCHMARKS---------------------------------
+
+func BenchmarkRNGv1(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		rand.Intn(1000)
+	}
+}
+
+func BenchmarkRNGChaCha(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		randv2.IntN(1000) // if not seeded, it used the ChaCha algo
+	}
+}
+
+func BenchmarkRNGPCG(b *testing.B) {
+	rng := randv2.New(randv2.NewPCG(1, 2))
+	for i := 0; i < b.N; i++ {
+		rng.IntN(1000)
+	}
+}
 
 func BenchmarkGenerateWalk(b *testing.B) {
 

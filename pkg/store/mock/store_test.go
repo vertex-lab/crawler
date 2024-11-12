@@ -590,7 +590,7 @@ func TestPruneWalk(t *testing.T) {
 				expectedError: models.ErrEmptyRWS,
 			},
 			{
-				name:          "walk not found in RWS",
+				name:          "walkID not found",
 				RWSType:       "one-node0",
 				walkID:        1,
 				expectedError: models.ErrWalkNotFound,

@@ -222,7 +222,7 @@ func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 	// change the WalkIndex
 	RWS.WalkIndex[walkID] = oldWalk[:cutIndex]
 
-	// remove the walkID from each node
+	// remove the walkID from each pruned node
 	for _, prunedNodeID := range oldWalk[cutIndex:] {
 		RWS.NodeWalkIDSet[prunedNodeID].Remove(walkID)
 	}
@@ -250,7 +250,7 @@ func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error
 	// graft the walk
 	RWS.WalkIndex[walkID] = append(RWS.WalkIndex[walkID], walkSegment...)
 
-	// add the walkID to each node
+	// add the walkID to each grafted node
 	for _, nodeID := range walkSegment {
 		// Initialize the WalkIDSet for nodeID if it doesn't exist
 		if _, exists := RWS.NodeWalkIDSet[nodeID]; !exists {
