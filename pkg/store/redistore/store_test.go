@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
@@ -480,56 +481,96 @@ func TestPruneGraftWalk(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-
-		RWS, err := SetupRWS(cl, "one-walk0")
-		if err != nil {
-			t.Fatalf("SetupRWS(): expected nil, got %v", err)
+		testCases := []struct {
+			name           string
+			RWSType        string
+			walkID         uint32
+			cutIndex       int
+			oldWalk        models.RandomWalk
+			newWalkSegment models.RandomWalk
+			expectedWalk   models.RandomWalk
+		}{
+			{
+				name:           "pruning only",
+				RWSType:        "one-walk0",
+				walkID:         0,
+				cutIndex:       2,
+				oldWalk:        models.RandomWalk{0, 1, 2, 3},
+				newWalkSegment: models.RandomWalk{},
+				expectedWalk:   models.RandomWalk{0, 1},
+			},
+			{
+				name:           "grafting only",
+				RWSType:        "one-walk0",
+				walkID:         0,
+				cutIndex:       4, //  the lenght of the walk
+				oldWalk:        models.RandomWalk{0, 1, 2, 3},
+				newWalkSegment: models.RandomWalk{4, 5},
+				expectedWalk:   models.RandomWalk{0, 1, 2, 3, 4, 5},
+			},
+			{
+				name:           "pruning and grafting",
+				RWSType:        "one-walk0",
+				walkID:         0,
+				cutIndex:       1, //  the lenght of the walk
+				oldWalk:        models.RandomWalk{0, 1, 2, 3},
+				newWalkSegment: models.RandomWalk{4, 5},
+				expectedWalk:   models.RandomWalk{0, 4, 5},
+			},
 		}
 
-		walkID := uint32(0)
-		cutIndex := 1
-		newWalkSegment := models.RandomWalk{2, 3, 4}
-		expectedWalk := models.RandomWalk{0, 2, 3, 4}
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
 
-		if err := RWS.PruneGraftWalk(walkID, cutIndex, newWalkSegment); err != nil {
-			t.Fatalf("PruneGraftWalk(): expected nil, got %v", err)
-		}
+				RWS, err := SetupRWS(cl, test.RWSType)
+				if err != nil {
+					t.Fatalf("SetupRWS(): expected nil, got %v", err)
+				}
 
-		// Load the walk from Redis
-		strWalk, err := RWS.client.Get(RWS.ctx, KeyWalk(walkID)).Result()
-		if err != nil {
-			t.Fatalf("Get(): expected nil, got %v", err)
-		}
+				if err := RWS.PruneGraftWalk(test.walkID, test.cutIndex, test.newWalkSegment); err != nil {
+					t.Fatalf("PruneGraftWalk(): expected nil, got %v", err)
+				}
 
-		loadedWalk, err := ParseWalk(strWalk)
-		if err != nil {
-			t.Fatalf("ParseWalk(): expected nil, got %v", err)
-		}
+				// check the walk has been changed correctly
+				strWalk, err := RWS.client.Get(RWS.ctx, KeyWalk(test.walkID)).Result()
+				if err != nil {
+					t.Fatalf("Get(): expected nil, got %v", err)
+				}
+				walk, err := ParseWalk(strWalk)
+				if err != nil {
+					t.Errorf("ParseWalk(%v): expected nil, got %v", strWalk, err)
+				}
 
-		// check if the two walks match
-		if !reflect.DeepEqual(expectedWalk, loadedWalk) {
-			t.Fatalf("PruneGraftWalk(): expected %v, got %v", expectedWalk, loadedWalk)
-		}
+				if !reflect.DeepEqual(walk, test.expectedWalk) {
+					t.Errorf("PruneGraftWalk(): excepted %v, got %v", test.expectedWalk, walk)
+				}
 
-		// check that each node is associated with the walkID = 0
-		for _, nodeID := range loadedWalk {
+				// check that each node in walk contains only walkID
+				expectedWalkIDs := []string{strconv.FormatUint(uint64(test.walkID), 10)}
+				for _, nodeID := range test.expectedWalk {
+					strWalkIDs, err := RWS.client.SMembers(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
+					if err != nil {
+						t.Fatalf("SMembers(%d): expected nil, got %v", nodeID, err)
+					}
 
-			// Get the only walkID associated with nodeID
-			strWalkID, err := RWS.client.SRandMember(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
-			if err != nil {
-				t.Fatalf("SRandMember(%d): expected nil, got %v", nodeID, err)
-			}
+					if !reflect.DeepEqual(strWalkIDs, expectedWalkIDs) {
+						t.Errorf("PruneGraftWalk(): expected %v, got %v", expectedWalkIDs, strWalkIDs)
+					}
+				}
 
-			// Parse it to a walkID
-			loadedWalkID, err := ParseID(strWalkID)
-			if err != nil {
-				t.Fatalf("ParseID(): expected nil, got %v", err)
-			}
+				// check that each pruned node doesn't contain walkID
+				for _, nodeID := range test.oldWalk[test.cutIndex:] {
+					size, err := RWS.client.SCard(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
+					if err != nil {
+						t.Fatalf("SCard(%d): expected nil, got %v", nodeID, err)
+					}
 
-			// check it matches the intended walkID
-			if loadedWalkID != walkID {
-				t.Errorf("PruneGraftWalk(): expected %v, got %v", 0, loadedWalkID)
-			}
+					if size != 0 {
+						t.Errorf("PruneGraftWalk(%d): expected empty set, got carinality = %v", nodeID, size)
+					}
+				}
+
+			})
 		}
 	})
 }

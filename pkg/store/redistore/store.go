@@ -262,10 +262,6 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 	// Begins the transaction
 	pipe := RWS.client.TxPipeline()
 
-	// prune and graft operation on the walk
-	newWalk := append(walk[:cutIndex], walkSegment...)
-	pipe.Set(RWS.ctx, KeyWalk(walkID), FormatWalk(newWalk), 0)
-
 	// remove the walkID form each pruned node
 	for _, prunedNodeID := range walk[cutIndex:] {
 		pipe.SRem(RWS.ctx, KeyNodeWalkIDs(prunedNodeID), walkID)
@@ -275,6 +271,10 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 	for _, graftedNodeID := range walkSegment {
 		pipe.SAdd(RWS.ctx, KeyNodeWalkIDs(graftedNodeID), walkID)
 	}
+
+	// prune and graft operation on the walk
+	newWalk := append(walk[:cutIndex], walkSegment...)
+	pipe.Set(RWS.ctx, KeyWalk(walkID), FormatWalk(newWalk), 0)
 
 	// Execute the transaction
 	_, err = pipe.Exec(RWS.ctx)
