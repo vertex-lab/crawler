@@ -46,7 +46,7 @@ func (RWM *RandomWalkManager) GenerateAll(DB models.Database) error {
 		return err
 	}
 
-	nodeIDs, err := DB.All()
+	nodeIDs, err := DB.AllNodes()
 	if err != nil {
 		return err
 	}

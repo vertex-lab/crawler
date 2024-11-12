@@ -66,7 +66,7 @@ func TestPagerankStatic(t *testing.T) {
 			}
 
 			// compute pagerank
-			pr, err := pagerank.Pagerank(RWM.Store)
+			pr, err := pagerank.Pagerank(DB, RWM.Store)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}
@@ -153,7 +153,7 @@ func TestPagerankDynamic(t *testing.T) {
 			}
 
 			// compute pagerank
-			pr, err := pagerank.Pagerank(RWM.Store)
+			pr, err := pagerank.Pagerank(DB, RWM.Store)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}

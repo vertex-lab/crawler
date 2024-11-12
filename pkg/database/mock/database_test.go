@@ -306,7 +306,7 @@ func TestIsDandling(t *testing.T) {
 	}
 }
 
-func TestAllDB(t *testing.T) {
+func TestAllNodes(t *testing.T) {
 
 	testCases := []testCases{
 		{
@@ -331,7 +331,7 @@ func TestAllDB(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			nodeIDs, err := DB.All()
+			nodeIDs, err := DB.AllNodes()
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("All(): expected %v, got %v", test.expectedError, err)
@@ -347,6 +347,41 @@ func TestAllDB(t *testing.T) {
 				if !reflect.DeepEqual(nodeIDs, test.expectedSlice) {
 					t.Errorf("All(): expected %v, got %v", test.expectedSlice, nodeIDs)
 				}
+			}
+		})
+	}
+}
+
+func TestNodeCount(t *testing.T) {
+	testCases := []struct {
+		name          string
+		DBType        string
+		expectedCount int
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			expectedCount: 0,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			expectedCount: 0,
+		},
+		{
+			name:          "DB with node 0",
+			DBType:        "one-node0",
+			expectedCount: 1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := SetupDB(test.DBType)
+			count := DB.NodeCount()
+
+			if count != test.expectedCount {
+				t.Errorf("NodeCount(): expected %v, got %v", test.expectedCount, count)
 			}
 		})
 	}

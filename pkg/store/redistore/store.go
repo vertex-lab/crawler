@@ -20,7 +20,6 @@ type RandomWalkStore struct {
 type RWSFields struct {
 	Alpha        float32 `redis:"alpha"`
 	WalksPerNode uint16  `redis:"walksPerNode"`
-	LastNodeID   int     `redis:"lastNodeID"`
 	LastWalkID   int     `redis:"lastWalkID"`
 }
 
@@ -49,8 +48,7 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 	fields := RWSFields{
 		Alpha:        alpha,
 		WalksPerNode: walksPerNode,
-		LastNodeID:   -1, // the first ID will be 0, since we increment and return with HIncrBy
-		LastWalkID:   -1,
+		LastWalkID:   -1, // the first ID will be 0, since we increment and return with HIncrBy
 	}
 
 	if err := cl.HSet(ctx, "RWS", fields).Err(); err != nil {
@@ -73,7 +71,7 @@ func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 		return nil, ErrNilClientPointer
 	}
 
-	cmdReturn := cl.HMGet(ctx, "RWS", "alpha", "walksPerNode")
+	cmdReturn := cl.HMGet(ctx, KeyRWS(), KeyAlpha(), KeyWalksPerNode())
 	if cmdReturn.Err() != nil {
 		return nil, cmdReturn.Err()
 	}

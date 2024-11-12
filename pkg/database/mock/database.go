@@ -110,7 +110,7 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 }
 
 // All returns a slice with the IDs of all nodes in the mock GraphDB
-func (DB *Database) All() ([]uint32, error) {
+func (DB *Database) AllNodes() ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -122,6 +122,15 @@ func (DB *Database) All() ([]uint32, error) {
 	}
 
 	return nodeIDs, nil
+}
+
+// NodeCount() returns the number of nodes in the DB (ignores errors).
+func (DB *Database) NodeCount() int {
+
+	if DB == nil {
+		return 0
+	}
+	return len(DB.Nodes)
 }
 
 // ------------------------------------HELPERS----------------------------------

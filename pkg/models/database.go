@@ -27,8 +27,11 @@ type Database interface {
 	// Successors() returns a slice that contains the IDs of all successors of a node
 	Successors(nodeID uint32) ([]uint32, error)
 
-	// All() returns a slice with the IDs of all nodes in the DB
-	All() ([]uint32, error)
+	// AllNodes() returns a slice with the IDs of all nodes in the DB
+	AllNodes() ([]uint32, error)
+
+	// NodeCount() returns the number of nodes in the DB (ignores errors).
+	NodeCount() int
 }
 
 //--------------------------ERROR-CODES--------------------------

@@ -37,18 +37,12 @@ type RandomWalkStore interface {
 	// IsEmpty() returns whether RWS is empty (ignores errors).
 	IsEmpty() bool
 
-	// Validate() checks whether the RWS is nil, empty or non-empty and returns
-	// an appropriate error based on the requirement.
-	Validate(expectEmptyRWS bool) error
-
 	// ContainsNode() returns whether RWS contains a given nodeID (ignores errors)
 	ContainsNode(nodeID uint32) bool
 
-	// NodeCount() returns the number of nodes in the RWS (ignores errors).
-	NodeCount() int
-
-	// All() returns a slice with all the nodeIDs in the RWS.
-	AllNodes() []uint32
+	// Validate() checks whether the RWS is nil, empty or non-empty and returns
+	// an appropriate error based on the requirement.
+	Validate(expectEmptyRWS bool) error
 
 	// VisitCount() returns the number of times nodeID has been visited by a walk
 	VisitCount(nodeID uint32) int

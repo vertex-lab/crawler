@@ -15,22 +15,38 @@ import (
 func TestPagerank(t *testing.T) {
 	testCases := []struct {
 		name             string
+		DBType           string
 		RWSType          string
 		expectedPagerank PagerankMap
 		expectedError    error
 	}{
 		{
+			name:          "nil DB",
+			DBType:        "nil",
+			RWSType:       "one-node0",
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			RWSType:       "one-node0",
+			expectedError: models.ErrEmptyDB,
+		},
+		{
 			name:          "nil RWS",
+			DBType:        "one-node0",
 			RWSType:       "nil",
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
 			name:          "empty RWS",
+			DBType:        "one-node0",
 			RWSType:       "empty",
 			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "just one node",
+			DBType:        "one-node0",
 			RWSType:       "one-node0",
 			expectedError: nil,
 			expectedPagerank: PagerankMap{
@@ -39,6 +55,7 @@ func TestPagerank(t *testing.T) {
 		},
 		{
 			name:          "simple RWS",
+			DBType:        "simple",
 			RWSType:       "simple",
 			expectedError: nil,
 			expectedPagerank: PagerankMap{
@@ -49,6 +66,7 @@ func TestPagerank(t *testing.T) {
 		},
 		{
 			name:          "triangle RWS",
+			DBType:        "triangle",
 			RWSType:       "triangle",
 			expectedError: nil,
 			expectedPagerank: PagerankMap{
@@ -61,9 +79,9 @@ func TestPagerank(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
+			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
-			pagerank, err := Pagerank(RWS)
+			pagerank, err := Pagerank(DB, RWS)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
@@ -99,7 +117,7 @@ func BenchmarkPagerank(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(RWM.Store)
+					_, err := Pagerank(DB, RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}
@@ -123,7 +141,7 @@ func BenchmarkPagerank(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(RWM.Store)
+					_, err := Pagerank(DB, RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}
