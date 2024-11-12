@@ -316,6 +316,67 @@ func TestVisitCount(t *testing.T) {
 	}
 }
 
+func TestNodeWalks(t *testing.T) {
+	cl := SetupClient()
+	defer CleanupRedis(cl)
+
+	testCases := []struct {
+		name            string
+		RWSType         string
+		nodeID          uint32
+		expectedWalkMap map[uint32]models.RandomWalk
+		expectedError   error
+	}{
+		{
+			name:          "nil RWS",
+			RWSType:       "nil",
+			nodeID:        0,
+			expectedError: models.ErrNilRWSPointer,
+		},
+		{
+			name:          "empty RWS",
+			RWSType:       "empty",
+			nodeID:        0,
+			expectedError: models.ErrEmptyRWS,
+		},
+		{
+			name:          "node not found in RWS",
+			RWSType:       "one-node0",
+			nodeID:        1,
+			expectedError: nil,
+		},
+		// {
+		// 	name:    "normal",
+		// 	RWSType: "triangle",
+		// 	nodeID:  0,
+		// 	expectedWalkMap: map[uint32]models.RandomWalk{
+		// 		0: {0, 1, 2},
+		// 		1: {1, 2, 0},
+		// 		2: {2, 0, 1},
+		// 	},
+		// },
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			RWS, err := SetupRWS(cl, test.RWSType)
+			if err != nil {
+				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+			}
+
+			walkMap, err := RWS.NodeWalks(test.nodeID)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NodeWalks(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
+				t.Errorf("NodeWalks(): expected %v, got %v", test.expectedWalkMap, walkMap)
+			}
+		})
+	}
+}
+
 func TestAddWalk(t *testing.T) {
 	cl := SetupClient()
 	defer CleanupRedis(cl)
@@ -373,7 +434,7 @@ func TestAddWalk(t *testing.T) {
 		}
 
 		// check the walkID has been incremented
-		strLastWalkID, err := cl.HGet(RWS.ctx, KeyRWS(), KeyLastWalkID()).Result()
+		strLastWalkID, err := cl.HGet(RWS.ctx, KeyRWS, KeyLastWalkID).Result()
 		if err != nil {
 			t.Fatalf("HGet(): expected nil, got %v", err)
 		}

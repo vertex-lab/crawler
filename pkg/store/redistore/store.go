@@ -71,7 +71,7 @@ func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 		return nil, ErrNilClientPointer
 	}
 
-	cmdReturn := cl.HMGet(ctx, KeyRWS(), KeyAlpha(), KeyWalksPerNode())
+	cmdReturn := cl.HMGet(ctx, KeyRWS, KeyAlpha, KeyWalksPerNode)
 	if cmdReturn.Err() != nil {
 		return nil, cmdReturn.Err()
 	}
@@ -112,6 +112,22 @@ func (RWS *RandomWalkStore) IsEmpty() bool {
 
 	_, err := RWS.client.Get(RWS.ctx, KeyWalk(0)).Result()
 	return err != nil
+}
+
+// ContainsNode() returns whether RWS contains a given nodeID. It ignores errors
+// intentionally, returning false in case of any Redis or context issues.
+func (RWS *RandomWalkStore) ContainsNode(nodeID uint32) bool {
+
+	if RWS == nil || RWS.client == nil {
+		return false
+	}
+
+	exist, err := RWS.client.Exists(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
+	if err != nil {
+		return false
+	}
+
+	return exist > 0
 }
 
 // Validate() checks the fields alpha, walksPerNode and whether the RWS is nil, empty or
@@ -156,22 +172,6 @@ func (RWS *RandomWalkStore) validateFields() error {
 	return nil
 }
 
-// ContainsNode() returns whether RWS contains a given nodeID. It ignores errors
-// intentionally, returning false in case of any Redis or context issues.
-func (RWS *RandomWalkStore) ContainsNode(nodeID uint32) bool {
-
-	if RWS == nil || RWS.client == nil {
-		return false
-	}
-
-	exist, err := RWS.client.Exists(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
-	if err != nil {
-		return false
-	}
-
-	return exist > 0
-}
-
 // VisitCount() returns the number of times nodeID has been visited by a walk.
 // intentionally, returning 0 in case of any Redis or context issues.
 func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
@@ -186,6 +186,41 @@ func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
 	}
 
 	return int(visits)
+}
+
+// NodeWalks() returns a map of walks by walksID that visit nodeID.
+func (RWS *RandomWalkStore) NodeWalks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.Validate(false); err != nil {
+		return nil, err
+	}
+
+	luaScript := `
+        local KeyNodeWalkIDs = KEYS[1]
+        local KeyWalkPrefix = ARGV[1]
+
+        -- Get all walkIDs for the node
+        local walkIDs = redis.call("SMEMBERS", KeyNodeWalkIDs)
+        local walks = {}
+
+        -- For each walkID, retrieve the corresponding walk
+        for i, walkID in ipairs(walkIDs) do
+            local KeyWalk = KeyWalkPrefix .. walkID
+            local walk = redis.call("GET", KeyWalk)
+            table.insert(walks, walk)
+        end
+
+        -- Return both walkIDs and walks as two parallel arrays
+        return {walkIDs, walks}
+    `
+	// Execute the Lua script
+	result, err := RWS.client.Eval(RWS.ctx, luaScript, []string{KeyNodeWalkIDs(nodeID)}, KeyWalkPrefix).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
+	}
+
+	fmt.Printf("result %v", result)
+	return ParseWalkMap(result)
 }
 
 // AddWalk() adds the walk to the WalkIndex. It also adds the walkID to the
@@ -203,7 +238,7 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 
 	// assign a new walkID to this walk. It's not possible to do it inside the tx,
 	// which means there might be "holes" in the walkIndex, meaning walkIDs NOT associated with any walk.
-	walkID, err := RWS.client.HIncrBy(RWS.ctx, KeyRWS(), KeyLastWalkID(), 1).Result()
+	walkID, err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyLastWalkID, 1).Result()
 	if err != nil {
 		return err
 	}

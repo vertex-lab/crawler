@@ -11,44 +11,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Key RWS returns the Redis key of the RandomWalkStore
-func KeyRWS() string {
-	return "RWS"
-}
+const KeyRWS string = "RWS"
+const KeyAlpha string = "alpha"
+const KeyWalksPerNode string = "walksPerNode"
+const KeyLastWalkID string = "lastWalkID"
+const KeyWalkPrefix string = "walk:"
+const KeyNodeWalkIDsPrefix string = "nodeWalkIDs:"
 
-// KeyWalk() returns the Redis key for the walk
+// KeyWalk() returns the Redis key for the walk with specified walkID
 func KeyWalk(walkID uint32) string {
-	return fmt.Sprintf("walk:%d", walkID)
+	return fmt.Sprintf("%v%d", KeyWalkPrefix, walkID)
 }
 
-// KeyLastWalkID() returns the Redis key for the next walk ID
-func KeyLastWalkID() string {
-	return "lastWalkID"
-}
-
-// KeyLastNodeID() returns the Redis key for the next node ID
-func KeyLastNodeID() string {
-	return "lastNodeID"
-}
-
-// KeyAlpha() returns the Redis key for the dampening factor alpha
-func KeyAlpha() string {
-	return "alpha"
-}
-
-// KeyWalksPerNode() returns the Redis key for the number of walks per node
-func KeyWalksPerNode() string {
-	return "walksPerNode"
-}
-
-// KeyNode() returns the Redis key for the node
-func KeyNode(nodeID uint32) string {
-	return fmt.Sprintf("node:%d", nodeID)
-}
-
-// KeyNodeWalkIDs() returns the Redis key for the nodeWalkIDs
+// KeyNodeWalkIDs() returns the Redis key for the nodeWalkIDs with specified nodeID
 func KeyNodeWalkIDs(nodeID uint32) string {
-	return fmt.Sprintf("nodeWalkIDs:%d", nodeID)
+	return fmt.Sprintf("%v%d", KeyNodeWalkIDsPrefix, nodeID)
 }
 
 // SetupRedis() initializes a new Redis client for testing purposes.
@@ -118,6 +95,55 @@ func ParseFloat64(strVal string) (float64, error) {
 	return parsedVal, err
 }
 
+// ParseWalkMap parses the result of a Redis Lua script into a map[uint32]models.RandomWalk.
+// The input `result` should be a Redis result containing two slices:
+// - strWalkIDs as strings, and
+// - strWalks as serialized strings, which will be parsed into models.RandomWalk.
+func ParseWalkMap(result interface{}) (map[uint32]models.RandomWalk, error) {
+
+	resultList, ok := result.([]interface{})
+	if !ok || len(resultList) != 2 {
+		return nil, fmt.Errorf("unexpected result format: %v", result)
+	}
+
+	// convert the interfaces to slices of strings
+	var strWalkIDs []string
+	for _, v := range resultList[0].([]interface{}) {
+		strWalkID, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("unexpected format for walkID: %v", v)
+		}
+		strWalkIDs = append(strWalkIDs, strWalkID)
+	}
+
+	var strWalks []string
+	for _, v := range resultList[1].([]interface{}) {
+		strWalk, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("unexpected format for walk: %v", v)
+		}
+		strWalks = append(strWalks, strWalk)
+	}
+
+	// create the walkMap with parsed RandomWalks
+	walkMap := make(map[uint32]models.RandomWalk, len(strWalkIDs))
+	for i, strWalkID := range strWalkIDs {
+		walkID, err := ParseID(strWalkID)
+		if err != nil {
+			return nil, err
+		}
+
+		walk, err := ParseWalk(strWalks[i])
+		if err != nil {
+			return nil, err
+		}
+
+		walkMap[uint32(walkID)] = walk
+	}
+
+	return walkMap, nil
+}
+
 // SetupRWS returns a RandomWalkStore ready to be used in tests
 func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 	if cl == nil {
@@ -133,6 +159,24 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		if err != nil {
 			return nil, err
 		}
+		return RWS, nil
+
+	case "one-node0":
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walk := models.RandomWalk{0}
+		if err := cl.Set(ctx, KeyWalk(0), FormatWalk(walk), 0).Err(); err != nil {
+			return nil, err
+		}
+
+		if err := cl.SAdd(ctx, KeyNodeWalkIDs(0), 0).Err(); err != nil {
+			return nil, err
+		}
+
 		return RWS, nil
 
 	case "one-walk0":
