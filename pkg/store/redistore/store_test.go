@@ -365,7 +365,7 @@ func TestWalks(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			walkMap, err := RWS.Walks(test.nodeID)
+			walkMap, err := RWS.Walks(test.nodeID, -1)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)

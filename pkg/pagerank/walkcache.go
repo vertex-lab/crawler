@@ -96,7 +96,7 @@ func (WC *WalkCache) Load(RWS models.RandomWalkStore, nodeID uint32, limit int) 
 		return ErrNodeAlreadyLoadedWC
 	}
 
-	walkMap, err := RWS.Walks(nodeID)
+	walkMap, err := RWS.Walks(nodeID, -1)
 	if err != nil {
 		return err
 	}

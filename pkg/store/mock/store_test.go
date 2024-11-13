@@ -451,6 +451,7 @@ func TestWalks(t *testing.T) {
 		name            string
 		RWSType         string
 		nodeID          uint32
+		limit           int
 		expectedWalkMap map[uint32]models.RandomWalk
 		expectedError   error
 	}{
@@ -458,28 +459,42 @@ func TestWalks(t *testing.T) {
 			name:          "nil RWS",
 			RWSType:       "nil",
 			nodeID:        0,
+			limit:         1,
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
 			name:          "empty RWS",
 			RWSType:       "empty",
 			nodeID:        0,
+			limit:         1,
 			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "node not found in RWS",
 			RWSType:       "one-node0",
 			nodeID:        1,
+			limit:         1,
 			expectedError: models.ErrNodeNotFoundRWS,
 		},
 		{
-			name:    "normal",
+			name:    "valid, all",
 			RWSType: "triangle",
 			nodeID:  0,
+			limit:   -1,
 			expectedWalkMap: map[uint32]models.RandomWalk{
 				0: {0, 1, 2},
 				1: {1, 2, 0},
 				2: {2, 0, 1},
+			},
+		},
+		{
+			name:    "valid",
+			RWSType: "triangle",
+			nodeID:  0,
+			limit:   2,
+			expectedWalkMap: map[uint32]models.RandomWalk{
+				0: {0, 1, 2},
+				1: {1, 2, 0},
 			},
 		},
 	}
@@ -487,7 +502,7 @@ func TestWalks(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			walkMap, err := RWS.Walks(test.nodeID)
+			walkMap, err := RWS.Walks(test.nodeID, test.limit)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
@@ -860,89 +875,3 @@ func TestGraftWalk(t *testing.T) {
 func TestInterface(t *testing.T) {
 	var _ models.RandomWalkStore = &RandomWalkStore{}
 }
-
-// ------------------------------BENCHMARKS------------------------------
-
-func BenchmarkAddWalk(b *testing.B) {
-
-	RWS, _ := NewRWS(0.85, 1)
-	walk := models.RandomWalk{0, 1, 2, 3, 4, 5, 6, 7}
-
-	for i := 0; i < b.N; i++ {
-		if err := RWS.AddWalk(walk); err != nil {
-			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
-		}
-	}
-}
-
-/*
-func BenchmarkPruneWalk(b *testing.B) {
-
-	// initial setup
-	nodesSize := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
-	RWS, _ := NewRWS(0.85, 1)
-
-	// setup the walks
-	rWalks := []*RandomWalk{}
-	for i := uint32(0); i < uint32(b.N); i++ {
-
-		startingNodeID := uint32(rng.Intn(nodesSize))
-		walk, _ := generateWalk(DB, startingNodeID, RWS.Alpha, rng)
-		rWalk := &RandomWalk{NodeIDs: walk}
-		RWS.AddWalk(rWalk)
-
-		rWalks = append(rWalks, rWalk)
-	}
-
-	b.ResetTimer()
-
-	// Run the benchmark
-	for i := 0; i < b.N; i++ {
-
-		err := RWS.PruneWalk(rWalks[i], 0)
-		if err != nil {
-			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
-		}
-	}
-}
-
-func BenchmarkGraftWalk(b *testing.B) {
-
-	// initial setup
-	nodesSize := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateMockDB(nodesSize, edgesPerNode, rng)
-	RWS, _ := NewRWS(0.85, 1)
-
-	// setup the walks and walk segments
-	rWalks := []*RandomWalk{}
-	walkSegments := [][]uint32{}
-	for i := uint32(0); i < uint32(b.N); i++ {
-
-		startingNodeID := uint32(rng.Intn(nodesSize))
-		walk, _ := generateWalk(DB, startingNodeID, RWS.Alpha, rng)
-		rWalk := &RandomWalk{NodeIDs: walk}
-		RWS.AddWalk(rWalk)
-		rWalks = append(rWalks, rWalk)
-
-		startingNodeID = uint32(rng.Intn(nodesSize))
-		walkSegment, _ := generateWalk(DB, startingNodeID, RWS.Alpha, rng)
-		walkSegments = append(walkSegments, walkSegment)
-	}
-
-	b.ResetTimer()
-
-	// Run the benchmark
-	for i := 0; i < b.N; i++ {
-
-		err := RWS.GraftWalk(rWalks[i], walkSegments[i])
-		if err != nil {
-			b.Fatalf("BenchmarkAddWalk(): expected nil, got %v", err)
-		}
-	}
-}
-*/

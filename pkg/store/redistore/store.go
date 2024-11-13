@@ -190,18 +190,23 @@ func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
 }
 
 // Walks() returns a map of walks by walksID that visit nodeID.
-func (RWS *RandomWalkStore) Walks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
+func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 
 	if err := RWS.Validate(false); err != nil {
 		return nil, err
 	}
 
+	if limit < 0 {
+		limit = 1000000000 // a very large number, such that SRANDMEMBER returns everything
+	}
+
 	luaScript := `
         local nodeID = KEYS[1]
-        local KeyWalkPrefix = ARGV[1]
+		local limit = ARGV[1]
+        local KeyWalkPrefix = ARGV[2]
 
         -- Get all walkIDs for the node
-        local walkIDs = redis.call("SMEMBERS", nodeID)
+        local walkIDs = redis.call("SRANDMEMBER", nodeID, limit)
         local walks = {}
 
         -- For each walkID, retrieve the corresponding walk
@@ -215,6 +220,119 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32) (map[uint32]models.RandomWalk, 
     `
 	// execute the Lua script
 	keys := []string{KeyNodeWalkIDs(nodeID)}
+	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, limit, KeyWalkPrefix).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
+	}
+
+	return ParseWalkMap(result)
+}
+
+/*
+WalksRand() returns a map of walks by walkID chosen at random from the walks
+that visit nodeID, according to a specified probability of selection.
+*/
+/*
+WalksRand() returns a map of walks by walkID chosen at random from the walks
+that visit nodeID, according to a specified probability of selection.
+*/
+func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
+	probabilityOfSelection float32) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.validateFields(); err != nil {
+		return nil, err
+	}
+
+	luaScript := `
+		local nodeID = KEYS[1]
+		local probability = tonumber(ARGV[1])
+		local KeyWalkPrefix = ARGV[2]
+		local cardinality = redis.call("SCARD", nodeID)
+
+		-- Round up to the nearest integer
+		local expectedSize = math.floor(cardinality * probability + 0.5) 
+		
+		-- Get random members from the set based on the expected size
+		local walkIDs = redis.call("SRANDMEMBER", nodeID, expectedSize)
+		
+		local walks = {}
+		
+		-- For each walkID, retrieve the corresponding walk
+		for _, walkID in ipairs(walkIDs) do
+			local walk = redis.call("GET", KeyWalkPrefix .. walkID)
+			table.insert(walks, walk)
+		end
+		
+		-- Return both walkIDs and walks as two parallel arrays
+		return {walkIDs, walks}
+    `
+	// execute the Lua script
+	keys := []string{KeyNodeWalkIDs(nodeID)}
+	args := []interface{}{probabilityOfSelection, KeyWalkPrefix}
+	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, args...).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
+	}
+
+	return ParseWalkMap(result)
+}
+
+// CommonWalks returns a map of walks by walkID that contain both nodeID and at
+// least one of the removedNode in removedNodes.
+func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
+	removedNodes []uint32) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.validateFields(); err != nil {
+		return nil, err
+	}
+
+	luaScript := `
+		local nodeID = KEYS[1]
+		local removedNodes = {}		
+		for i = 2, #KEYS do
+			table.insert(removedNodes, KEYS[i])
+		end
+
+		local KeyWalkPrefix = ARGV[1]
+		
+		-- Get walk IDs associated with the main nodeID
+		local nodeWalkIDs = redis.call("SMEMBERS", nodeID)
+		
+		-- Build a union set of walk IDs for all removed nodes
+		local unionRemovedNodesWalkIDs = {}
+		for _, removedNode in ipairs(removedNodes) do
+			local removedNodeWalkIDs = redis.call("SMEMBERS", removedNode)
+			for _, id in ipairs(removedNodeWalkIDs) do
+				unionRemovedNodesWalkIDs[id] = true  -- Using a table as a set for union
+			end
+		end
+		
+		-- Find the intersection of nodeWalkIDs and unionRemovedNodesWalkIDs
+		local candidateWalkIDs = {}
+		for _, walkID in ipairs(nodeWalkIDs) do
+			if unionRemovedNodesWalkIDs[walkID] then
+				table.insert(candidateWalkIDs, walkID)
+			end
+		end
+		
+		-- Fetch the walk for each candidate walkID
+		local candidateWalks = {}
+		for _, walkID in ipairs(candidateWalkIDs) do
+			local walk = redis.call("GET", KeyWalkPrefix .. walkID)
+			table.insert(candidateWalks, walk)
+		end
+		
+		-- Return both candidateWalkIDs and candidateWalks as two parallel arrays
+		return {candidateWalkIDs, candidateWalks}
+	`
+
+	// format the keys
+	keys := []string{KeyNodeWalkIDs(nodeID)}
+	for _, removedNode := range removedNodes {
+		keys = append(keys, KeyNodeWalkIDs(removedNode))
+	}
+
+	// execute the Lua script
 	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, KeyWalkPrefix).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
@@ -314,113 +432,4 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 	}
 
 	return nil
-}
-
-// CommonWalks returns a map of walks by walkID that contain both nodeID and at
-// least one of the removedNode in removedNodes.
-func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
-	removedNodes []uint32) (map[uint32]models.RandomWalk, error) {
-
-	if err := RWS.validateFields(); err != nil {
-		return nil, err
-	}
-
-	luaScript := `
-		local nodeID = KEYS[1]
-		local removedNodes = {}		
-		for i = 2, #KEYS do
-			table.insert(removedNodes, KEYS[i])
-		end
-
-		local KeyWalkPrefix = ARGV[1]
-		
-		-- Get walk IDs associated with the main nodeID
-		local nodeWalkIDs = redis.call("SMEMBERS", nodeID)
-		
-		-- Build a union set of walk IDs for all removed nodes
-		local unionRemovedNodesWalkIDs = {}
-		for _, removedNode in ipairs(removedNodes) do
-			local removedNodeWalkIDs = redis.call("SMEMBERS", removedNode)
-			for _, id in ipairs(removedNodeWalkIDs) do
-				unionRemovedNodesWalkIDs[id] = true  -- Using a table as a set for union
-			end
-		end
-		
-		-- Find the intersection of nodeWalkIDs and unionRemovedNodesWalkIDs
-		local candidateWalkIDs = {}
-		for _, walkID in ipairs(nodeWalkIDs) do
-			if unionRemovedNodesWalkIDs[walkID] then
-				table.insert(candidateWalkIDs, walkID)
-			end
-		end
-		
-		-- Fetch the walk for each candidate walkID
-		local candidateWalks = {}
-		for _, walkID in ipairs(candidateWalkIDs) do
-			local walk = redis.call("GET", KeyWalkPrefix .. walkID)
-			table.insert(candidateWalks, walk)
-		end
-		
-		-- Return both candidateWalkIDs and candidateWalks as two parallel arrays
-		return {candidateWalkIDs, candidateWalks}
-	`
-
-	// format the keys
-	keys := []string{KeyNodeWalkIDs(nodeID)}
-	for _, removedNode := range removedNodes {
-		keys = append(keys, KeyNodeWalkIDs(removedNode))
-	}
-
-	// execute the Lua script
-	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, KeyWalkPrefix).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
-	}
-
-	return ParseWalkMap(result)
-}
-
-/*
-WalksRand() returns a map of walks by walkID chosen at random from the walks
-that visit nodeID, according to a specified probability of selection.
-*/
-func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
-	probabilityOfSelection float32) (map[uint32]models.RandomWalk, error) {
-
-	if err := RWS.validateFields(); err != nil {
-		return nil, err
-	}
-
-	luaScript := `
-		local nodeID = KEYS[1]
-		local KeyWalkPrefix = ARGV[1]
-		local cardinality = redis.call("SCARD", nodeID)
-		local probability = tonumber(ARGV[2])
-
-		-- Round up to the nearest integer
-		local expectedSize = math.floor(cardinality * probability + 0.5) 
-		
-		-- Get random members from the set based on the expected size
-		local walkIDs = redis.call("SRANDMEMBER", nodeID, expectedSize)
-		
-		local walks = {}
-		
-		-- For each walkID, retrieve the corresponding walk
-		for _, walkID in ipairs(walkIDs) do
-			local walk = redis.call("GET", KeyWalkPrefix .. walkID)
-			table.insert(walks, walk)
-		end
-		
-		-- Return both walkIDs and walks as two parallel arrays
-		return {walkIDs, walks}
-    `
-	// execute the Lua script
-	keys := []string{KeyNodeWalkIDs(nodeID)}
-	args := []interface{}{KeyWalkPrefix, probabilityOfSelection}
-	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, args...).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
-	}
-
-	return ParseWalkMap(result)
 }

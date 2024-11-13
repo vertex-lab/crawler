@@ -155,16 +155,26 @@ func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (models.WalkIDSet, error) {
 }
 
 // Walks() returns a map of walks by walkID that visit nodeID.
-func (RWS *RandomWalkStore) Walks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
+// - if limit is positive, the map contains up to that many key-value pairs.
+// - if limit is negative, all walks are returned
+func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 
 	walkIDs, err := RWS.WalkIDs(nodeID)
 	if err != nil {
 		return nil, err
 	}
 
+	if limit < 0 {
+		limit = walkIDs.Cardinality()
+	}
+
 	// extract into the map format
 	walkMap := make(map[uint32]models.RandomWalk, walkIDs.Cardinality())
 	for walkID := range walkIDs.Iter() {
+		if len(walkMap) >= limit {
+			break
+		}
+
 		walkMap[walkID] = RWS.WalkIndex[walkID]
 	}
 

@@ -170,7 +170,7 @@ func TestGenerateWalks(t *testing.T) {
 					break
 				}
 
-				walkMap, err := RWM.Store.Walks(nodeID)
+				walkMap, err := RWM.Store.Walks(nodeID, -1)
 				if err != nil {
 					t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 				}
@@ -242,7 +242,7 @@ func TestGenerate(t *testing.T) {
 			}
 
 			if test.expectedWalks != nil {
-				walkMap, err := RWM.Store.Walks(0)
+				walkMap, err := RWM.Store.Walks(0, -1)
 				if err != nil {
 					t.Fatalf("WalkSet(0): expected nil, got %v", err)
 				}
@@ -319,7 +319,7 @@ func TestGenerateAll(t *testing.T) {
 		// check that each walk in the WalkSet of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
 
-			walks, err := RWM.Store.Walks(nodeID)
+			walks, err := RWM.Store.Walks(nodeID, -1)
 			if err != nil {
 				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
 			}

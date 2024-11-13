@@ -11,7 +11,7 @@ import (
 
 /*
 Generate() generates `walksPerNode` random walks for a single node using dampening
-factor `alpha`. The walkIDs are added to the RandomWalkStore.
+factor `alpha`. The walks are added to the RandomWalkStore.
 */
 func (RWM *RandomWalkManager) Generate(DB models.Database, nodeID uint32) error {
 
@@ -122,8 +122,8 @@ func generateWalk(DB models.Database, startingNodeID uint32,
 			break
 		}
 
-		// get the successorIDs of the current node. This can be improved by checking
-		// a successor cache first, and eventually store it there.
+		// get the successorIDs of the current node. This can be improved
+		// by checking a successor cache first.
 		successorIDs, err := DB.Successors(currentNodeID)
 		if err != nil {
 			return nil, err

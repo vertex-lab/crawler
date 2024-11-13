@@ -19,7 +19,7 @@ random walks stored in the RandomWalkManager.
 	> DB models.Database
 	The interface of the graph database
 
-	> RWS *walks.RandomWalkStore
+	> RWS models.RandomWalkStore
 	The structure that manages the random walks for each node
 
 	> nodeID uint32

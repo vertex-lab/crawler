@@ -148,7 +148,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkMap, err := RWM.Store.Walks(nodeID)
+			walkMap, err := RWM.Store.Walks(nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -245,7 +245,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkMap, err := RWM.Store.Walks(nodeID)
+			walkMap, err := RWM.Store.Walks(nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -369,7 +369,7 @@ func TestUpdate(t *testing.T) {
 		// check that each walk in the Walks of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
 
-			walks, err := RWM.Store.Walks(nodeID)
+			walks, err := RWM.Store.Walks(nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
