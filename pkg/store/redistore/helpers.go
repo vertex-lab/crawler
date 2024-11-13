@@ -200,6 +200,7 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		return RWS, nil
 
 	case "triangle":
+		// 0 --> 1 --> 2 --> 0
 		ctx := context.Background()
 		RWS, err := NewRWS(ctx, cl, 0.85, 1)
 		if err != nil {
@@ -213,6 +214,23 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 			}
 		}
 
+		return RWS, nil
+
+	case "complex":
+		// 0 --> 1 --> 2
+		// 0 --> 3
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walks := []models.RandomWalk{{0, 1, 2}, {0, 3}, {1, 2}}
+		for _, walk := range walks {
+			if err := RWS.AddWalk(walk); err != nil {
+				return nil, err
+			}
+		}
 		return RWS, nil
 
 	default:

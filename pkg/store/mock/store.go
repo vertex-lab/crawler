@@ -58,7 +58,7 @@ func (RWS *RandomWalkStore) IsEmpty() bool {
 	return RWS == nil || len(RWS.WalkIndex) == 0
 }
 
-// NodeCount() returns the number of nodes in the RWS (ignores errors).
+// DEPRECATED NodeCount() returns the number of nodes in the RWS (ignores errors).
 func (RWS *RandomWalkStore) NodeCount() int {
 	if RWS.IsEmpty() {
 		return 0
@@ -66,7 +66,7 @@ func (RWS *RandomWalkStore) NodeCount() int {
 	return len(RWS.NodeWalkIDSet)
 }
 
-// All() returns a slice with all the nodeIDs in the RWS.
+// DEPRECATED AllNodes() returns a slice with all the nodeIDs in the RWS.
 func (RWS *RandomWalkStore) AllNodes() []uint32 {
 	if RWS.IsEmpty() {
 		return []uint32{}
@@ -140,8 +140,8 @@ func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
 	return 0
 }
 
-// NodeWalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
-func (RWS *RandomWalkStore) NodeWalkIDs(nodeID uint32) (models.WalkIDSet, error) {
+// WalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
+func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (models.WalkIDSet, error) {
 
 	if err := RWS.Validate(false); err != nil {
 		return nil, err
@@ -154,10 +154,10 @@ func (RWS *RandomWalkStore) NodeWalkIDs(nodeID uint32) (models.WalkIDSet, error)
 	return walkIDs, nil
 }
 
-// NodeWalks() returns a map of walks by walkID that visit nodeID.
-func (RWS *RandomWalkStore) NodeWalks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
+// Walks() returns a map of walks by walkID that visit nodeID.
+func (RWS *RandomWalkStore) Walks(nodeID uint32) (map[uint32]models.RandomWalk, error) {
 
-	walkIDs, err := RWS.NodeWalkIDs(nodeID)
+	walkIDs, err := RWS.WalkIDs(nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +165,50 @@ func (RWS *RandomWalkStore) NodeWalks(nodeID uint32) (map[uint32]models.RandomWa
 	// extract into the map format
 	walkMap := make(map[uint32]models.RandomWalk, walkIDs.Cardinality())
 	for walkID := range walkIDs.Iter() {
+		walkMap[walkID] = RWS.WalkIndex[walkID]
+	}
+
+	return walkMap, nil
+}
+
+/*
+CommonWalks returns a map of candidate walks by walkID that MIGHT
+be updated inside the method RWM.updateRemovedNodes().
+
+These candidate walks are the one that contain both nodeID and at least one
+of the removed node in removedNodes.
+*/
+func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
+	removedNodes []uint32) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.Validate(false); err != nil {
+		return nil, err
+	}
+
+	// get the IDs of the walks that visit nodeID
+	nodeWalkIDs, err := RWS.WalkIDs(nodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// get the IDs of the walks that visit one of the removedNodes
+	unionRemovedNodesWalkIDs := mapset.NewSet[uint32]()
+	for _, removedNode := range removedNodes {
+
+		removedWalkIDs, err := RWS.WalkIDs(removedNode)
+		if err != nil {
+			return nil, err
+		}
+
+		unionRemovedNodesWalkIDs.Append(removedWalkIDs.ToSlice()...)
+	}
+
+	// get the walks that contain both nodeID and one of the removedNodes
+	candidateWalkIDs := nodeWalkIDs.Intersect(unionRemovedNodesWalkIDs)
+
+	// extract into the map format
+	walkMap := make(map[uint32]models.RandomWalk, candidateWalkIDs.Cardinality())
+	for walkID := range candidateWalkIDs.Iter() {
 		walkMap[walkID] = RWS.WalkIndex[walkID]
 	}
 
@@ -286,64 +330,20 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int,
 }
 
 /*
-WalksForUpdateRemoved returns a map of candidate walks by walkID that MIGHT
-be updated inside the method RWM.updateRemovedNodes().
-
-These candidate walks are the one that contain both nodeID and at least one
-of the removed node in removedNodes.
-*/
-func (RWS *RandomWalkStore) WalksForUpdateRemoved(nodeID uint32,
-	removedNodes []uint32) (map[uint32]models.RandomWalk, error) {
-
-	if err := RWS.Validate(false); err != nil {
-		return nil, err
-	}
-
-	// get the IDs of the walks that visit nodeID
-	nodeWalkIDs, err := RWS.NodeWalkIDs(nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	// get the IDs of the walks that visit one of the removedNodes
-	unionRemovedNodesWalkIDs := mapset.NewSet[uint32]()
-	for _, removedNode := range removedNodes {
-
-		removedNodeWalkIDs, err := RWS.NodeWalkIDs(removedNode)
-		if err != nil {
-			return nil, err
-		}
-
-		unionRemovedNodesWalkIDs.Append(removedNodeWalkIDs.ToSlice()...)
-	}
-
-	// get the walks that contain both nodeID and one of the removedNodes
-	candidateWalkIDs := nodeWalkIDs.Intersect(unionRemovedNodesWalkIDs)
-
-	// extract into the map format
-	walkMap := make(map[uint32]models.RandomWalk, candidateWalkIDs.Cardinality())
-	for walkID := range candidateWalkIDs.Iter() {
-		walkMap[walkID] = RWS.WalkIndex[walkID]
-	}
-
-	return walkMap, nil
-}
-
-/*
 WalksForUpdateAdded returns a slice of random walks that WILL be updated
 inside the method RWM.updateAddedNodes().
 These walks will be chosen at random from the walks that visit nodeID, according to
 a specified probability of selection.
 */
-func (RWS *RandomWalkStore) WalksForUpdateAdded(nodeID uint32,
-	probabilityOfSelection float32, rng *rand.Rand) (map[uint32]models.RandomWalk, error) {
+func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
+	probabilityOfSelection float32) (map[uint32]models.RandomWalk, error) {
 
 	if err := RWS.Validate(false); err != nil {
 		return nil, err
 	}
 
 	// get the IDs of the walks that visit nodeID
-	walkIDs, err := RWS.NodeWalkIDs(nodeID)
+	walkIDs, err := RWS.WalkIDs(nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func (RWS *RandomWalkStore) WalksForUpdateAdded(nodeID uint32,
 	walkMap := make(map[uint32]models.RandomWalk, expectedSize)
 
 	for walkID := range walkIDs.Iter() {
-		if rng.Float32() > probabilityOfSelection {
+		if rand.Float32() > probabilityOfSelection {
 			continue
 		}
 
