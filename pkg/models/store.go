@@ -48,8 +48,8 @@ type RandomWalkStore interface {
 	VisitCount(nodeID uint32) int
 
 	// Walks() returns a map of walks by walksID that visit nodeID.
-	// - if limit is positive, the map contains up to that many key-value pairs.
-	// - if limit is negative, all walks are returned
+	// - if limit > 0, the map contains up to that many key-value pairs.
+	// - if limit <= 0, all walks are returned
 	Walks(nodeID uint32, limit int) (map[uint32]RandomWalk, error)
 
 	// WalksRand() returns a map of walks by walkID chosen at random from the walks

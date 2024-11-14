@@ -86,8 +86,8 @@ encapsulates the data around the personalized walk.
 type PersonalizedWalk struct {
 	startingNodeID uint32
 	currentNodeID  uint32
-	currentWalk    []uint32
-	walk           []uint32
+	currentWalk    models.RandomWalk
+	walk           models.RandomWalk
 }
 
 // initialize a new personalized walk with a specified targetLenght
@@ -95,8 +95,8 @@ func NewPersonalizedWalk(nodeID uint32, targetLength int) *PersonalizedWalk {
 	return &PersonalizedWalk{
 		startingNodeID: nodeID,
 		currentNodeID:  nodeID,
-		currentWalk:    []uint32{nodeID},
-		walk:           make([]uint32, 0, targetLength),
+		currentWalk:    models.RandomWalk{nodeID},
+		walk:           make(models.RandomWalk, 0, targetLength),
 	}
 }
 
@@ -109,7 +109,7 @@ func (p *PersonalizedWalk) Reached(targetLength int) bool {
 func (p *PersonalizedWalk) Reset() {
 	p.walk = append(p.walk, p.currentWalk...)
 	p.currentNodeID = p.startingNodeID
-	p.currentWalk = []uint32{p.startingNodeID}
+	p.currentWalk = models.RandomWalk{p.startingNodeID}
 }
 
 // appends nextNodeID and moves there
@@ -119,7 +119,7 @@ func (p *PersonalizedWalk) AppendNode(nextNodeID uint32) {
 }
 
 // removed potential cycles from the walkSegment, appends it to the personalized walks and resets
-func (p *PersonalizedWalk) AppendWalk(walkSegment []uint32) {
+func (p *PersonalizedWalk) AppendWalk(walkSegment models.RandomWalk) {
 
 	// remove potential cycles
 	walkSegment = walks.TrimCycles(p.currentWalk, walkSegment)
@@ -130,7 +130,7 @@ func (p *PersonalizedWalk) AppendWalk(walkSegment []uint32) {
 
 	// reset
 	p.currentNodeID = p.startingNodeID
-	p.currentWalk = []uint32{p.startingNodeID}
+	p.currentWalk = models.RandomWalk{p.startingNodeID}
 }
 
 /*
@@ -203,7 +203,7 @@ func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
 
 // count the number of times each node is visited in the pWalk and computes their frequencies.
 // Returns an empty map if pWalk is nil or empty.
-func countAndNormalize(pWalk []uint32) PagerankMap {
+func countAndNormalize(pWalk models.RandomWalk) PagerankMap {
 
 	// count the frequency of each nodeID
 	pp := make(PagerankMap, (len(pWalk)))

@@ -96,22 +96,13 @@ func (WC *WalkCache) Load(RWS models.RandomWalkStore, nodeID uint32, limit int) 
 		return ErrNodeAlreadyLoadedWC
 	}
 
-	walkMap, err := RWS.Walks(nodeID, -1)
+	walkMap, err := RWS.Walks(nodeID, limit)
 	if err != nil {
 		return err
 	}
 
-	if limit <= 0 {
-		limit = len(walkMap)
-	}
-
-	walks := make([]models.RandomWalk, 0, limit)
+	walks := make([]models.RandomWalk, 0, len(walkMap))
 	for walkID, walk := range walkMap {
-
-		// the exit condition
-		if len(walks) == limit {
-			break
-		}
 
 		// skip walks already loaded
 		if WC.LoadedWalkIDs.ContainsOne(walkID) {

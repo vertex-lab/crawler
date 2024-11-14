@@ -170,17 +170,17 @@ func TestReset(t *testing.T) {
 	testCases := []struct {
 		name            string
 		pWalkType       string
-		expectedNodeIDs []uint32
+		expectedNodeIDs models.RandomWalk
 	}{
 		{
 			name:            "one-node0",
 			pWalkType:       "one-node0",
-			expectedNodeIDs: []uint32{0},
+			expectedNodeIDs: models.RandomWalk{0},
 		},
 		{
 			name:            "triangle",
 			pWalkType:       "triangle",
-			expectedNodeIDs: []uint32{0, 1, 2},
+			expectedNodeIDs: models.RandomWalk{0, 1, 2},
 		},
 	}
 
@@ -194,8 +194,8 @@ func TestReset(t *testing.T) {
 				t.Errorf("Reset(): expected %v, got %v", pWalk.startingNodeID, pWalk.currentNodeID)
 			}
 
-			if !reflect.DeepEqual(pWalk.currentWalk, []uint32{pWalk.startingNodeID}) {
-				t.Errorf("Reset(): expected %v, got %v", []uint32{pWalk.startingNodeID}, pWalk.currentWalk)
+			if !reflect.DeepEqual(pWalk.currentWalk, models.RandomWalk{pWalk.startingNodeID}) {
+				t.Errorf("Reset(): expected %v, got %v", models.RandomWalk{pWalk.startingNodeID}, pWalk.currentWalk)
 			}
 
 			if !reflect.DeepEqual(pWalk.walk, test.expectedNodeIDs) {
@@ -211,19 +211,19 @@ func TestAppendNode(t *testing.T) {
 		name                string
 		pWalkType           string
 		nextNodeID          uint32
-		expectedCurrentWalk []uint32
+		expectedCurrentWalk models.RandomWalk
 	}{
 		{
 			name:                "one-node0",
 			pWalkType:           "one-node0",
 			nextNodeID:          1,
-			expectedCurrentWalk: []uint32{0, 1},
+			expectedCurrentWalk: models.RandomWalk{0, 1},
 		},
 		{
 			name:                "triangle",
 			pWalkType:           "triangle",
 			nextNodeID:          3,
-			expectedCurrentWalk: []uint32{0, 1, 2, 3},
+			expectedCurrentWalk: models.RandomWalk{0, 1, 2, 3},
 		},
 	}
 
@@ -249,20 +249,20 @@ func TestAppendWalk(t *testing.T) {
 	testCases := []struct {
 		name            string
 		pWalkType       string
-		walkSegment     []uint32
-		expectedNodeIDs []uint32
+		walkSegment     models.RandomWalk
+		expectedNodeIDs models.RandomWalk
 	}{
 		{
 			name:            "one-node0",
 			pWalkType:       "one-node0",
-			walkSegment:     []uint32{1, 2},
-			expectedNodeIDs: []uint32{0, 1, 2},
+			walkSegment:     models.RandomWalk{1, 2},
+			expectedNodeIDs: models.RandomWalk{0, 1, 2},
 		},
 		{
 			name:            "triangle",
 			pWalkType:       "triangle",
-			walkSegment:     []uint32{3, 1},
-			expectedNodeIDs: []uint32{0, 1, 2, 3},
+			walkSegment:     models.RandomWalk{3, 1},
+			expectedNodeIDs: models.RandomWalk{0, 1, 2, 3},
 		},
 	}
 

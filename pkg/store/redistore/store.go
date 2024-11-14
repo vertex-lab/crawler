@@ -196,7 +196,7 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 		return nil, err
 	}
 
-	if limit < 0 {
+	if limit <= 0 {
 		limit = 1000000000 // a very large number, such that SRANDMEMBER returns everything
 	}
 
