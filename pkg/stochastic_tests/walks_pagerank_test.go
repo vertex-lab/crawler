@@ -135,7 +135,7 @@ func TestPagerankDynamic(t *testing.T) {
 
 			// setup the old state
 			nodeID, oldSuccessors, currentSuccessors := SetupOldState(DB, changes)
-			DB.Nodes[nodeID].Successors = oldSuccessors
+			DB.NodeIndex[nodeID].Successors = oldSuccessors
 
 			// generate walks
 			RWM, _ := walks.NewRWM("mock", alpha, walkPerNode)
@@ -145,7 +145,7 @@ func TestPagerankDynamic(t *testing.T) {
 			}
 
 			// update the graph to the current state
-			DB.Nodes[nodeID].Successors = currentSuccessors
+			DB.NodeIndex[nodeID].Successors = currentSuccessors
 
 			// update the random walks
 			if err = RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors); err != nil {

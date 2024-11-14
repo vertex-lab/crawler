@@ -8,15 +8,16 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
-// simulates a simple graph databas for testing.
+// simulates a simple graph database for testing.
 type Database struct {
-	Nodes map[uint32]*models.Node
+	KeyIndex  map[string]uint32
+	NodeIndex map[uint32]*models.Node
 }
 
 // NewDatabase() creates and returns a new Database instance.
 func NewDatabase() *Database {
 	return &Database{
-		Nodes: make(map[uint32]*models.Node), // Initialize an empty map to store nodes.
+		NodeIndex: make(map[uint32]*models.Node), // Initialize an empty map to store nodes.
 	}
 }
 
@@ -28,11 +29,16 @@ func (DB *Database) Validate() error {
 		return models.ErrNilDBPointer
 	}
 
-	if len(DB.Nodes) == 0 {
+	if len(DB.NodeIndex) == 0 {
 		return models.ErrEmptyDB
 	}
 
 	return nil
+}
+
+// AddNode() adds a node to the database and returns its assigned nodeID
+func (DB *Database) AddNode(Npub string) (uint32, error) {
+	return 0, nil
 }
 
 // ContainsNode() returns whether nodeID is found in the DB
@@ -42,7 +48,7 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 		return false
 	}
 
-	_, exist := DB.Nodes[nodeID]
+	_, exist := DB.NodeIndex[nodeID]
 	return exist
 }
 
@@ -53,7 +59,7 @@ func (DB *Database) Node(nodeID uint32) (*models.Node, error) {
 		return nil, err
 	}
 
-	node, exists := DB.Nodes[nodeID]
+	node, exists := DB.NodeIndex[nodeID]
 	if !exists {
 		return nil, models.ErrNodeNotFoundDB
 	}
@@ -80,7 +86,7 @@ func (DB *Database) RandomSuccessor(nodeID uint32) (uint32, error) {
 		return math.MaxUint32, err
 	}
 
-	node, exists := DB.Nodes[nodeID]
+	node, exists := DB.NodeIndex[nodeID]
 	if !exists {
 		return math.MaxUint32, models.ErrNodeNotFoundDB
 	}
@@ -102,7 +108,7 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 		return nil, err
 	}
 
-	node, exists := DB.Nodes[nodeID]
+	node, exists := DB.NodeIndex[nodeID]
 	if !exists {
 		return nil, models.ErrNodeNotFoundDB
 	}
@@ -116,8 +122,8 @@ func (DB *Database) AllNodes() ([]uint32, error) {
 		return nil, err
 	}
 
-	nodeIDs := make([]uint32, 0, len(DB.Nodes))
-	for nodeID := range DB.Nodes {
+	nodeIDs := make([]uint32, 0, len(DB.NodeIndex))
+	for nodeID := range DB.NodeIndex {
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
@@ -130,7 +136,7 @@ func (DB *Database) NodeCount() int {
 	if DB == nil {
 		return 0
 	}
-	return len(DB.Nodes)
+	return len(DB.NodeIndex)
 }
 
 // ------------------------------------HELPERS----------------------------------
@@ -147,33 +153,33 @@ func SetupDB(DBType string) *Database {
 
 	case "dandling":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{Successors: []uint32{}, Timestamp: 0}
-		DB.Nodes[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
-		DB.Nodes[2] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
+		DB.NodeIndex[2] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
 		return DB
 
 	case "one-node0":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
 		return DB
 
 	case "one-node1":
 		DB := NewDatabase()
-		DB.Nodes[1] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[1] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
 		return DB
 
 	case "triangle":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
-		DB.Nodes[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
-		DB.Nodes[2] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
+		DB.NodeIndex[2] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
 		return DB
 
 	case "simple":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
-		DB.Nodes[1] = &models.Node{Successors: []uint32{}, Timestamp: 0}
-		DB.Nodes[2] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}, Timestamp: 0}
 		return DB
 
 	default:
@@ -203,7 +209,7 @@ func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 			randomSuccessors = append(randomSuccessors, succ)
 		}
 
-		DB.Nodes[uint32(i)] = &models.Node{Successors: randomSuccessors, Timestamp: 0}
+		DB.NodeIndex[uint32(i)] = &models.Node{Successors: randomSuccessors, Timestamp: 0}
 	}
 	return DB
 }

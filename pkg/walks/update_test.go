@@ -123,7 +123,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		// update the DB
 		commonSucc := []uint32{2}
-		DB.Nodes[nodeID].Successors = commonSucc
+		DB.NodeIndex[nodeID].Successors = commonSucc
 
 		rng := rand.New(rand.NewSource(5))
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
@@ -226,7 +226,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		// update the DB
 		currentSucc := []uint32{2}
-		DB.Nodes[nodeID].Successors = currentSucc
+		DB.NodeIndex[nodeID].Successors = currentSucc
 
 		rng := rand.New(rand.NewSource(5))
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
@@ -356,9 +356,9 @@ func TestUpdate(t *testing.T) {
 
 		// update one node at the time
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			oldSucc := DB1.Nodes[nodeID].Successors
-			newSucc := DB2.Nodes[nodeID].Successors
-			DB1.Nodes[nodeID].Successors = newSucc
+			oldSucc := DB1.NodeIndex[nodeID].Successors
+			newSucc := DB2.NodeIndex[nodeID].Successors
+			DB1.NodeIndex[nodeID].Successors = newSucc
 
 			// update the random walks
 			if err := RWM.Update(DB1, nodeID, oldSucc, newSucc); err != nil {
