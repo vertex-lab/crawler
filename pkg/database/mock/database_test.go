@@ -9,18 +9,12 @@ import (
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 )
 
-// grouping properties of a test together
-type testCases struct {
-	name          string
-	DBType        string
-	expectedError error
-	expectedNode  *models.Node
-	expectedSlice []uint32
-}
-
 func TestValidate(t *testing.T) {
-
-	testCases := []testCases{
+	testCases := []struct {
+		name          string
+		DBType        string
+		expectedError error
+	}{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
@@ -91,9 +85,72 @@ func TestContainsNode(t *testing.T) {
 	}
 }
 
-func TestNode(t *testing.T) {
+func TestAddNode(t *testing.T) {
+	testCases := []struct {
+		name           string
+		DBType         string
+		PubKey         string
+		expectedNodeID uint32
+		expectedError  error
+		expectedNode   *models.Node
+	}{
+		{
+			name:           "nil DB",
+			DBType:         "nil",
+			expectedNodeID: math.MaxUint32,
+			expectedError:  models.ErrNilDBPointer,
+		},
+		{
+			name:           "node already in the DB",
+			DBType:         "simple-with-mock-pks",
+			PubKey:         "one",
+			expectedNodeID: math.MaxUint32,
+			expectedError:  models.ErrNodeAlreadyInDB,
+		},
+		{
+			name:           "valid",
+			DBType:         "simple-with-mock-pks",
+			PubKey:         "three",
+			expectedNodeID: 3,
+			expectedNode:   &models.Node{PubKey: "three"},
+		},
+	}
 
-	testCases := []testCases{
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := SetupDB(test.DBType)
+
+			nodeID, err := DB.AddNode(test.PubKey, 0, nil, nil)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("AddNode(%v): expected %v, got %v", test.PubKey, test.expectedError, err)
+			}
+
+			if nodeID != test.expectedNodeID {
+				t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.PubKey, test.expectedNodeID, nodeID)
+			}
+
+			// check if data was added correctly
+			if nodeID != math.MaxUint32 {
+				node, err := DB.Node(nodeID)
+				if err != nil {
+					t.Fatalf("Node(%d): expected nil, got %v", nodeID, err)
+				}
+
+				if !reflect.DeepEqual(node, test.expectedNode) {
+					t.Errorf("AddNode(%v): expected node %v \n got %v", test.PubKey, test.expectedNode, node)
+				}
+			}
+		})
+	}
+}
+
+func TestNode(t *testing.T) {
+	testCases := []struct {
+		name          string
+		DBType        string
+		expectedError error
+		expectedNode  *models.Node
+	}{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
@@ -119,7 +176,6 @@ func TestNode(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			DB := SetupDB(test.DBType)
 			node, err := DB.Node(1)
 
@@ -134,12 +190,8 @@ func TestNode(t *testing.T) {
 					t.Fatalf("Node(1): expected node, got nil")
 				}
 
-				if node.Timestamp != test.expectedNode.Timestamp {
-					t.Errorf("Node(1): expected timestamp %v, got %v", test.expectedNode.Timestamp, node.Timestamp)
-				}
-
-				if !reflect.DeepEqual(node.Successors, test.expectedNode.Successors) {
-					t.Errorf("Node(1): expected successors %v, got %v", test.expectedNode.Successors, node.Successors)
+				if !reflect.DeepEqual(test.expectedNode, node) {
+					t.Errorf("Node(1): expected %v, got %v", test.expectedNode, node)
 				}
 			}
 		})
@@ -203,8 +255,12 @@ func TestRandomSuccessor(t *testing.T) {
 }
 
 func TestSuccessors(t *testing.T) {
-
-	testCases := []testCases{
+	testCases := []struct {
+		name          string
+		DBType        string
+		expectedError error
+		expectedSlice []uint32
+	}{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
@@ -254,7 +310,6 @@ func TestSuccessors(t *testing.T) {
 }
 
 func TestIsDandling(t *testing.T) {
-
 	testCases := []struct {
 		name       string
 		DBType     string
@@ -307,8 +362,12 @@ func TestIsDandling(t *testing.T) {
 }
 
 func TestAllNodes(t *testing.T) {
-
-	testCases := []testCases{
+	testCases := []struct {
+		name          string
+		DBType        string
+		expectedError error
+		expectedSlice []uint32
+	}{
 		{
 			name:          "nil DB",
 			DBType:        "nil",

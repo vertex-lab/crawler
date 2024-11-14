@@ -4,7 +4,7 @@ import "errors"
 
 // the basic structure of a node in the graph
 type Node struct {
-	Npub         string
+	PubKey       string
 	Timestamp    int64
 	Successors   []uint32
 	Predecessors []uint32
@@ -17,7 +17,7 @@ type Database interface {
 	Validate() error
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
-	AddNode(Npub string) (uint32, error)
+	// AddNode(Npub string) (uint32, error)
 
 	// ContainsNode() returns wheter a specified nodeID is found in the DB
 	ContainsNode(nodeID uint32) bool
@@ -40,3 +40,4 @@ type Database interface {
 var ErrNilDBPointer = errors.New("database pointer is nil")
 var ErrEmptyDB = errors.New("database is empty")
 var ErrNodeNotFoundDB = errors.New("node not found in the database")
+var ErrNodeAlreadyInDB = errors.New("node already in the database")

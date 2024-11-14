@@ -10,21 +10,29 @@ import (
 
 // simulates a simple graph database for testing.
 type Database struct {
-	KeyIndex  map[string]uint32
+
+	// a map that associates each public key with a unique nodeID
+	KeyIndex map[string]uint32
+
+	// a map that associates each nodeID with its node data
 	NodeIndex map[uint32]*models.Node
+
+	// the next nodeID to be used. When a new node is added, this fiels is incremented by one
+	NextNodeID uint32
 }
 
 // NewDatabase() creates and returns a new Database instance.
 func NewDatabase() *Database {
 	return &Database{
-		NodeIndex: make(map[uint32]*models.Node), // Initialize an empty map to store nodes.
+		KeyIndex:   make(map[string]uint32),
+		NodeIndex:  make(map[uint32]*models.Node),
+		NextNodeID: 0,
 	}
 }
 
 // Validate() returns an error if the DB is nil or has no nodes
 func (DB *Database) Validate() error {
 
-	// handle nil pointer
 	if DB == nil {
 		return models.ErrNilDBPointer
 	}
@@ -36,9 +44,31 @@ func (DB *Database) Validate() error {
 	return nil
 }
 
-// AddNode() adds a node to the database and returns its assigned nodeID
-func (DB *Database) AddNode(Npub string) (uint32, error) {
-	return 0, nil
+// AddNode() adds a node to the database and returns its assigned nodeID.
+// In case of errors, it returns MaxUint32 as the nodeID.
+func (DB *Database) AddNode(pk string, ts int64, succ, pred []uint32) (uint32, error) {
+
+	if DB == nil {
+		return math.MaxUint32, models.ErrNilDBPointer
+	}
+
+	if _, exist := DB.KeyIndex[pk]; exist {
+		return math.MaxUint32, models.ErrNodeAlreadyInDB
+	}
+
+	// add the node to the KeyIndex
+	nodeID := DB.NextNodeID
+	DB.NextNodeID++
+	DB.KeyIndex[pk] = nodeID
+
+	// add the node to the NodeIndex
+	DB.NodeIndex[nodeID] = &models.Node{
+		PubKey:       pk,
+		Timestamp:    ts,
+		Successors:   succ,
+		Predecessors: pred}
+
+	return nodeID, nil
 }
 
 // ContainsNode() returns whether nodeID is found in the DB
@@ -79,7 +109,7 @@ func (DB *Database) IsDandling(nodeID uint32) bool {
 }
 
 // RandomSuccessor() returns a random successor of nodeID. In case of error
-// it returns maxUint32.
+// it returns MaxUint32 as the nodeID.
 func (DB *Database) RandomSuccessor(nodeID uint32) (uint32, error) {
 
 	if err := DB.Validate(); err != nil {
@@ -180,6 +210,17 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
 		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}, Timestamp: 0}
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		return DB
+
+	case "simple-with-mock-pks":
+		DB := NewDatabase()
+		DB.KeyIndex["zero"] = 0
+		DB.KeyIndex["one"] = 1
+		DB.KeyIndex["two"] = 2
+		DB.NodeIndex[0] = &models.Node{PubKey: "zero", Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[1] = &models.Node{PubKey: "one", Successors: []uint32{}, Timestamp: 0}
+		DB.NodeIndex[2] = &models.Node{PubKey: "two", Successors: []uint32{}, Timestamp: 0}
+		DB.NextNodeID = 3
 		return DB
 
 	default:
