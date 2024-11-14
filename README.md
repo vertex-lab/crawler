@@ -22,15 +22,15 @@ This project implements the algorithms described in [this paper](http://snap.sta
 `/pkg/models/`: defines the fundamental interfaces and structures.
 
 `/pkg/store/`: contains two implementations of the `RandomWalkStore` interface, which deals with saving and fetching random walks from an in-memory database.
-- `/pkg/store/redis/`: Implementation using redis, for production use (WIP).
+- `/pkg/store/redistore/`: Implementation using redis, for production use (WIP).
 - `/pkg/store/mock/`: Implementation in-memory, for tests.
 
 `/pkg/database/`: contains two implementations of the `Database` interface, which deals with saving and fetching nodes and edges from a persistent database.
-- `/pkg/database/redis/`: Implementation using redis, for production use (WIP).
+- `/pkg/database/redisdb/`: Implementation using redis, for production use (WIP).
 - `/pkg/database/mock/`: Implementation in-memory, for tests.
 
 `/pkg/walks/`: responsible for all the logic around the random walks, including generating new random walks and updating existing ones.
 
 `/pkg/pagerank/`: contains the definitions of all algorithms that use random walks, such as pagerank and personalized pagerank.
 
-`/pkg/stochastic_tests/`: contains stochastic tests that ensure that the walk logic and the algorithms (pagerank, personalized pagerank) work as expected.
+`/pkg/stochastic_tests/`: contains stochastic tests that ensure that the walk logic and the algorithms (pagerank, personalized pagerank) work together as expected.

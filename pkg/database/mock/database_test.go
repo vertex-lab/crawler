@@ -87,32 +87,36 @@ func TestContainsNode(t *testing.T) {
 
 func TestAddNode(t *testing.T) {
 	testCases := []struct {
-		name           string
-		DBType         string
-		PubKey         string
-		expectedNodeID uint32
-		expectedError  error
-		expectedNode   *models.Node
+		name               string
+		DBType             string
+		PubKey             string
+		expectedNodeID     uint32
+		expectedNextNodeID uint32
+		expectedError      error
+		expectedNode       *models.Node
 	}{
 		{
-			name:           "nil DB",
-			DBType:         "nil",
-			expectedNodeID: math.MaxUint32,
-			expectedError:  models.ErrNilDBPointer,
+			name:               "nil DB",
+			DBType:             "nil",
+			expectedNodeID:     math.MaxUint32,
+			expectedNextNodeID: 0,
+			expectedError:      models.ErrNilDBPointer,
 		},
 		{
-			name:           "node already in the DB",
-			DBType:         "simple-with-mock-pks",
-			PubKey:         "one",
-			expectedNodeID: math.MaxUint32,
-			expectedError:  models.ErrNodeAlreadyInDB,
+			name:               "node already in the DB",
+			DBType:             "simple-with-mock-pks",
+			PubKey:             "one",
+			expectedNodeID:     math.MaxUint32,
+			expectedNextNodeID: 3,
+			expectedError:      models.ErrNodeAlreadyInDB,
 		},
 		{
-			name:           "valid",
-			DBType:         "simple-with-mock-pks",
-			PubKey:         "three",
-			expectedNodeID: 3,
-			expectedNode:   &models.Node{PubKey: "three"},
+			name:               "valid",
+			DBType:             "simple-with-mock-pks",
+			PubKey:             "three",
+			expectedNodeID:     3,
+			expectedNextNodeID: 4,
+			expectedNode:       &models.Node{PubKey: "three"},
 		},
 	}
 
@@ -125,8 +129,20 @@ func TestAddNode(t *testing.T) {
 				t.Fatalf("AddNode(%v): expected %v, got %v", test.PubKey, test.expectedError, err)
 			}
 
+			// check if nodeID has been assigned correctly
 			if nodeID != test.expectedNodeID {
 				t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.PubKey, test.expectedNodeID, nodeID)
+			}
+
+			// check if DB internals have been changed correctly
+			if DB != nil {
+				if DB.NextNodeID != test.expectedNextNodeID {
+					t.Errorf("AddNode(%v): expected NextNodeID = %v, got %v", test.PubKey, test.expectedNextNodeID, DB.NextNodeID)
+				}
+
+				if _, exist := DB.KeyIndex[test.PubKey]; !exist {
+					t.Errorf("AddNode(%v): node was not added to the KeyIndex", test.PubKey)
+				}
 			}
 
 			// check if data was added correctly
@@ -444,4 +460,8 @@ func TestNodeCount(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInterface(t *testing.T) {
+	var _ models.Database = &Database{}
 }

@@ -17,7 +17,7 @@ type Database interface {
 	Validate() error
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
-	// AddNode(Npub string) (uint32, error)
+	AddNode(pk string, ts int64, succ, pred []uint32) (uint32, error)
 
 	// ContainsNode() returns wheter a specified nodeID is found in the DB
 	ContainsNode(nodeID uint32) bool
