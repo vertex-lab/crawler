@@ -113,7 +113,7 @@ func TestNode(t *testing.T) {
 			name:          "DB with node 1",
 			DBType:        "one-node1",
 			expectedError: nil,
-			expectedNode:  &models.Node{ID: 1, Successors: []uint32{1}},
+			expectedNode:  &models.Node{Successors: []uint32{1}, Timestamp: 0},
 		},
 	}
 
@@ -131,11 +131,11 @@ func TestNode(t *testing.T) {
 			if test.expectedNode != nil {
 
 				if node == nil {
-					t.Fatalf("Node(1): expected node ID %d, got nil", test.expectedNode.ID)
+					t.Fatalf("Node(1): expected node, got nil")
 				}
 
-				if node.ID != test.expectedNode.ID {
-					t.Errorf("Node(1): expected node ID %d, got %d", test.expectedNode.ID, node.ID)
+				if node.Timestamp != test.expectedNode.Timestamp {
+					t.Errorf("Node(1): expected timestamp %v, got %v", test.expectedNode.Timestamp, node.Timestamp)
 				}
 
 				if !reflect.DeepEqual(node.Successors, test.expectedNode.Successors) {

@@ -79,11 +79,11 @@ func SetupGraph(graphType string) TestSetup {
 
 	switch graphType {
 	case "dandlings":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{}}
-		DB.Nodes[3] = &models.Node{ID: 3, Successors: []uint32{}}
-		DB.Nodes[4] = &models.Node{ID: 4, Successors: []uint32{}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[3] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[4] = &models.Node{Successors: []uint32{}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.20,
 			1: 0.20,
@@ -107,9 +107,9 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "triangle":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{2}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{0}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{2}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{0}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.3333,
 			1: 0.3333,
@@ -117,10 +117,10 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "cyclic1":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1, 3}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{2}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{0}}
-		DB.Nodes[3] = &models.Node{ID: 3, Successors: []uint32{}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1, 3}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{2}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{0}}
+		DB.Nodes[3] = &models.Node{Successors: []uint32{}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.29700319989476004,
 			1: 0.20616253803697476,
@@ -129,11 +129,11 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "acyclic1":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1, 2}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{3}}
-		DB.Nodes[3] = &models.Node{ID: 3, Successors: []uint32{1}}
-		DB.Nodes[4] = &models.Node{ID: 4, Successors: []uint32{}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1, 2}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{3}}
+		DB.Nodes[3] = &models.Node{Successors: []uint32{1}}
+		DB.Nodes[4] = &models.Node{Successors: []uint32{}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.11185368285521291,
 			1: 0.36950360789646736,
@@ -174,12 +174,12 @@ func SetupGraph(graphType string) TestSetup {
 			{OldSuccessors: []uint32{0, 1}},
 		}
 	case "acyclic2":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1, 2}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{}}
-		DB.Nodes[3] = &models.Node{ID: 3, Successors: []uint32{}}
-		DB.Nodes[4] = &models.Node{ID: 4, Successors: []uint32{3, 5}}
-		DB.Nodes[5] = &models.Node{ID: 5, Successors: []uint32{}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1, 2}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[3] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[4] = &models.Node{Successors: []uint32{3, 5}}
+		DB.Nodes[5] = &models.Node{Successors: []uint32{}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.12987025255292317,
 			1: 0.18506487372353833,
@@ -221,10 +221,10 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "acyclic3":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1, 2}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{}}
-		DB.Nodes[3] = &models.Node{ID: 3, Successors: []uint32{1, 2}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1, 2}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[3] = &models.Node{Successors: []uint32{1, 2}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.17543839772251532,
 			1: 0.32456160227748454,
@@ -251,10 +251,10 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "acyclic4":
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1, 2}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{}}
-		DB.Nodes[3] = &models.Node{ID: 3, Successors: []uint32{1}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1, 2}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{}}
+		DB.Nodes[3] = &models.Node{Successors: []uint32{1}}
 		expectedPR = pagerank.PagerankMap{
 			0: 0.17543839772251535,
 			1: 0.3991232045549693,
@@ -288,14 +288,14 @@ func SetupGraph(graphType string) TestSetup {
 		expectedPR = make(pagerank.PagerankMap, 50)
 		expectedPPR0 = make(pagerank.PagerankMap, 50)
 		for nodeID := uint32(0); nodeID < 49; nodeID++ {
-			DB.Nodes[nodeID] = &models.Node{ID: nodeID, Successors: []uint32{nodeID + 1}}
+			DB.Nodes[nodeID] = &models.Node{Successors: []uint32{nodeID + 1}}
 
 			expectedPR[nodeID] = 1.0 / 50.0
 			expectedPPR0[nodeID] = 0.15 * math.Pow(0.85, float64(nodeID))
 		}
 
 		// closing the big cycle
-		DB.Nodes[49] = &models.Node{ID: 49, Successors: []uint32{0}}
+		DB.Nodes[49] = &models.Node{Successors: []uint32{0}}
 		expectedPR[49] = 1.0 / 50.0
 		expectedPPR0[49] = 0.15 * math.Pow(0.85, float64(49))
 
@@ -314,7 +314,7 @@ func SetupGraph(graphType string) TestSetup {
 
 	default:
 		// just one node
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{}}
 		expectedPR = pagerank.PagerankMap{0: 1.0}
 		expectedPPR0 = pagerank.PagerankMap{0: 1.0}
 	}

@@ -147,33 +147,33 @@ func SetupDB(DBType string) *Database {
 
 	case "dandling":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{2}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{1}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
 		return DB
 
 	case "one-node0":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{0}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
 		return DB
 
 	case "one-node1":
 		DB := NewDatabase()
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{1}}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
 		return DB
 
 	case "triangle":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{2}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{0}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
 		return DB
 
 	case "simple":
 		DB := NewDatabase()
-		DB.Nodes[0] = &models.Node{ID: 0, Successors: []uint32{1}}
-		DB.Nodes[1] = &models.Node{ID: 1, Successors: []uint32{}}
-		DB.Nodes[2] = &models.Node{ID: 2, Successors: []uint32{}}
+		DB.Nodes[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.Nodes[1] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		DB.Nodes[2] = &models.Node{Successors: []uint32{}, Timestamp: 0}
 		return DB
 
 	default:
@@ -203,7 +203,7 @@ func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 			randomSuccessors = append(randomSuccessors, succ)
 		}
 
-		DB.Nodes[uint32(i)] = &models.Node{ID: uint32(i), Successors: randomSuccessors}
+		DB.Nodes[uint32(i)] = &models.Node{Successors: randomSuccessors, Timestamp: 0}
 	}
 	return DB
 }
