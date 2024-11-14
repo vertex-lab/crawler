@@ -1,4 +1,4 @@
-package redistore
+package redisutils
 
 import (
 	"errors"

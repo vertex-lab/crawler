@@ -1,4 +1,4 @@
-package walks
+package sliceutils
 
 import (
 	"math/rand"

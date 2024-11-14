@@ -1,17 +1,11 @@
-package walks
+package sliceutils
 
 import (
 	"slices"
 	"sort"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	mock "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 )
-
-// function that returns a RWM setup based on the RWMType.
-func SetupRWM(RWMType string) *RandomWalkManager {
-	return &RandomWalkManager{Store: mock.SetupRWS(RWMType)}
-}
 
 /*
 returns the difference between slice1 and slice2; in set notation:
@@ -26,7 +20,6 @@ func Difference(slice1, slice2 []uint32) []uint32 {
 	// Sort both slices first
 	slices.Sort(slice1)
 	slices.Sort(slice2)
-
 	difference := []uint32{}
 
 	i, j := 0, 0
@@ -66,7 +59,6 @@ func Partition(slice1, slice2 []uint32) ([]uint32, []uint32, []uint32) {
 	// Sort both slices first
 	slices.Sort(slice1)
 	slices.Sort(slice2)
-
 	removed := []uint32{}
 	common := []uint32{}
 	added := []uint32{}

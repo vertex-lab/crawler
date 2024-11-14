@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/redisutils"
 	"github.com/redis/go-redis/v9"
 )
 
 func TestNewRWS(t *testing.T) {
 
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name          string
@@ -70,8 +71,8 @@ func TestNewRWS(t *testing.T) {
 }
 
 func TestLoadRWS(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name          string
@@ -115,8 +116,8 @@ func TestLoadRWS(t *testing.T) {
 }
 
 func TestIsEmpty(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name          string
@@ -157,8 +158,8 @@ func TestIsEmpty(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name          string
@@ -221,8 +222,8 @@ func TestValidate(t *testing.T) {
 }
 
 func TestContainsNode(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name             string
@@ -272,8 +273,8 @@ func TestContainsNode(t *testing.T) {
 }
 
 func TestVisitCount(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name           string
@@ -317,8 +318,8 @@ func TestVisitCount(t *testing.T) {
 }
 
 func TestWalks(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name            string
@@ -379,8 +380,8 @@ func TestWalks(t *testing.T) {
 }
 
 func TestAddWalk(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
@@ -440,7 +441,7 @@ func TestAddWalk(t *testing.T) {
 			t.Fatalf("HGet(): expected nil, got %v", err)
 		}
 
-		lastWalkID, err := ParseID(strLastWalkID)
+		lastWalkID, err := redisutils.ParseID(strLastWalkID)
 		if err != nil {
 			t.Fatalf("ParseID(): expected nil, got %v", err)
 		}
@@ -455,7 +456,7 @@ func TestAddWalk(t *testing.T) {
 			t.Fatalf("Get(): expected nil, got %v", err)
 		}
 
-		loadedWalk, err := ParseWalk(strWalk)
+		loadedWalk, err := redisutils.ParseWalk(strWalk)
 		if err != nil {
 			t.Fatalf("ParseWalk(): expected nil, got %v", err)
 		}
@@ -475,7 +476,7 @@ func TestAddWalk(t *testing.T) {
 			}
 
 			// Parse it to a walkID
-			loadedWalkID, err := ParseID(strWalkID)
+			loadedWalkID, err := redisutils.ParseID(strWalkID)
 			if err != nil {
 				t.Fatalf("ParseID(): expected nil, got %v", err)
 			}
@@ -489,8 +490,8 @@ func TestAddWalk(t *testing.T) {
 }
 
 func TestPruneGraftWalk(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
@@ -598,7 +599,7 @@ func TestPruneGraftWalk(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Get(): expected nil, got %v", err)
 				}
-				walk, err := ParseWalk(strWalk)
+				walk, err := redisutils.ParseWalk(strWalk)
 				if err != nil {
 					t.Errorf("ParseWalk(%v): expected nil, got %v", strWalk, err)
 				}
@@ -638,8 +639,8 @@ func TestPruneGraftWalk(t *testing.T) {
 }
 
 func TestCommonWalks(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name            string
@@ -707,8 +708,8 @@ func TestCommonWalks(t *testing.T) {
 }
 
 func TestWalksRand(t *testing.T) {
-	cl := SetupClient()
-	defer CleanupRedis(cl)
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name                   string

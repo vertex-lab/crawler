@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/sliceutils"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -122,7 +123,7 @@ func (p *PersonalizedWalk) AppendNode(nextNodeID uint32) {
 func (p *PersonalizedWalk) AppendWalk(walkSegment models.RandomWalk) {
 
 	// remove potential cycles
-	walkSegment = walks.TrimCycles(p.currentWalk, walkSegment)
+	walkSegment = sliceutils.TrimCycles(p.currentWalk, walkSegment)
 
 	// append
 	p.currentWalk = append(p.currentWalk, walkSegment...)
@@ -141,7 +142,7 @@ To avoid the overhead of continually fetching walks from the RWS, the requests
 are batched and the walks are stored in the WalkCache struct.
 */
 func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
-	nodeID uint32, targetLength int, rng *rand.Rand) ([]uint32, error) {
+	nodeID uint32, targetLength int, rng *rand.Rand) (models.RandomWalk, error) {
 
 	WC := NewWalkCache()
 	pWalk := NewPersonalizedWalk(nodeID, targetLength)

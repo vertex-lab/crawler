@@ -30,3 +30,8 @@ func NewRWM(storeType string,
 		return &RandomWalkManager{Store: RWS}, nil
 	}
 }
+
+// function that returns a RWM setup based on the RWMType.
+func SetupRWM(RWMType string) *RandomWalkManager {
+	return &RandomWalkManager{Store: mock.SetupRWS(RWMType)}
+}

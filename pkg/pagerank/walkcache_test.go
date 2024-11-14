@@ -8,6 +8,7 @@ import (
 	mockdb "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
 	mockstore "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/sliceutils"
 	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
 )
 
@@ -234,7 +235,7 @@ func TestLoad(t *testing.T) {
 					}
 
 					// sort walks in lexographic order
-					walks := walks.SortWalks(WC.NodeWalks[test.nodeID])
+					walks := sliceutils.SortWalks(WC.NodeWalks[test.nodeID])
 
 					if !reflect.DeepEqual(walks, expectedWalks) {
 						t.Errorf("Load(): expected %v, got %v", expectedWalks, walks)
@@ -269,7 +270,7 @@ func TestLoad(t *testing.T) {
 
 		// check each walkSlice (sorted in lexographic order)
 		for _, nodeID := range nodeIDs {
-			walkSlice := walks.SortWalks(WC.NodeWalks[nodeID])
+			walkSlice := sliceutils.SortWalks(WC.NodeWalks[nodeID])
 			if !reflect.DeepEqual(walkSlice, expectedWalks[nodeID]) {
 				t.Errorf("Load(): nodeID = %v, expected %v, got %v", nodeID, expectedWalks[nodeID], walkSlice)
 			}

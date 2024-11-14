@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/sliceutils"
 )
 
 /*
@@ -37,7 +38,7 @@ func (RWM *RandomWalkManager) Update(DB models.Database, nodeID uint32,
 func (RWM *RandomWalkManager) update(DB models.Database, nodeID uint32,
 	oldSucc []uint32, currentSucc []uint32, rng *rand.Rand) error {
 
-	removedSucc, commonSucc, addesSucc := Partition(oldSucc, currentSucc)
+	removedSucc, commonSucc, addesSucc := sliceutils.Partition(oldSucc, currentSucc)
 
 	if err := RWM.updateRemovedNodes(DB, nodeID, removedSucc, commonSucc, rng); err != nil {
 		return err
@@ -159,7 +160,7 @@ func generateWalkSegment(DB models.Database, candidateNodes []uint32, currentWal
 	}
 
 	// remove potential cycles
-	return DeleteCyclesInPlace(currentWalk, newWalkSegment), nil
+	return sliceutils.DeleteCyclesInPlace(currentWalk, newWalkSegment), nil
 }
 
 /*

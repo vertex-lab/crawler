@@ -2,9 +2,11 @@ package redistore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/redisutils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,7 +18,7 @@ type RandomWalkStore struct {
 	walksPerNode uint16
 }
 
-// RWSFields are the fields of the RandomWalkStore in Redis. This struct is used for serialize and deserialize.
+// RWSFields are the fields of the RWS in Redis. This struct is used for serialize and deserialize.
 type RWSFields struct {
 	Alpha        float32 `redis:"alpha"`
 	WalksPerNode uint16  `redis:"walksPerNode"`
@@ -225,7 +227,7 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
 	}
 
-	return ParseWalkMap(result)
+	return redisutils.ParseWalkMap(result)
 }
 
 /*
@@ -274,7 +276,7 @@ func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
 	}
 
-	return ParseWalkMap(result)
+	return redisutils.ParseWalkMap(result)
 }
 
 // CommonWalks returns a map of walks by walkID that contain both nodeID and at
@@ -338,7 +340,7 @@ func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
 	}
 
-	return ParseWalkMap(result)
+	return redisutils.ParseWalkMap(result)
 }
 
 // AddWalk() adds the walk to the WalkIndex. It also adds the walkID to the
@@ -365,7 +367,7 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 	pipe := RWS.client.TxPipeline()
 
 	// add the walk to the WalkIndex
-	pipe.Set(RWS.ctx, KeyWalk(uint32(walkID)), FormatWalk(walk), 0)
+	pipe.Set(RWS.ctx, KeyWalk(uint32(walkID)), redisutils.FormatWalk(walk), 0)
 
 	// add the walkID to each node
 	for _, nodeID := range walk {
@@ -400,7 +402,7 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 	if err != nil {
 		return err
 	}
-	walk, err := ParseWalk(strWalk)
+	walk, err := redisutils.ParseWalk(strWalk)
 	if err != nil {
 		return err
 	}
@@ -424,7 +426,7 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 
 	// prune and graft operation on the walk
 	newWalk := append(walk[:cutIndex], walkSegment...)
-	pipe.Set(RWS.ctx, KeyWalk(walkID), FormatWalk(newWalk), 0)
+	pipe.Set(RWS.ctx, KeyWalk(walkID), redisutils.FormatWalk(newWalk), 0)
 
 	// Execute the transaction
 	if _, err = pipe.Exec(RWS.ctx); err != nil {
@@ -433,3 +435,120 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 
 	return nil
 }
+
+// SetupRWS returns a RandomWalkStore ready to be used in tests
+func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
+	if cl == nil {
+		return nil, ErrNilClientPointer
+	}
+
+	switch RWSType {
+	case "nil":
+		return nil, nil
+
+	case "empty":
+		RWS, err := NewRWS(context.Background(), cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+		return RWS, nil
+
+	case "one-node0":
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walk := models.RandomWalk{0}
+		if err := cl.Set(ctx, KeyWalk(0), redisutils.FormatWalk(walk), 0).Err(); err != nil {
+			return nil, err
+		}
+
+		if err := cl.SAdd(ctx, KeyNodeWalkIDs(0), 0).Err(); err != nil {
+			return nil, err
+		}
+
+		return RWS, nil
+
+	case "one-walk0":
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walk := models.RandomWalk{0, 1, 2, 3}
+		if err := cl.Set(ctx, KeyWalk(0), redisutils.FormatWalk(walk), 0).Err(); err != nil {
+			return nil, err
+		}
+
+		for _, nodeID := range walk {
+			if err := cl.SAdd(ctx, KeyNodeWalkIDs(nodeID), 0).Err(); err != nil {
+				return nil, err
+			}
+		}
+
+		return RWS, nil
+
+	case "triangle":
+		// 0 --> 1 --> 2 --> 0
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walks := []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
+		for _, walk := range walks {
+			if err := RWS.AddWalk(walk); err != nil {
+				return nil, err
+			}
+		}
+
+		return RWS, nil
+
+	case "complex":
+		// 0 --> 1 --> 2
+		// 0 --> 3
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walks := []models.RandomWalk{{0, 1, 2}, {0, 3}, {1, 2}}
+		for _, walk := range walks {
+			if err := RWS.AddWalk(walk); err != nil {
+				return nil, err
+			}
+		}
+		return RWS, nil
+
+	default:
+		return nil, nil
+	}
+}
+
+//----------------------------------REDIS-KEYS----------------------------------
+
+const KeyRWS string = "RWS"
+const KeyAlpha string = "alpha"
+const KeyWalksPerNode string = "walksPerNode"
+const KeyLastWalkID string = "lastWalkID"
+const KeyWalkPrefix string = "walk:"
+const KeyNodeWalkIDsPrefix string = "nodeWalkIDs:"
+
+// KeyWalk() returns the Redis key for the walk with specified walkID
+func KeyWalk(walkID uint32) string {
+	return fmt.Sprintf("%v%d", KeyWalkPrefix, walkID)
+}
+
+// KeyNodeWalkIDs() returns the Redis key for the nodeWalkIDs with specified nodeID
+func KeyNodeWalkIDs(nodeID uint32) string {
+	return fmt.Sprintf("%v%d", KeyNodeWalkIDsPrefix, nodeID)
+}
+
+//---------------------------------ERROR-CODES---------------------------------
+
+var ErrNilClientPointer = errors.New("nil redis client pointer")
