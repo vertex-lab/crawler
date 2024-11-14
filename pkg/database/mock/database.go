@@ -160,8 +160,8 @@ func (DB *Database) AllNodes() ([]uint32, error) {
 	return nodeIDs, nil
 }
 
-// NodeCount() returns the number of nodes in the DB (ignores errors).
-func (DB *Database) NodeCount() int {
+// Size() returns the number of nodes in the DB (ignores errors).
+func (DB *Database) Size() int {
 
 	if DB == nil {
 		return 0

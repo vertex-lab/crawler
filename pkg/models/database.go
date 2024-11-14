@@ -31,8 +31,8 @@ type Database interface {
 	// AllNodes() returns a slice with the IDs of all nodes in the DB
 	AllNodes() ([]uint32, error)
 
-	// NodeCount() returns the number of nodes in the DB (ignores errors).
-	NodeCount() int
+	// Size() returns the number of nodes in the DB (ignores errors).
+	Size() int
 }
 
 //--------------------------ERROR-CODES--------------------------

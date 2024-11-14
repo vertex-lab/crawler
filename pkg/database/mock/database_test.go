@@ -453,10 +453,10 @@ func TestNodeCount(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			count := DB.NodeCount()
+			count := DB.Size()
 
 			if count != test.expectedCount {
-				t.Errorf("NodeCount(): expected %v, got %v", test.expectedCount, count)
+				t.Errorf("Size(): expected %v, got %v", test.expectedCount, count)
 			}
 		})
 	}
