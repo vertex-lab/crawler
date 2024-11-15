@@ -13,7 +13,6 @@ import (
 )
 
 func TestNewRWS(t *testing.T) {
-
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 

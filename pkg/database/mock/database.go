@@ -224,7 +224,7 @@ func SetupDB(DBType string) *Database {
 		return DB
 
 	default:
-		return nil // Default to nil for unrecognized scenarios
+		return nil // default to nil
 	}
 }
 

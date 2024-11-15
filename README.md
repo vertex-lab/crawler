@@ -19,10 +19,10 @@ This project implements the algorithms described in [this paper](http://snap.sta
 - listen for graph updates (e.g. a node is added, or a node has changed it's out-edges)
 - update the random walks
 
-`/pkg/models/`: defines the fundamental interfaces and structures.
+`/pkg/models/`: defines the fundamental interfaces and structures that are used across packages
 
 `/pkg/store/`: contains two implementations of the `RandomWalkStore` interface, which deals with saving and fetching random walks from an in-memory database.
-- `/pkg/store/redistore/`: Implementation using redis, for production use (WIP).
+- `/pkg/store/redistore/`: Implementation using redis, for production use.
 - `/pkg/store/mock/`: Implementation in-memory, for tests.
 
 `/pkg/database/`: contains two implementations of the `Database` interface, which deals with saving and fetching nodes and edges from a persistent database.
@@ -33,4 +33,4 @@ This project implements the algorithms described in [this paper](http://snap.sta
 
 `/pkg/pagerank/`: contains the definitions of all algorithms that use random walks, such as pagerank and personalized pagerank.
 
-`/pkg/stochastic_tests/`: contains stochastic tests that ensure that the walk logic and the algorithms (pagerank, personalized pagerank) work together as expected.
+`/tests/stochastic/`: contains stochastic tests that ensure that the walk logic and the algorithms (pagerank, personalized pagerank) work together as expected.

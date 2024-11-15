@@ -10,7 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RandomWalkStore fullfills the RandomWalkStore interface defined in models
+// RandomWalkStore fulfills the RandomWalkStore interface defined in models
 type RandomWalkStore struct {
 	client       *redis.Client
 	ctx          context.Context

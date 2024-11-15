@@ -34,7 +34,6 @@ func TestValidate(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			DB := SetupDB(test.DBType)
 			err := DB.Validate()
 
