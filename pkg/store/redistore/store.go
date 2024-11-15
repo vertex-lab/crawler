@@ -106,14 +106,14 @@ func (RWS *RandomWalkStore) WalksPerNode() uint16 {
 	return RWS.walksPerNode
 }
 
-// IsEmpty() returns false if "walk:0" is found in Redis, otherwise true.
+// IsEmpty() returns false if the size of the hash key "walks" is > 0, otherwise true.
 func (RWS *RandomWalkStore) IsEmpty() bool {
 	if RWS == nil {
 		return true
 	}
 
-	_, err := RWS.client.Get(RWS.ctx, KeyWalk(0)).Result()
-	return err != nil
+	len, err := RWS.client.HLen(RWS.ctx, KeyWalks).Result()
+	return err != nil || len == 0
 }
 
 // ContainsNode() returns whether RWS contains a given nodeID, meaning if
@@ -125,7 +125,7 @@ func (RWS *RandomWalkStore) ContainsNode(nodeID uint32) bool {
 		return false
 	}
 
-	exist, err := RWS.client.Exists(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
+	exist, err := RWS.client.Exists(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
 	if err != nil {
 		return false
 	}
@@ -183,7 +183,7 @@ func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
 		return 0
 	}
 
-	visits, err := RWS.client.SCard(RWS.ctx, KeyNodeWalkIDs(nodeID)).Result()
+	visits, err := RWS.client.SCard(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
 	if err != nil {
 		return 0
 	}
@@ -205,24 +205,24 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 	luaScript := `
         local nodeID = KEYS[1]
 		local limit = ARGV[1]
-        local KeyWalkPrefix = ARGV[2]
+        local KeyWalks = ARGV[2]
 
-        -- Get all walkIDs for the node
+        -- Get some walkIDs from the walks visiting nodeID
         local walkIDs = redis.call("SRANDMEMBER", nodeID, limit)
-        local walks = {}
-
-        -- For each walkID, retrieve the corresponding walk
-        for _, walkID in ipairs(walkIDs) do
-            local walk = redis.call("GET", KeyWalkPrefix .. walkID)
-            table.insert(walks, walk)
-        end
+        
+		if not walkIDs or #walkIDs == 0 then
+			return {{}, {}}
+		end
+		
+		-- Get the walks associated with the walkIDs
+		local walks = redis.call("HMGET", KeyWalks, unpack(walkIDs))
 
         -- Return both walkIDs and walks as two parallel arrays
         return {walkIDs, walks}
     `
 	// execute the Lua script
-	keys := []string{KeyNodeWalkIDs(nodeID)}
-	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, limit, KeyWalkPrefix).Result()
+	keys := []string{KeyWalksVisiting(nodeID)}
+	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, limit, KeyWalks).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
 	}
@@ -248,29 +248,28 @@ func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
 	luaScript := `
 		local nodeID = KEYS[1]
 		local probability = tonumber(ARGV[1])
-		local KeyWalkPrefix = ARGV[2]
+		local KeyWalks = ARGV[2]
 		local cardinality = redis.call("SCARD", nodeID)
 
 		-- Round up to the nearest integer
 		local expectedSize = math.floor(cardinality * probability + 0.5) 
 		
-		-- Get random members from the set based on the expected size
+		-- Get some walkIDs from the walks visiting nodeID
 		local walkIDs = redis.call("SRANDMEMBER", nodeID, expectedSize)
 		
-		local walks = {}
-		
-		-- For each walkID, retrieve the corresponding walk
-		for _, walkID in ipairs(walkIDs) do
-			local walk = redis.call("GET", KeyWalkPrefix .. walkID)
-			table.insert(walks, walk)
+		if not walkIDs or #walkIDs == 0 then
+			return {{}, {}}
 		end
 		
-		-- Return both walkIDs and walks as two parallel arrays
-		return {walkIDs, walks}
+		-- Get the walks associated with the walkIDs
+		local walks = redis.call("HMGET", KeyWalks, unpack(walkIDs))
+
+        -- Return both walkIDs and walks as two parallel arrays
+        return {walkIDs, walks}
     `
 	// execute the Lua script
-	keys := []string{KeyNodeWalkIDs(nodeID)}
-	args := []interface{}{probabilityOfSelection, KeyWalkPrefix}
+	keys := []string{KeyWalksVisiting(nodeID)}
+	args := []interface{}{probabilityOfSelection, KeyWalks}
 	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, args...).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
@@ -295,7 +294,7 @@ func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
 			table.insert(removedNodes, KEYS[i])
 		end
 
-		local KeyWalkPrefix = ARGV[1]
+		local KeyWalks = ARGV[1]
 		
 		-- Get walk IDs associated with the main nodeID
 		local nodeWalkIDs = redis.call("SMEMBERS", nodeID)
@@ -310,32 +309,32 @@ func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
 		end
 		
 		-- Find the intersection of nodeWalkIDs and unionRemovedNodesWalkIDs
-		local candidateWalkIDs = {}
+		local walkIDs = {}
 		for _, walkID in ipairs(nodeWalkIDs) do
 			if unionRemovedNodesWalkIDs[walkID] then
-				table.insert(candidateWalkIDs, walkID)
+				table.insert(walkIDs, walkID)
 			end
 		end
-		
-		-- Fetch the walk for each candidate walkID
-		local candidateWalks = {}
-		for _, walkID in ipairs(candidateWalkIDs) do
-			local walk = redis.call("GET", KeyWalkPrefix .. walkID)
-			table.insert(candidateWalks, walk)
+
+		if not walkIDs or #walkIDs == 0 then
+			return {{}, {}}
 		end
 		
-		-- Return both candidateWalkIDs and candidateWalks as two parallel arrays
-		return {candidateWalkIDs, candidateWalks}
+		-- Get the walks associated with the walkIDs
+		local walks = redis.call("HMGET", KeyWalks, unpack(walkIDs))
+
+		-- Return both walkIDs and walks as two parallel arrays
+		return {walkIDs, walks}
 	`
 
 	// format the keys
-	keys := []string{KeyNodeWalkIDs(nodeID)}
+	keys := []string{KeyWalksVisiting(nodeID)}
 	for _, removedNode := range removedNodes {
-		keys = append(keys, KeyNodeWalkIDs(removedNode))
+		keys = append(keys, KeyWalksVisiting(removedNode))
 	}
 
 	// execute the Lua script
-	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, KeyWalkPrefix).Result()
+	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, KeyWalks).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
 	}
@@ -366,12 +365,12 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 	// begin the transaction
 	pipe := RWS.client.TxPipeline()
 
-	// add the walk to the WalkIndex
-	pipe.Set(RWS.ctx, KeyWalk(uint32(walkID)), redisutils.FormatWalk(walk), 0)
+	// add the walk to the walks HASH
+	pipe.HSet(RWS.ctx, KeyWalks, redisutils.FormatID(uint32(walkID)), redisutils.FormatWalk(walk))
 
 	// add the walkID to each node
 	for _, nodeID := range walk {
-		pipe.SAdd(RWS.ctx, KeyNodeWalkIDs(nodeID), walkID)
+		pipe.SAdd(RWS.ctx, KeyWalksVisiting(nodeID), walkID)
 	}
 
 	// execute the transaction
@@ -398,7 +397,8 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 	}
 
 	// fetch and parse the walk by the walkID
-	strWalk, err := RWS.client.Get(RWS.ctx, KeyWalk(walkID)).Result()
+	walkIDKey := redisutils.FormatID(walkID)
+	strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, walkIDKey).Result()
 	if err != nil {
 		return err
 	}
@@ -416,17 +416,17 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 
 	// remove the walkID form each pruned node
 	for _, prunedNodeID := range walk[cutIndex:] {
-		pipe.SRem(RWS.ctx, KeyNodeWalkIDs(prunedNodeID), walkID)
+		pipe.SRem(RWS.ctx, KeyWalksVisiting(prunedNodeID), walkID)
 	}
 
 	// add the walkID to each grafted node
 	for _, graftedNodeID := range walkSegment {
-		pipe.SAdd(RWS.ctx, KeyNodeWalkIDs(graftedNodeID), walkID)
+		pipe.SAdd(RWS.ctx, KeyWalksVisiting(graftedNodeID), walkID)
 	}
 
 	// prune and graft operation on the walk
 	newWalk := append(walk[:cutIndex], walkSegment...)
-	pipe.Set(RWS.ctx, KeyWalk(walkID), redisutils.FormatWalk(newWalk), 0)
+	pipe.HSet(RWS.ctx, KeyWalks, walkIDKey, redisutils.FormatWalk(newWalk))
 
 	// Execute the transaction
 	if _, err = pipe.Exec(RWS.ctx); err != nil {
@@ -461,11 +461,11 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walk := models.RandomWalk{0}
-		if err := cl.Set(ctx, KeyWalk(0), redisutils.FormatWalk(walk), 0).Err(); err != nil {
+		if err := cl.HSet(ctx, KeyWalks, "0", redisutils.FormatWalk(walk)).Err(); err != nil {
 			return nil, err
 		}
 
-		if err := cl.SAdd(ctx, KeyNodeWalkIDs(0), 0).Err(); err != nil {
+		if err := cl.SAdd(ctx, KeyWalksVisiting(0), 0).Err(); err != nil {
 			return nil, err
 		}
 
@@ -479,12 +479,12 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walk := models.RandomWalk{0, 1, 2, 3}
-		if err := cl.Set(ctx, KeyWalk(0), redisutils.FormatWalk(walk), 0).Err(); err != nil {
+		if err := cl.HSet(ctx, KeyWalks, "0", redisutils.FormatWalk(walk)).Err(); err != nil {
 			return nil, err
 		}
 
 		for _, nodeID := range walk {
-			if err := cl.SAdd(ctx, KeyNodeWalkIDs(nodeID), 0).Err(); err != nil {
+			if err := cl.SAdd(ctx, KeyWalksVisiting(nodeID), 0).Err(); err != nil {
 				return nil, err
 			}
 		}
@@ -536,17 +536,17 @@ const KeyRWS string = "RWS"
 const KeyAlpha string = "alpha"
 const KeyWalksPerNode string = "walksPerNode"
 const KeyLastWalkID string = "lastWalkID"
-const KeyWalkPrefix string = "walk:"
-const KeyNodeWalkIDsPrefix string = "nodeWalkIDs:"
+const KeyWalks string = "walks"
+const KeyWalksVisitingPrefix string = "walksVisiting:"
 
-// KeyWalk() returns the Redis key for the walk with specified walkID
-func KeyWalk(walkID uint32) string {
-	return fmt.Sprintf("%v%d", KeyWalkPrefix, walkID)
-}
+// // KeyWalk() returns the Redis key for the walk with specified walkID
+// func KeyWalk(walkID uint32) string {
+// 	return fmt.Sprintf("%v%d", KeyWalks, walkID)
+// }
 
-// KeyNodeWalkIDs() returns the Redis key for the nodeWalkIDs with specified nodeID
-func KeyNodeWalkIDs(nodeID uint32) string {
-	return fmt.Sprintf("%v%d", KeyNodeWalkIDsPrefix, nodeID)
+// KeyWalksVisiting() returns the Redis key for the nodeWalkIDs with specified nodeID
+func KeyWalksVisiting(nodeID uint32) string {
+	return fmt.Sprintf("%v%d", KeyWalksVisitingPrefix, nodeID)
 }
 
 //---------------------------------ERROR-CODES---------------------------------

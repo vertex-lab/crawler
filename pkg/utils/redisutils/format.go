@@ -39,6 +39,11 @@ func ParseWalk(strWalk string) (models.RandomWalk, error) {
 	return walk, nil
 }
 
+// FormatID() formats a nodeID or walkID (uint32) into a string
+func FormatID(ID uint32) string {
+	return strconv.FormatUint(uint64(ID), 10)
+}
+
 // ParseID() parses a nodeID or walkID (uint32) from the specified string
 func ParseID(strVal string) (uint32, error) {
 	parsedVal, err := strconv.ParseUint(strVal, 10, 32)
