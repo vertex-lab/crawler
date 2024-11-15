@@ -80,14 +80,14 @@ RWS = HASH {     alpha: <alpha>,
 
 #### walks
 
-The `walks` is a Redis hash maps each walkID to a walk, which is a strings of nodeIDs separated by commas e.g.  `"0,1,2,3,4"`.
+The `walks` is a Redis hash that maps each walkID to a walk, which is a strings of nodeIDs separated by commas e.g.  `"0,1,2,3,4"`.
 
 ```
 walks = HASH { <walkID>: <walk> }
 ```
 
 **Note**: we could have implemented this as a bunch Redis strings `walk:<walkID>`.
-For fetching a batch of walks, instead of using the build in `HMGET` we should have do something like
+For fetching a batch of walks, instead of using the built-in `HMGET` we should have do something like
 
 ```lua
 -- Lua script to retrieve multiple keys
@@ -100,7 +100,7 @@ end
 return results
 ```
 
-The following table shows the relative speed of this script vs the `HGET` command:
+The following table shows the relative speed of this script vs the `HMGET` command:
 
 | batch size | STRINGS (lua script) | HASH (HMGET) |
 | ---------- | -------------------- | ------------ |
