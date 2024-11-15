@@ -75,26 +75,28 @@ func TestLoadRWS(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		RMType        string
+		RWSType       string
 		expectedError error
 		// ADD CONTEXT TESTS
 	}{
 		{
 			name:          "RWS not set",
-			RMType:        "nil",
+			RWSType:       "nil",
 			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "valid",
-			RMType:        "empty",
+			RWSType:       "empty",
 			expectedError: nil,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			if _, err := SetupRWS(cl, test.RWSType); err != nil {
+				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+			}
 
-			SetupRWS(cl, test.RMType)
 			RWS, err := LoadRWS(context.Background(), cl)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("LoadRWS(): expected %v, got %v", test.expectedError, err)

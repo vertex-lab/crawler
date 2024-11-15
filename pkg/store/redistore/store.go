@@ -43,7 +43,7 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 		LastWalkID:   -1, // the first ID will be 0, since we increment and return with HIncrBy
 	}
 
-	if err := cl.HSet(ctx, "RWS", fields).Err(); err != nil {
+	if err := cl.HSet(ctx, KeyRWS, fields).Err(); err != nil {
 		return nil, err
 	}
 

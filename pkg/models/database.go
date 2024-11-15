@@ -4,8 +4,10 @@ import "errors"
 
 // the basic structure of a node in the graph
 type Node struct {
-	PubKey       string
-	Timestamp    int64
+	PubKey       string  `redis:"pubkey"`
+	Timestamp    int64   `redis:"timestamp"`
+	Status       string  `redis:"status"`
+	Pagerank     float32 `redis:"pagerank"`
 	Successors   []uint32
 	Predecessors []uint32
 }
@@ -17,7 +19,7 @@ type Database interface {
 	Validate() error
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
-	AddNode(pk string, ts int64, succ, pred []uint32) (uint32, error)
+	AddNode(*Node) (uint32, error)
 
 	// ContainsNode() returns wheter a specified nodeID is found in the DB
 	ContainsNode(nodeID uint32) bool

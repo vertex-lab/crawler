@@ -18,7 +18,7 @@ type Database struct {
 	NodeIndex map[uint32]*models.Node
 
 	// the next nodeID to be used. When a new node is added, this fiels is incremented by one
-	NextNodeID uint32
+	LastNodeID int
 }
 
 // NewDatabase() creates and returns a new Database instance.
@@ -26,7 +26,7 @@ func NewDatabase() *Database {
 	return &Database{
 		KeyIndex:   make(map[string]uint32),
 		NodeIndex:  make(map[uint32]*models.Node),
-		NextNodeID: 0,
+		LastNodeID: -1, // the first nodeID will be 0
 	}
 }
 
@@ -46,28 +46,23 @@ func (DB *Database) Validate() error {
 
 // AddNode() adds a node to the database and returns its assigned nodeID.
 // In case of errors, it returns MaxUint32 as the nodeID.
-func (DB *Database) AddNode(pk string, ts int64, succ, pred []uint32) (uint32, error) {
+func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 
 	if DB == nil {
 		return math.MaxUint32, models.ErrNilDBPointer
 	}
 
-	if _, exist := DB.KeyIndex[pk]; exist {
+	if _, exist := DB.KeyIndex[node.PubKey]; exist {
 		return math.MaxUint32, models.ErrNodeAlreadyInDB
 	}
 
 	// add the node to the KeyIndex
-	nodeID := DB.NextNodeID
-	DB.NextNodeID++
-	DB.KeyIndex[pk] = nodeID
+	nodeID := uint32(DB.LastNodeID + 1)
+	DB.LastNodeID++
+	DB.KeyIndex[node.PubKey] = nodeID
 
 	// add the node to the NodeIndex
-	DB.NodeIndex[nodeID] = &models.Node{
-		PubKey:       pk,
-		Timestamp:    ts,
-		Successors:   succ,
-		Predecessors: pred}
-
+	DB.NodeIndex[nodeID] = node
 	return nodeID, nil
 }
 
@@ -220,7 +215,7 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[0] = &models.Node{PubKey: "zero", Successors: []uint32{1}, Timestamp: 0}
 		DB.NodeIndex[1] = &models.Node{PubKey: "one", Successors: []uint32{}, Timestamp: 0}
 		DB.NodeIndex[2] = &models.Node{PubKey: "two", Successors: []uint32{}, Timestamp: 0}
-		DB.NextNodeID = 3
+		DB.LastNodeID = 2
 		return DB
 
 	default:

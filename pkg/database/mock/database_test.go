@@ -90,7 +90,7 @@ func TestAddNode(t *testing.T) {
 		DBType             string
 		PubKey             string
 		expectedNodeID     uint32
-		expectedNextNodeID uint32
+		expectedLastNodeID int
 		expectedError      error
 		expectedNode       *models.Node
 	}{
@@ -98,7 +98,7 @@ func TestAddNode(t *testing.T) {
 			name:               "nil DB",
 			DBType:             "nil",
 			expectedNodeID:     math.MaxUint32,
-			expectedNextNodeID: 0,
+			expectedLastNodeID: -1,
 			expectedError:      models.ErrNilDBPointer,
 		},
 		{
@@ -106,7 +106,7 @@ func TestAddNode(t *testing.T) {
 			DBType:             "simple-with-mock-pks",
 			PubKey:             "one",
 			expectedNodeID:     math.MaxUint32,
-			expectedNextNodeID: 3,
+			expectedLastNodeID: 2,
 			expectedError:      models.ErrNodeAlreadyInDB,
 		},
 		{
@@ -114,7 +114,7 @@ func TestAddNode(t *testing.T) {
 			DBType:             "simple-with-mock-pks",
 			PubKey:             "three",
 			expectedNodeID:     3,
-			expectedNextNodeID: 4,
+			expectedLastNodeID: 3,
 			expectedNode:       &models.Node{PubKey: "three"},
 		},
 	}
@@ -123,7 +123,12 @@ func TestAddNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			nodeID, err := DB.AddNode(test.PubKey, 0, nil, nil)
+			node := &models.Node{
+				PubKey:    test.PubKey,
+				Timestamp: 0,
+			}
+
+			nodeID, err := DB.AddNode(node)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("AddNode(%v): expected %v, got %v", test.PubKey, test.expectedError, err)
 			}
@@ -135,8 +140,8 @@ func TestAddNode(t *testing.T) {
 
 			// check if DB internals have been changed correctly
 			if DB != nil {
-				if DB.NextNodeID != test.expectedNextNodeID {
-					t.Errorf("AddNode(%v): expected NextNodeID = %v, got %v", test.PubKey, test.expectedNextNodeID, DB.NextNodeID)
+				if DB.LastNodeID != test.expectedLastNodeID {
+					t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", test.PubKey, test.expectedLastNodeID, DB.LastNodeID)
 				}
 
 				if _, exist := DB.KeyIndex[test.PubKey]; !exist {
