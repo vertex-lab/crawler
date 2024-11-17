@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/redisutils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -43,11 +44,25 @@ func NewDatabase(ctx context.Context, cl *redis.Client) (*Database, error) {
 	return DB, nil
 }
 
-// Validate() returns an error if the DB is nil or has no nodes
-func (DB *Database) Validate() error {
+// validateFields() check if DB and client are nil and returns the appropriare error
+func (DB *Database) validateFields() error {
 
 	if DB == nil {
 		return models.ErrNilDBPointer
+	}
+
+	if DB.client == nil {
+		return ErrNilClientPointer
+	}
+
+	return nil
+}
+
+// Validate() returns an error if the DB is nil or has no nodes
+func (DB *Database) Validate() error {
+
+	if err := DB.validateFields(); err != nil {
+		return err
 	}
 
 	len, err := DB.client.HLen(DB.ctx, KeyKeyIndex).Result()
@@ -62,18 +77,15 @@ func (DB *Database) Validate() error {
 	return nil
 }
 
-// AddNode() adds a node to the database and returns its assigned nodeID
+// AddNode() adds a node to the database and returns its assigned nodeID.
 func (DB *Database) AddNode(node *models.Node) (uint32, error) {
-	if DB == nil {
-		return math.MaxUint32, models.ErrNilDBPointer
-	}
 
-	if DB.client == nil {
-		return math.MaxUint32, ErrNilClientPointer
+	if err := DB.validateFields(); err != nil {
+		return math.MaxUint32, err
 	}
 
 	// check if pubkey already exists in the DB
-	exist, err := DB.client.HExists(DB.ctx, KeyKeyIndex, node.PubKey).Result()
+	exist, err := DB.client.HExists(DB.ctx, KeyKeyIndex, node.Metadata.PubKey).Result()
 	if err != nil {
 		return math.MaxUint32, err
 	}
@@ -81,8 +93,9 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 		return math.MaxUint32, models.ErrNodeAlreadyInDB
 	}
 
-	// get the next nodeID
-	nextNodeID, err := DB.client.HIncrBy(DB.ctx, KeyDatabase, KeyLastNodeID, 1).Result()
+	// get the nodeID outside the transaction. This implies that there might be "holes",
+	// meaning IDs not associated with any node
+	nodeID, err := DB.client.HIncrBy(DB.ctx, KeyDatabase, KeyLastNodeID, 1).Result()
 	if err != nil {
 		return math.MaxUint32, err
 	}
@@ -91,16 +104,65 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	pipe := DB.client.TxPipeline()
 
 	// add pubkey to the KeyIndex
-	pipe.HSetNX(DB.ctx, KeyKeyIndex, node.PubKey, nextNodeID)
+	pipe.HSetNX(DB.ctx, KeyKeyIndex, node.Metadata.PubKey, nodeID)
 
-	// add the node data in a new hash
-	pipe.HSet(DB.ctx, KeyNode(uint32(nextNodeID)), node)
+	// add the node metadata in a node HASH
+	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata)
 
+	// add successors and predecessors
+	AddSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
+	AddPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
+
+	// execute the transaction
 	if _, err := pipe.Exec(DB.ctx); err != nil {
 		return math.MaxUint32, err
 	}
 
-	return uint32(nextNodeID), nil
+	return uint32(nodeID), nil
+}
+
+// AddSuccessors() adds the successors of nodeID to the database
+func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, succ []uint32) {
+
+	if len(succ) == 0 {
+		return // early return to avoid errors
+	}
+
+	// format successors
+	strSucc := make([]string, 0, len(succ))
+	for _, s := range succ {
+		strSucc = append(strSucc, redisutils.FormatID(s))
+	}
+
+	// add successors to the follows set of nodeID
+	pipe.SAdd(ctx, KeyFollows(nodeID), strSucc)
+
+	// add nodeID to the followers of the other nodes
+	for _, followedNodeID := range succ {
+		pipe.SAdd(ctx, KeyFollowers(followedNodeID), nodeID)
+	}
+}
+
+// AddPredecessors() adds the predecessors of nodeID to the database
+func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, pred []uint32) {
+
+	if len(pred) == 0 {
+		return // early return to avoid errors
+	}
+
+	// format predecessors
+	strPred := make([]string, 0, len(pred))
+	for _, p := range pred {
+		strPred = append(strPred, redisutils.FormatID(p))
+	}
+
+	// add predecessors to the followers set of nodeID
+	pipe.SAdd(ctx, KeyFollowers(nodeID), strPred)
+
+	// add nodeID to the follows of the other nodes
+	for _, followersNodeID := range pred {
+		pipe.SAdd(ctx, KeyFollows(followersNodeID), nodeID)
+	}
 }
 
 // function that returns a DB setup based on the DBType
@@ -137,8 +199,8 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 			return nil, err
 		}
 
-		// add node0 related data
-		fields := models.Node{
+		// add node0  metadata
+		fields := models.NodeMeta{
 			PubKey:    "zero",
 			Timestamp: 1731685733,
 			Status:    "idk",
@@ -161,10 +223,22 @@ const KeyDatabase string = "database"
 const KeyLastNodeID string = "lastNodeID"
 const KeyKeyIndex string = "keyIndex"
 const KeyNodePrefix string = "node:"
+const KeyFollowsPrefix string = "follows:"
+const KeyFollowersPrefix string = "followers:"
 
-// KeyWalk() returns the Redis key for the walk with specified walkID
-func KeyNode(nodeID uint32) string {
+// KeyNode() returns the Redis key for the node with specified nodeID
+func KeyNode(nodeID interface{}) string {
 	return fmt.Sprintf("%v%d", KeyNodePrefix, nodeID)
+}
+
+// KeyFollows() returns the Redis key for the follows of the specified nodeID
+func KeyFollows(nodeID interface{}) string {
+	return fmt.Sprintf("%v%d", KeyFollowsPrefix, nodeID)
+}
+
+// KeyFollowers() returns the Redis key for the followers of the specified nodeID
+func KeyFollowers(nodeID interface{}) string {
+	return fmt.Sprintf("%v%d", KeyFollowersPrefix, nodeID)
 }
 
 //---------------------------------ERROR-CODES---------------------------------

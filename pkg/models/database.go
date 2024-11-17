@@ -2,12 +2,17 @@ package models
 
 import "errors"
 
+// the metadata about a node in the graph, meaning everything that is not a relationship
+type NodeMeta struct {
+	PubKey    string  `redis:"pubkey"`
+	Timestamp int64   `redis:"timestamp"`
+	Status    string  `redis:"status"`
+	Pagerank  float32 `redis:"pagerank"`
+}
+
 // the basic structure of a node in the graph
 type Node struct {
-	PubKey       string  `redis:"pubkey"`
-	Timestamp    int64   `redis:"timestamp"`
-	Status       string  `redis:"status"`
-	Pagerank     float32 `redis:"pagerank"`
+	Metadata     NodeMeta
 	Successors   []uint32
 	Predecessors []uint32
 }

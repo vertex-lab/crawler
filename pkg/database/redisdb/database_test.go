@@ -52,117 +52,243 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestAddNode(t *testing.T) {
+func TestAddSuccessors(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
-	testCases := []struct {
-		name               string
-		DBType             string
-		PubKey             string
-		expectedNodeID     uint32
-		expectedLastNodeID int
-		expectedError      error
-		expectedNode       *models.Node
-	}{
-		{
-			name:               "nil DB",
-			DBType:             "nil",
-			expectedNodeID:     math.MaxUint32,
-			expectedLastNodeID: -1,
-			expectedError:      models.ErrNilDBPointer,
-		},
-		{
-			name:               "node already in the DB",
-			DBType:             "one-node0",
-			PubKey:             "zero",
-			expectedNodeID:     math.MaxUint32,
-			expectedLastNodeID: 0,
-			expectedError:      models.ErrNodeAlreadyInDB,
-		},
-		{
-			name:               "valid",
-			DBType:             "one-node0",
-			PubKey:             "one",
-			expectedNodeID:     1,
-			expectedLastNodeID: 1,
-			expectedNode:       &models.Node{PubKey: "one"},
-		},
+	nodeID := uint32(0)
+	successors := []uint32{1, 2, 3}
+
+	pipe := cl.TxPipeline()
+	ctx := context.Background()
+
+	AddSuccessors(ctx, pipe, nodeID, successors)
+	if _, err := pipe.Exec(ctx); err != nil {
+		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-			DB, err := SetupDB(cl, test.DBType)
-			if err != nil {
-				t.Fatalf("SetupDB(): expected nil, got %v", err)
-			}
+	// check the follows of nodeID are correctly added
+	follows, err := cl.SMembers(ctx, KeyFollows(nodeID)).Result()
+	if err != nil {
+		t.Errorf("SMembers(): expected nil, got %v", err)
+	}
+	// parse the follows
+	followIDs := make([]uint32, 0, len(follows))
+	for _, follow := range follows {
+		followID, err := redisutils.ParseID(follow)
+		if err != nil {
+			t.Fatalf("ParseID(%v): expected nil, got %v", follow, err)
+		}
+		followIDs = append(followIDs, followID)
+	}
 
-			node := &models.Node{
-				PubKey:    test.PubKey,
-				Timestamp: 0,
-			}
+	if !reflect.DeepEqual(followIDs, successors) {
+		t.Fatalf("AddSuccessors(): expected %v, got %v", successors, followIDs)
+	}
 
-			nodeID, err := DB.AddNode(node)
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("AddNode(%v): expected %v, got %v", test.PubKey, test.expectedError, err)
-			}
+	// check the succ have nodeID as a follower
+	for _, succ := range successors {
 
-			// check if nodeID has been assigned correctly
-			if nodeID != test.expectedNodeID {
-				t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.PubKey, test.expectedNodeID, nodeID)
-			}
+		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
+		if err != nil {
+			t.Errorf("IsMember(): expected nil, got %v", err)
+		}
 
-			if DB != nil {
+		if !isMember {
+			t.Fatalf("AddSuccessors(): expected nodeID = %d part of followers:%d", nodeID, succ)
+		}
+	}
+}
+
+func TestAddPredecessors(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	nodeID := uint32(0)
+	predecessors := []uint32{1, 2, 3}
+
+	pipe := cl.TxPipeline()
+	ctx := context.Background()
+
+	AddPredecessors(ctx, pipe, nodeID, predecessors)
+	if _, err := pipe.Exec(ctx); err != nil {
+		t.Fatalf("Exec(): expected nil, got %v", err)
+	}
+
+	// check the followers of nodeID are correctly added
+	followers, err := cl.SMembers(ctx, KeyFollowers(nodeID)).Result()
+	if err != nil {
+		t.Errorf("SMembers(): expected nil, got %v", err)
+	}
+	// parse the follows
+	followerIDs := make([]uint32, 0, len(followers))
+	for _, follower := range followers {
+		followerID, err := redisutils.ParseID(follower)
+		if err != nil {
+			t.Fatalf("ParseID(%v): expected nil, got %v", follower, err)
+		}
+		followerIDs = append(followerIDs, followerID)
+	}
+
+	if !reflect.DeepEqual(followerIDs, predecessors) {
+		t.Fatalf("AddSuccessors(): expected %v, got %v", predecessors, followerIDs)
+	}
+
+	// check the pred have nodeID as a follows
+	for _, pred := range predecessors {
+
+		isMember, err := cl.SIsMember(ctx, KeyFollows(pred), redisutils.FormatID(nodeID)).Result()
+		if err != nil {
+			t.Errorf("IsMember(): expected nil, got %v", err)
+		}
+
+		if !isMember {
+			t.Fatalf("AddSuccessors(): expected nodeID = %d part of follows:%d", nodeID, pred)
+		}
+	}
+}
+
+func TestAddNode(t *testing.T) {
+	cl := redisutils.SetupClient()
+
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []struct {
+			name           string
+			DBType         string
+			expectedNodeID uint32
+			expectedError  error
+			Node           *models.Node
+		}{
+			{
+				name:           "nil DB",
+				DBType:         "nil",
+				expectedNodeID: math.MaxUint32,
+				expectedError:  models.ErrNilDBPointer,
+				Node:           &models.Node{},
+			},
+			{
+				name:           "node already in the DB",
+				DBType:         "one-node0",
+				expectedNodeID: math.MaxUint32,
+				expectedError:  models.ErrNodeAlreadyInDB,
+				Node:           &models.Node{Metadata: models.NodeMeta{PubKey: "zero"}},
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				DB, err := SetupDB(cl, test.DBType)
+				defer redisutils.CleanupRedis(cl)
+
+				if err != nil {
+					t.Fatalf("SetupDB(): expected nil, got %v", err)
+				}
+
+				nodeID, err := DB.AddNode(test.Node)
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
+				}
+
+				// check if nodeID has been assigned correctly
+				if nodeID != test.expectedNodeID {
+					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		testCases := []struct {
+			name               string
+			DBType             string
+			Node               *models.Node
+			expectedNodeID     uint32
+			expectedLastNodeID int
+			expectedError      error
+		}{
+			{
+				name:               "just Pubkey",
+				DBType:             "one-node0",
+				Node:               &models.Node{Metadata: models.NodeMeta{PubKey: "one"}},
+				expectedNodeID:     1,
+				expectedLastNodeID: 1,
+			},
+			{
+				name:               "all meta fields",
+				DBType:             "one-node0",
+				expectedNodeID:     1,
+				expectedLastNodeID: 1,
+				Node: &models.Node{
+					Metadata: models.NodeMeta{
+						PubKey:    "one",
+						Timestamp: 0,
+						Status:    "not-crawled",
+						Pagerank:  0.0,
+					},
+				},
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				ctx := context.Background()
+				defer redisutils.CleanupRedis(cl)
+
+				DB, err := SetupDB(cl, test.DBType)
+				if err != nil {
+					t.Fatalf("SetupDB(): expected nil, got %v", err)
+				}
+
+				nodeID, err := DB.AddNode(test.Node)
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
+				}
+
+				// check if nodeID has been assigned correctly
+				if nodeID != test.expectedNodeID {
+					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
+				}
+
 				// check if database HASH was updated correctly
-				cmdReturn := cl.HMGet(ctx, KeyDatabase, KeyLastNodeID)
-				if cmdReturn.Err() != nil {
+				cmdReturnDB := cl.HMGet(ctx, KeyDatabase, KeyLastNodeID)
+				if cmdReturnDB.Err() != nil {
 					t.Errorf("HMGet(): expected nil, got %v", err)
 				}
-
 				var fields DatabaseFields
-				if err := cmdReturn.Scan(&fields); err != nil {
+				if err := cmdReturnDB.Scan(&fields); err != nil {
 					t.Errorf("Scan(): expected nil, got %v", err)
 				}
-
 				if fields.LastNodeID != test.expectedLastNodeID {
-					t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", test.PubKey, test.expectedLastNodeID, fields.LastNodeID)
+					t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", test.Node, test.expectedLastNodeID, fields.LastNodeID)
 				}
-			}
-
-			// check if node data was added correctly
-			if test.expectedNodeID != math.MaxUint32 {
 
 				// check if the node was added to the keyIndex correctly
-				strNodeID, err := cl.HGet(ctx, KeyKeyIndex, test.PubKey).Result()
+				strNodeID, err := cl.HGet(ctx, KeyKeyIndex, test.Node.Metadata.PubKey).Result()
 				if err != nil {
 					t.Errorf("HGet(): expected nil, got %v", err)
 				}
-
-				nodeID, err := redisutils.ParseID(strNodeID)
+				LoadedNodeID, err := redisutils.ParseID(strNodeID)
 				if err != nil {
 					t.Errorf("ParseID(%v): expected nil, got %v", strNodeID, err)
 				}
-
-				if nodeID != test.expectedNodeID {
-					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.PubKey, test.expectedNodeID, nodeID)
+				if LoadedNodeID != test.expectedNodeID {
+					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
 				}
 
 				// check if node HASH was added correctly
-				cmdReturn := cl.HGetAll(ctx, KeyNode(test.expectedNodeID))
-				if cmdReturn.Err() != nil {
+				cmdReturnNode := cl.HGetAll(ctx, KeyNode(test.expectedNodeID))
+				if cmdReturnNode.Err() != nil {
 					t.Errorf("HGetAll(): expected nil, got %v", err)
 				}
-
-				var node models.Node
-				if err := cmdReturn.Scan(&node); err != nil {
+				var nodeMeta models.NodeMeta
+				if err := cmdReturnNode.Scan(&nodeMeta); err != nil {
 					t.Errorf("Scan(): expected nil, got %v", err)
 				}
-
-				if !reflect.DeepEqual(&node, test.expectedNode) {
-					t.Errorf("AddNode(%v): expected node %v \n got %v", test.PubKey, test.expectedNode, node)
+				if !reflect.DeepEqual(nodeMeta, test.Node.Metadata) {
+					t.Errorf("AddNode(): expected node %v \n got %v", test.Node.Metadata, nodeMeta)
 				}
-			}
-		})
-	}
+			})
+		}
+	})
+
 }

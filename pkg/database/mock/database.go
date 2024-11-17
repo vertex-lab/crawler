@@ -52,14 +52,14 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 		return math.MaxUint32, models.ErrNilDBPointer
 	}
 
-	if _, exist := DB.KeyIndex[node.PubKey]; exist {
+	if _, exist := DB.KeyIndex[node.Metadata.PubKey]; exist {
 		return math.MaxUint32, models.ErrNodeAlreadyInDB
 	}
 
 	// add the node to the KeyIndex
 	nodeID := uint32(DB.LastNodeID + 1)
 	DB.LastNodeID++
-	DB.KeyIndex[node.PubKey] = nodeID
+	DB.KeyIndex[node.Metadata.PubKey] = nodeID
 
 	// add the node to the NodeIndex
 	DB.NodeIndex[nodeID] = node
@@ -178,33 +178,33 @@ func SetupDB(DBType string) *Database {
 
 	case "dandling":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{}, Timestamp: 0}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
 		return DB
 
 	case "one-node0":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{0}}
 		return DB
 
 	case "one-node1":
 		DB := NewDatabase()
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
 		return DB
 
 	case "triangle":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}, Timestamp: 0}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{0}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{0}}
 		return DB
 
 	case "simple":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}, Timestamp: 0}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}, Timestamp: 0}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{}}
 		return DB
 
 	case "simple-with-mock-pks":
@@ -212,9 +212,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex["zero"] = 0
 		DB.KeyIndex["one"] = 1
 		DB.KeyIndex["two"] = 2
-		DB.NodeIndex[0] = &models.Node{PubKey: "zero", Successors: []uint32{1}, Timestamp: 0}
-		DB.NodeIndex[1] = &models.Node{PubKey: "one", Successors: []uint32{}, Timestamp: 0}
-		DB.NodeIndex[2] = &models.Node{PubKey: "two", Successors: []uint32{}, Timestamp: 0}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: "one", Timestamp: 0}, Successors: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: "two", Timestamp: 0}, Successors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -245,7 +245,9 @@ func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 			randomSuccessors = append(randomSuccessors, succ)
 		}
 
-		DB.NodeIndex[uint32(i)] = &models.Node{Successors: randomSuccessors, Timestamp: 0}
+		DB.NodeIndex[uint32(i)] = &models.Node{
+			Metadata:   models.NodeMeta{Timestamp: 0},
+			Successors: randomSuccessors}
 	}
 	return DB
 }

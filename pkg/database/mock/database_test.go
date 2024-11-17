@@ -88,11 +88,10 @@ func TestAddNode(t *testing.T) {
 	testCases := []struct {
 		name               string
 		DBType             string
-		PubKey             string
+		Node               *models.Node
 		expectedNodeID     uint32
 		expectedLastNodeID int
 		expectedError      error
-		expectedNode       *models.Node
 	}{
 		{
 			name:               "nil DB",
@@ -104,18 +103,19 @@ func TestAddNode(t *testing.T) {
 		{
 			name:               "node already in the DB",
 			DBType:             "simple-with-mock-pks",
-			PubKey:             "one",
 			expectedNodeID:     math.MaxUint32,
 			expectedLastNodeID: 2,
 			expectedError:      models.ErrNodeAlreadyInDB,
+			Node: &models.Node{
+				Metadata: models.NodeMeta{PubKey: "one"}},
 		},
 		{
 			name:               "valid",
 			DBType:             "simple-with-mock-pks",
-			PubKey:             "three",
 			expectedNodeID:     3,
 			expectedLastNodeID: 3,
-			expectedNode:       &models.Node{PubKey: "three"},
+			Node: &models.Node{
+				Metadata: models.NodeMeta{PubKey: "three"}},
 		},
 	}
 
@@ -123,29 +123,24 @@ func TestAddNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			node := &models.Node{
-				PubKey:    test.PubKey,
-				Timestamp: 0,
-			}
-
-			nodeID, err := DB.AddNode(node)
+			nodeID, err := DB.AddNode(test.Node)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("AddNode(%v): expected %v, got %v", test.PubKey, test.expectedError, err)
+				t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
 			}
 
 			// check if nodeID has been assigned correctly
 			if nodeID != test.expectedNodeID {
-				t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.PubKey, test.expectedNodeID, nodeID)
+				t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
 			}
 
 			// check if DB internals have been changed correctly
 			if DB != nil {
 				if DB.LastNodeID != test.expectedLastNodeID {
-					t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", test.PubKey, test.expectedLastNodeID, DB.LastNodeID)
+					t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", test.Node, test.expectedLastNodeID, DB.LastNodeID)
 				}
 
-				if _, exist := DB.KeyIndex[test.PubKey]; !exist {
-					t.Errorf("AddNode(%v): node was not added to the KeyIndex", test.PubKey)
+				if _, exist := DB.KeyIndex[test.Node.Metadata.PubKey]; !exist {
+					t.Errorf("AddNode(%v): node was not added to the KeyIndex", test.Node.Metadata.PubKey)
 				}
 			}
 
@@ -156,8 +151,8 @@ func TestAddNode(t *testing.T) {
 					t.Fatalf("Node(%d): expected nil, got %v", nodeID, err)
 				}
 
-				if !reflect.DeepEqual(node, test.expectedNode) {
-					t.Errorf("AddNode(%v): expected node %v \n got %v", test.PubKey, test.expectedNode, node)
+				if !reflect.DeepEqual(node, test.Node) {
+					t.Errorf("AddNode(%v): expected node %v \n got %v", test.Node, test.Node, node)
 				}
 			}
 		})
@@ -190,7 +185,9 @@ func TestNode(t *testing.T) {
 			name:          "DB with node 1",
 			DBType:        "one-node1",
 			expectedError: nil,
-			expectedNode:  &models.Node{Successors: []uint32{1}, Timestamp: 0},
+			expectedNode: &models.Node{
+				Metadata:   models.NodeMeta{Timestamp: 0},
+				Successors: []uint32{1}},
 		},
 	}
 
