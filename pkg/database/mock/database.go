@@ -140,6 +140,29 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 	return node.Successors, nil
 }
 
+// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
+// If a pubkey is not found, nil is returned
+func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
+
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	nodeIDs := make([]interface{}, 0, len(pubkeys))
+	for _, pubkey := range pubkeys {
+
+		nodeID, exist := DB.KeyIndex[pubkey]
+		if !exist {
+			nodeIDs = append(nodeIDs, nil)
+			continue
+		}
+
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+
+	return nodeIDs, nil
+}
+
 // All returns a slice with the IDs of all nodes in the mock GraphDB
 func (DB *Database) AllNodes() ([]uint32, error) {
 

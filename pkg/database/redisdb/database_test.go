@@ -461,6 +461,57 @@ func TestSuccessors(t *testing.T) {
 	}
 }
 
+func TestNodeIDs(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name            string
+		DBType          string
+		pubkeys         []string
+		expectedError   error
+		expectedNodeIDs []interface{}
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:            "one pubkey not found DB",
+			DBType:          "one-node0",
+			pubkeys:         []string{"four"},
+			expectedError:   nil,
+			expectedNodeIDs: []interface{}{nil},
+		},
+		{
+			name:            "one pubkey found DB",
+			DBType:          "one-node0",
+			pubkeys:         []string{"zero"},
+			expectedError:   nil,
+			expectedNodeIDs: []interface{}{uint32(0)},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			nodeIDs, err := DB.NodeIDs(test.pubkeys)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NodeIDs(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(nodeIDs, test.expectedNodeIDs) {
+				t.Errorf("NodeIDs(): expected %v, got %v", test.expectedNodeIDs, nodeIDs)
+			}
+		})
+	}
+}
+
 func TestAllNodes(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)

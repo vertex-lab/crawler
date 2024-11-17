@@ -378,6 +378,56 @@ func TestIsDandling(t *testing.T) {
 	}
 }
 
+func TestNodeIDs(t *testing.T) {
+	testCases := []struct {
+		name            string
+		DBType          string
+		pubkeys         []string
+		expectedError   error
+		expectedNodeIDs []interface{}
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			expectedError: models.ErrEmptyDB,
+		},
+		{
+			name:            "one pubkey not found DB",
+			DBType:          "simple-with-mock-pks",
+			pubkeys:         []string{"four"},
+			expectedError:   nil,
+			expectedNodeIDs: []interface{}{nil},
+		},
+		{
+			name:            "one pubkey found DB",
+			DBType:          "simple-with-mock-pks",
+			pubkeys:         []string{"one"},
+			expectedError:   nil,
+			expectedNodeIDs: []interface{}{uint32(1)},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := SetupDB(test.DBType)
+
+			nodeIDs, err := DB.NodeIDs(test.pubkeys)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NodeIDs(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(nodeIDs, test.expectedNodeIDs) {
+				t.Errorf("NodeIDs(): expected %v, got %v", test.expectedNodeIDs, nodeIDs)
+			}
+		})
+	}
+}
+
 func TestAllNodes(t *testing.T) {
 	testCases := []struct {
 		name          string

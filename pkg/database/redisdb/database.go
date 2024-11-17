@@ -226,6 +226,34 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 	return successors, nil
 }
 
+// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
+// If a pubkey is not found, nil is returned
+func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
+
+	if err := DB.validateFields(); err != nil {
+		return nil, err
+	}
+
+	nodeIDs, err := DB.client.HMGet(DB.ctx, KeyKeyIndex, pubkeys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	for i, strNodeID := range nodeIDs {
+
+		// whatever is not nil, parse it to uint32
+		if strNodeID != nil {
+			nodeID, err := redisutils.ParseID(strNodeID.(string))
+			if err != nil {
+				return nil, err
+			}
+			nodeIDs[i] = nodeID
+		}
+	}
+
+	return nodeIDs, err
+}
+
 // AllNodes() returns a slice with the IDs of all nodes in the DB
 func (DB *Database) AllNodes() ([]uint32, error) {
 

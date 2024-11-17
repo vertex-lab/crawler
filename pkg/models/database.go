@@ -35,6 +35,10 @@ type Database interface {
 	// Successors() returns a slice that contains the IDs of all successors of a node
 	Successors(nodeID uint32) ([]uint32, error)
 
+	// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
+	// If a pubkey is not found, nil is returned
+	NodeIDs(pubkeys []string) ([]interface{}, error)
+
 	// AllNodes() returns a slice with the IDs of all nodes in the DB
 	AllNodes() ([]uint32, error)
 
