@@ -202,6 +202,76 @@ func (DB *Database) IsDandling(nodeID uint32) bool {
 	return card == 0
 }
 
+// Successors() returns a slice that contains the IDs of all successors of a node
+func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
+
+	if err := DB.validateFields(); err != nil {
+		return nil, err
+	}
+
+	strSucc, err := DB.client.SMembers(DB.ctx, KeyFollows(nodeID)).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	successors := make([]uint32, 0, len(strSucc))
+	for _, ID := range strSucc {
+		succ, err := redisutils.ParseID(ID)
+		if err != nil {
+			return nil, err
+		}
+
+		successors = append(successors, succ)
+	}
+	return successors, nil
+}
+
+// AllNodes() returns a slice with the IDs of all nodes in the DB
+func (DB *Database) AllNodes() ([]uint32, error) {
+
+	if err := DB.validateFields(); err != nil {
+		return nil, err
+	}
+
+	strNodeIDs, err := DB.client.HVals(DB.ctx, KeyKeyIndex).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(strNodeIDs) == 0 {
+		return nil, models.ErrEmptyDB
+	}
+
+	nodeIDs := make([]uint32, 0, len(strNodeIDs))
+	for _, ID := range strNodeIDs {
+
+		nodeID, err := redisutils.ParseID(ID)
+		if err != nil {
+			return nil, err
+		}
+
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+
+	return nodeIDs, nil
+}
+
+// Size() returns the number of nodes in the DB. In case of errors, it returns
+// the default value of 0.
+func (DB *Database) Size() int {
+
+	if err := DB.validateFields(); err != nil {
+		return 0
+	}
+
+	size, err := DB.client.HLen(DB.ctx, KeyKeyIndex).Result()
+	if err != nil {
+		return 0
+	}
+
+	return int(size)
+}
+
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	ctx := context.Background()

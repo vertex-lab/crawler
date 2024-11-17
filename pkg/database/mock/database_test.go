@@ -410,54 +410,54 @@ func TestAllNodes(t *testing.T) {
 			nodeIDs, err := DB.AllNodes()
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("All(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("AllNodes(): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check that the expected result is equal to the result
 			if test.expectedSlice != nil {
 
 				if nodeIDs == nil {
-					t.Errorf("All(): expected %v, got nil", test.expectedSlice)
+					t.Errorf("AllNodes(): expected %v, got nil", test.expectedSlice)
 				}
 
 				if !reflect.DeepEqual(nodeIDs, test.expectedSlice) {
-					t.Errorf("All(): expected %v, got %v", test.expectedSlice, nodeIDs)
+					t.Errorf("AllNodes(): expected %v, got %v", test.expectedSlice, nodeIDs)
 				}
 			}
 		})
 	}
 }
 
-func TestNodeCount(t *testing.T) {
+func TestSize(t *testing.T) {
 	testCases := []struct {
-		name          string
-		DBType        string
-		expectedCount int
+		name         string
+		DBType       string
+		expectedSize int
 	}{
 		{
-			name:          "nil DB",
-			DBType:        "nil",
-			expectedCount: 0,
+			name:         "nil DB",
+			DBType:       "nil",
+			expectedSize: 0,
 		},
 		{
-			name:          "empty DB",
-			DBType:        "empty",
-			expectedCount: 0,
+			name:         "empty DB",
+			DBType:       "empty",
+			expectedSize: 0,
 		},
 		{
-			name:          "DB with node 0",
-			DBType:        "one-node0",
-			expectedCount: 1,
+			name:         "DB with node 0",
+			DBType:       "one-node0",
+			expectedSize: 1,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			count := DB.Size()
+			size := DB.Size()
 
-			if count != test.expectedCount {
-				t.Errorf("Size(): expected %v, got %v", test.expectedCount, count)
+			if size != test.expectedSize {
+				t.Errorf("Size(): expected %v, got %v", test.expectedSize, size)
 			}
 		})
 	}

@@ -399,3 +399,156 @@ func TestIsDandling(t *testing.T) {
 		})
 	}
 }
+
+func TestSuccessors(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name          string
+		DBType        string
+		nodeID        uint32
+		expectedError error
+		expectedSlice []uint32
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeID:        0,
+			expectedSlice: nil,
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			nodeID:        0,
+			expectedSlice: []uint32{},
+			expectedError: nil,
+		},
+		{
+			name:          "node not found",
+			DBType:        "one-node0",
+			nodeID:        1,
+			expectedSlice: []uint32{},
+			expectedError: nil,
+		},
+		{
+			name:          "valid",
+			DBType:        "one-node0",
+			nodeID:        0,
+			expectedSlice: []uint32{0},
+			expectedError: nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDb(): expected nil, got %v", err)
+			}
+
+			succ, err := DB.Successors(test.nodeID)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("Successors(%d): expected %v, got %v", test.nodeID, test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(succ, test.expectedSlice) {
+				t.Errorf("Successors(%d): expected %v, got %v", test.nodeID, test.expectedSlice, succ)
+			}
+		})
+	}
+}
+
+func TestAllNodes(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name          string
+		DBType        string
+		expectedError error
+		expectedSlice []uint32
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			expectedError: models.ErrEmptyDB,
+		},
+		{
+			name:          "DB with node 0",
+			DBType:        "one-node0",
+			expectedError: nil,
+			expectedSlice: []uint32{0},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			nodeIDs, err := DB.AllNodes()
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("AllNodes(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(nodeIDs, test.expectedSlice) {
+				t.Errorf("AllNodes(): expected %v, got %v", test.expectedSlice, nodeIDs)
+			}
+		})
+	}
+}
+
+func TestSize(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name         string
+		DBType       string
+		expectedSize int
+	}{
+		{
+			name:         "nil DB",
+			DBType:       "nil",
+			expectedSize: 0,
+		},
+		{
+			name:         "empty DB",
+			DBType:       "empty",
+			expectedSize: 0,
+		},
+		{
+			name:         "DB with node 0",
+			DBType:       "one-node0",
+			expectedSize: 1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			size := DB.Size()
+			if size != test.expectedSize {
+				t.Errorf("Size(): expected %v, got %v", test.expectedSize, size)
+			}
+		})
+	}
+}
+
+func TestInterface(t *testing.T) {
+	var _ models.Database = &Database{}
+}
