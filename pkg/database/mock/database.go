@@ -66,6 +66,21 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	return nodeID, nil
 }
 
+// UpdateNode() updates the nodeID using the new values inside node.
+func (DB *Database) UpdateNode(nodeID uint32, node *models.Node) error {
+
+	if err := DB.Validate(); err != nil {
+		return err
+	}
+
+	if _, exist := DB.NodeIndex[nodeID]; !exist {
+		return models.ErrNodeNotFoundDB
+	}
+
+	DB.NodeIndex[nodeID] = node
+	return nil
+}
+
 // ContainsNode() returns whether nodeID is found in the DB
 func (DB *Database) ContainsNode(nodeID uint32) bool {
 

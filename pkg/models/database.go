@@ -26,6 +26,9 @@ type Database interface {
 	// AddNode() adds a node to the database and returns its assigned nodeID
 	AddNode(*Node) (uint32, error)
 
+	// UpdateNode() updates the nodeID using the new values inside node.
+	UpdateNode(nodeID uint32, node *Node) error
+
 	// ContainsNode() returns wheter a specified nodeID is found in the DB
 	ContainsNode(nodeID uint32) bool
 

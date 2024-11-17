@@ -159,6 +159,59 @@ func TestAddNode(t *testing.T) {
 	}
 }
 
+func TestUpdateNode(t *testing.T) {
+	testCases := []struct {
+		name          string
+		DBType        string
+		nodeID        uint32
+		node          *models.Node
+		expectedError error
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeID:        0,
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "node not found",
+			DBType:        "one-node0",
+			nodeID:        1,
+			expectedError: models.ErrNodeNotFoundDB,
+		},
+		{
+			name:   "valid",
+			DBType: "simple",
+			nodeID: 0,
+			node: &models.Node{
+				Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 11}},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := SetupDB(test.DBType)
+
+			err := DB.UpdateNode(test.nodeID, test.node)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.node, test.expectedError, err)
+			}
+
+			// check if node was updated correctly
+			if err == nil {
+				node, err := DB.Node(test.nodeID)
+				if err != nil {
+					t.Fatalf("Node(%d): expected nil, got %v", test.nodeID, err)
+				}
+
+				if !reflect.DeepEqual(node, test.node) {
+					t.Errorf("UpdateNode(%v): expected node %v \n got %v", test.nodeID, test.node, node)
+				}
+			}
+		})
+	}
+}
+
 func TestNode(t *testing.T) {
 	testCases := []struct {
 		name          string

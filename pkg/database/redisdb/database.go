@@ -110,8 +110,8 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata)
 
 	// add successors and predecessors
-	AddSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
-	AddPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
+	SetSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
+	SetPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
 
 	// execute the transaction
 	if _, err := pipe.Exec(DB.ctx); err != nil {
@@ -121,8 +121,8 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	return uint32(nodeID), nil
 }
 
-// AddSuccessors() adds the successors of nodeID to the database
-func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, succ []uint32) {
+// SetSuccessors() adds the successors of nodeID to the database
+func SetSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, succ []uint32) {
 
 	if len(succ) == 0 {
 		return // early return to avoid errors
@@ -143,8 +143,8 @@ func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, suc
 	}
 }
 
-// AddPredecessors() adds the predecessors of nodeID to the database
-func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, pred []uint32) {
+// SetPredecessors() adds the predecessors of nodeID to the database
+func SetPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, pred []uint32) {
 
 	if len(pred) == 0 {
 		return // early return to avoid errors
@@ -163,6 +163,37 @@ func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, p
 	for _, followersNodeID := range pred {
 		pipe.SAdd(ctx, KeyFollows(followersNodeID), nodeID)
 	}
+}
+
+// UpdateNode() updates the nodeID using the new values inside node.
+func (DB *Database) UpdateNode(nodeID uint32, node *models.Node) error {
+
+	if err := DB.validateFields(); err != nil {
+		return err
+	}
+
+	// check if the nodeID exists
+	exists, err := DB.client.Exists(DB.ctx, KeyNode(nodeID)).Result()
+	if err != nil {
+		return err
+	}
+	if exists <= 0 {
+		return models.ErrNodeNotFoundDB
+	}
+
+	// begin the transaction
+	pipe := DB.client.TxPipeline()
+
+	// update the node HASH
+	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata).Err()
+
+	// update successors and predecessors
+	SetSuccessors(DB.ctx, pipe, nodeID, node.Successors)
+	SetPredecessors(DB.ctx, pipe, nodeID, node.Predecessors)
+
+	// execute the transaction
+	_, err = pipe.Exec(DB.ctx)
+	return err
 }
 
 // ContainsNode() returns wheter a specified nodeID is found in the DB. In case of
