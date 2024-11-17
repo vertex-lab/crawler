@@ -165,6 +165,43 @@ func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, p
 	}
 }
 
+// ContainsNode() returns wheter a specified nodeID is found in the DB. In case of
+// errors, it returns the default false.
+func (DB *Database) ContainsNode(nodeID uint32) bool {
+
+	if err := DB.validateFields(); err != nil {
+		return false
+	}
+
+	exists, err := DB.client.Exists(DB.ctx, KeyNode(nodeID)).Result()
+	if err != nil {
+		return false
+	}
+
+	return exists == 1
+}
+
+// IsDandling() returns whether a node has any successor. In case of errors,
+// it returns the default false.
+func (DB *Database) IsDandling(nodeID uint32) bool {
+
+	if err := DB.validateFields(); err != nil {
+		return false
+	}
+
+	exists, err := DB.client.Exists(DB.ctx, KeyNode(nodeID)).Result()
+	if err != nil || exists <= 0 {
+		return false
+	}
+
+	card, err := DB.client.SCard(DB.ctx, KeyFollows(nodeID)).Result()
+	if err != nil {
+		return false
+	}
+
+	return card == 0
+}
+
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	ctx := context.Background()
@@ -184,6 +221,39 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 		return DB, nil
 
 	case "one-node0":
+		DB, err := NewDatabase(ctx, cl)
+		if err != nil {
+			return nil, err
+		}
+
+		// add node0 to the KeyIndex
+		if _, err = cl.HSet(DB.ctx, KeyKeyIndex, "zero", "0").Result(); err != nil {
+			return nil, err
+		}
+
+		// change the LastNodeID
+		if err := cl.HSet(ctx, KeyDatabase, KeyLastNodeID, 0).Err(); err != nil {
+			return nil, err
+		}
+
+		// add node0  metadata
+		fields := models.NodeMeta{
+			PubKey:    "zero",
+			Timestamp: 1731685733,
+			Status:    "idk",
+			Pagerank:  0.0,
+		}
+		if err = cl.HSet(DB.ctx, KeyNode(0), fields).Err(); err != nil {
+			return nil, err
+		}
+
+		if err := cl.SAdd(ctx, KeyFollows(0), 0).Err(); err != nil {
+			return nil, err
+		}
+
+		return DB, nil
+
+	case "dandling":
 		DB, err := NewDatabase(ctx, cl)
 		if err != nil {
 			return nil, err

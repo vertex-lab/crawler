@@ -290,5 +290,112 @@ func TestAddNode(t *testing.T) {
 			})
 		}
 	})
+}
 
+func TestContainsNode(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name             string
+		DBType           string
+		nodeID           uint32
+		expectedContains bool
+	}{
+		{
+			name:             "nil DB",
+			DBType:           "nil",
+			nodeID:           0,
+			expectedContains: false,
+		},
+		{
+			name:             "empty DB",
+			DBType:           "empty",
+			nodeID:           0,
+			expectedContains: false,
+		},
+		{
+			name:             "node not found",
+			DBType:           "one-node0",
+			nodeID:           1,
+			expectedContains: false,
+		},
+		{
+			name:             "node found",
+			DBType:           "one-node0",
+			nodeID:           0,
+			expectedContains: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			contains := DB.ContainsNode(test.nodeID)
+			if contains != test.expectedContains {
+				t.Errorf("ContainsNode(%d): expected %v, got %v", test.nodeID, test.expectedContains, contains)
+			}
+		})
+	}
+}
+
+func TestIsDandling(t *testing.T) {
+	cl := redisutils.SetupClient()
+
+	testCases := []struct {
+		name             string
+		DBType           string
+		nodeID           uint32
+		expectedDandling bool
+	}{
+		{
+			name:             "nil DB",
+			DBType:           "nil",
+			nodeID:           0,
+			expectedDandling: false,
+		},
+		{
+			name:             "empty DB",
+			DBType:           "empty",
+			nodeID:           0,
+			expectedDandling: false,
+		},
+		{
+			name:             "node not found",
+			DBType:           "one-node0",
+			nodeID:           1,
+			expectedDandling: false,
+		},
+		{
+			name:             "node found, has succ",
+			DBType:           "one-node0",
+			nodeID:           0,
+			expectedDandling: false,
+		},
+		{
+			name:             "node found, dandling",
+			DBType:           "dandling",
+			nodeID:           0,
+			expectedDandling: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			defer redisutils.CleanupRedis(cl)
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			dandling := DB.IsDandling(test.nodeID)
+			if dandling != test.expectedDandling {
+				t.Errorf("IsDandling(%d): expected %v, got %v", test.nodeID, test.expectedDandling, dandling)
+			}
+		})
+	}
 }
