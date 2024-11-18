@@ -2,8 +2,8 @@
 package walks
 
 import (
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	mock "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/models"
+	mock "github.com/vertex-lab/crawler/pkg/store/mock"
 )
 
 // RandomWalkManager wraps the RandomWalkStore and extends its functionalities

@@ -5,8 +5,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/sliceutils"
+	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
 /*

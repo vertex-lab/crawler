@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/sliceutils"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
+	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 /*

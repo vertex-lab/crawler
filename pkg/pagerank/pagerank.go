@@ -2,7 +2,7 @@
 package pagerank
 
 import (
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 // a map that associates each nodeID with its corrisponding pagerank value

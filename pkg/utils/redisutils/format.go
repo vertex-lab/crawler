@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 // FormatWalk() formats a RandomWalk into a string ready to be stored in Redis.

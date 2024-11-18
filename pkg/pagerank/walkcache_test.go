@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"testing"
 
-	mockdb "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	mockstore "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/sliceutils"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
+	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/models"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestValidate(t *testing.T) {

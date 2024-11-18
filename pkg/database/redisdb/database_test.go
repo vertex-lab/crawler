@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/redisutils"
+	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
 func TestValidate(t *testing.T) {

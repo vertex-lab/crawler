@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 func TestValidate(t *testing.T) {

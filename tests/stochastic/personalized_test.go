@@ -3,8 +3,8 @@ package stochastictest
 import (
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/pagerank"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/walks"
+	"github.com/vertex-lab/crawler/pkg/pagerank"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestPersonalizedPagerank(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"slices"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 // simulates a simple graph database for testing.

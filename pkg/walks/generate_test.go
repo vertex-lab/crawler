@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	mock "github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	mock "github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 func TestWalkStep(t *testing.T) {

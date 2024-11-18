@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/utils/redisutils"
 	"github.com/redis/go-redis/v9"
+	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
 // RandomWalkStore fulfills the RandomWalkStore interface defined in models

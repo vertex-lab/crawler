@@ -3,7 +3,7 @@ package pagerank
 import (
 	"math"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 // computes the L1 distance between two maps who are supposed to have the same keys.

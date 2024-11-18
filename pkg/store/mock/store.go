@@ -7,7 +7,7 @@ import (
 	"math/rand"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 // the in-memory version of the RandomWalkStore interface.

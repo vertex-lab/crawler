@@ -4,9 +4,9 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/database/mock"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
-	"github.com/pippellia-btc/Nostrcrawler/pkg/pagerank"
+	"github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/pagerank"
 )
 
 /*

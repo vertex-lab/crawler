@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/pippellia-btc/Nostrcrawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/models"
 )
 
 func TestFormatWalk(t *testing.T) {
