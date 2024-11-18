@@ -14,12 +14,12 @@ package models
 
 import "errors"
 
-// the metadata about a node in the graph, meaning everything that is not a relationship
+// NodeMeta contains the metadata about a node in the graph, meaning everything that is not a relationship
 type NodeMeta struct {
 	PubKey    string  `redis:"pubkey"`
 	Timestamp int64   `redis:"timestamp"`
 	Status    string  `redis:"status"`
-	Pagerank  float32 `redis:"pagerank"`
+	Pagerank  float64 `redis:"pagerank"`
 }
 
 // the basic structure of a node in the graph
@@ -59,7 +59,22 @@ type Database interface {
 
 	// Size() returns the number of nodes in the DB (ignores errors).
 	Size() int
+
+	// NodeCache() returns a NodeCache struct, used in the main crawler for
+	// efficiently filtering events without calling the database
+	NodeCache() (NodeCache, error)
 }
+
+// NodeFilterAttributes contains attributes of a node used to filter a Nostr
+// event without querying the Database.
+type NodeFilterAttributes struct {
+	ID        uint32
+	Timestamp int64
+	Pagerank  float64
+}
+
+// NodeCache maps a pubkey to the filter attributes of the corrisponding node.
+type NodeCache map[string]NodeFilterAttributes
 
 //--------------------------ERROR-CODES--------------------------
 

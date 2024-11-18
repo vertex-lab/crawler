@@ -140,7 +140,6 @@ func (DB *Database) RandomSuccessor(nodeID uint32) (uint32, error) {
 
 	randomIndex := rand.Intn((len(node.Successors)))
 	return node.Successors[randomIndex], nil
-
 }
 
 // Successors() returns the slice of successors of nodeID.
@@ -204,6 +203,28 @@ func (DB *Database) Size() int {
 	return len(DB.NodeIndex)
 }
 
+// NodeCache() returns a NodeCache struct.
+func (DB *Database) NodeCache() (models.NodeCache, error) {
+
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	NC := make(models.NodeCache, DB.Size())
+	for pubkey, nodeID := range DB.KeyIndex {
+
+		nodeAttr := models.NodeFilterAttributes{
+			ID:        nodeID,
+			Timestamp: DB.NodeIndex[nodeID].Metadata.Timestamp,
+			Pagerank:  DB.NodeIndex[nodeID].Metadata.Pagerank,
+		}
+
+		NC[pubkey] = nodeAttr
+	}
+
+	return NC, nil
+}
+
 // ------------------------------------HELPERS----------------------------------
 
 // function that returns a DB setup based on the DBType
@@ -252,9 +273,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex["zero"] = 0
 		DB.KeyIndex["one"] = 1
 		DB.KeyIndex["two"] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 0}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: "one", Timestamp: 0}, Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: "two", Timestamp: 0}, Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: "one", Timestamp: 0, Pagerank: 0.48}, Successors: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: "two", Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 

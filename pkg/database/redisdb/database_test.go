@@ -664,6 +664,57 @@ func TestSize(t *testing.T) {
 	}
 }
 
+func TestNodeCache(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name              string
+		DBType            string
+		expectedError     error
+		expectedNodeCache models.NodeCache
+	}{
+		{
+			name:              "nil DB",
+			DBType:            "nil",
+			expectedError:     models.ErrNilDBPointer,
+			expectedNodeCache: nil,
+		},
+		{
+			name:              "empty DB",
+			DBType:            "empty",
+			expectedError:     models.ErrEmptyDB,
+			expectedNodeCache: nil,
+		},
+		{
+			name:          "valid DB",
+			DBType:        "one-node0",
+			expectedError: nil,
+			expectedNodeCache: models.NodeCache{
+				"zero": models.NodeFilterAttributes{ID: 0, Timestamp: 1731685733, Pagerank: 1.0},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			NC, err := DB.NodeCache()
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NodeCache(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(NC, test.expectedNodeCache) {
+				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NC)
+			}
+		})
+	}
+}
+
 func TestInterface(t *testing.T) {
 	var _ models.Database = &Database{}
 }
