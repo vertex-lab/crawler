@@ -1,3 +1,4 @@
+// The redisdb package defines a Redis database that fulfills the Database interface in models.
 package redisdb
 
 import (

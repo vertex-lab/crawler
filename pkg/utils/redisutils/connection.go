@@ -1,3 +1,5 @@
+// The redisutils package simplifies and automates recurring operations like
+// connecting to, formatting for, and parsing from Redis.
 package redisutils
 
 import (

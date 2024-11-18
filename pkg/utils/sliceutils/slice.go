@@ -1,3 +1,4 @@
+// The sliceutils package adds helper functions that deal with slices and walks.
 package sliceutils
 
 import (

@@ -1,3 +1,4 @@
+// The walks package encapsulates all the logic around generating and updating random walks.
 package walks
 
 import (
@@ -5,10 +6,8 @@ import (
 	mock "github.com/pippellia-btc/Nostrcrawler/pkg/store/mock"
 )
 
-/*
-RandomWalkManager wraps the RandomWalkStore and extends its functionalities
-with complex methods like Update() and Generate().
-*/
+// RandomWalkManager wraps the RandomWalkStore and extends its functionalities
+// with complex methods like Update() and Generate().
 type RandomWalkManager struct {
 	Store models.RandomWalkStore
 }

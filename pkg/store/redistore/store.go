@@ -1,3 +1,5 @@
+// The redistore package defines a Redis store that fulfills the RandomWalkStore
+// interface in models.
 package redistore
 
 import (

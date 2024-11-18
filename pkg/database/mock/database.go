@@ -1,3 +1,5 @@
+// The mock database package allows for testing that are decoupled from a
+// particular database implementation.
 package mock
 
 import (

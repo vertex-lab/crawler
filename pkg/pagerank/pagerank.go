@@ -1,3 +1,4 @@
+// The pagerank package defines the algorithms that use the previously generated random walks.
 package pagerank
 
 import (

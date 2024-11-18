@@ -1,3 +1,5 @@
+// The mock store package allows for testing that are decoupled from a
+// particular RandomWalkStore implementation.
 package mock
 
 import (

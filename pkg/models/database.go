@@ -1,3 +1,15 @@
+/*
+The models package defines the fundamental structures and interfaces used in this project.
+Interfaces:
+
+Database:
+The Database interface abstracts the basic database functionalities, allowing for
+multiple implementations.
+
+RandomWalkStore:
+The RandomWalkStore interface abstracts atomic operations to create, update, and
+remove RandomWalks. These walks are then utilized in the pagerank package.
+*/
 package models
 
 import "errors"
