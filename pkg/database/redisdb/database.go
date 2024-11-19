@@ -3,7 +3,6 @@ package redisdb
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -345,7 +344,6 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 		return nil, models.ErrEmptyDB
 	}
 
-	NC := make(models.NodeCache, size)
 	luaScript := `
 		local KeyIndex = KEYS[1]
 		local KeyNodePrefix = KEYS[2]
@@ -376,17 +374,12 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 		return nil, err
 	}
 
-	// Parse the JSON string returned by the Lua script
-	jsonNC, ok := res.(string)
+	JSONNodeCache, ok := res.(string)
 	if !ok {
 		return nil, fmt.Errorf("unexpected result type, got %T", res)
 	}
 
-	if err := json.Unmarshal([]byte(jsonNC), &NC); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal Lua script result: %w", err)
-	}
-
-	return NC, nil
+	return models.FromJSON(JSONNodeCache)
 }
 
 // function that returns a DB setup based on the DBType
@@ -466,7 +459,54 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 		if err = cl.HSet(DB.ctx, KeyNode(0), fields).Err(); err != nil {
 			return nil, err
 		}
+		return DB, nil
 
+	case "fiatjaf":
+		const fiatjaf = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
+
+		DB, err := NewDatabase(ctx, cl)
+		if err != nil {
+			return nil, err
+		}
+
+		node := models.Node{
+			Metadata: models.NodeMeta{
+				PubKey:    fiatjaf,
+				Timestamp: 0,
+				Status:    "not-crawled",
+				Pagerank:  1.0,
+			},
+			Successors:   []uint32{},
+			Predecessors: []uint32{},
+		}
+
+		if _, err := DB.AddNode(&node); err != nil {
+			return nil, err
+		}
+		return DB, nil
+
+	case "pip":
+		const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
+
+		DB, err := NewDatabase(ctx, cl)
+		if err != nil {
+			return nil, err
+		}
+
+		node := models.Node{
+			Metadata: models.NodeMeta{
+				PubKey:    pip,
+				Timestamp: 0,
+				Status:    "not-crawled",
+				Pagerank:  1.0,
+			},
+			Successors:   []uint32{},
+			Predecessors: []uint32{},
+		}
+
+		if _, err := DB.AddNode(&node); err != nil {
+			return nil, err
+		}
 		return DB, nil
 
 	default:

@@ -571,7 +571,7 @@ func TestNodeCache(t *testing.T) {
 		name              string
 		DBType            string
 		expectedError     error
-		expectedNodeCache models.NodeCache
+		expectedNodeCache map[string]models.NodeFilterAttributes
 	}{
 		{
 			name:              "nil DB",
@@ -589,10 +589,10 @@ func TestNodeCache(t *testing.T) {
 			name:          "valid DB",
 			DBType:        "simple-with-mock-pks",
 			expectedError: nil,
-			expectedNodeCache: models.NodeCache{
-				"zero": models.NodeFilterAttributes{ID: 0, Timestamp: 0, Pagerank: 0.26},
-				"one":  models.NodeFilterAttributes{ID: 1, Timestamp: 0, Pagerank: 0.48},
-				"two":  models.NodeFilterAttributes{ID: 2, Timestamp: 0, Pagerank: 0.26},
+			expectedNodeCache: map[string]models.NodeFilterAttributes{
+				"zero": {ID: 0, Timestamp: 0, Pagerank: 0.26},
+				"one":  {ID: 1, Timestamp: 0, Pagerank: 0.48},
+				"two":  {ID: 2, Timestamp: 0, Pagerank: 0.26},
 			},
 		},
 	}
@@ -600,14 +600,17 @@ func TestNodeCache(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
+			_ = DB
 
 			NC, err := DB.NodeCache()
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeCache(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(NC, test.expectedNodeCache) {
-				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NC)
+			// Convert to regular map to compare
+			NCMap := models.ToMap(NC)
+			if !reflect.DeepEqual(NCMap, test.expectedNodeCache) {
+				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NCMap)
 			}
 		})
 	}

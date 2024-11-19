@@ -210,7 +210,7 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 		return nil, err
 	}
 
-	NC := make(models.NodeCache, DB.Size())
+	NC := models.NewNodeCache()
 	for pubkey, nodeID := range DB.KeyIndex {
 
 		nodeAttr := models.NodeFilterAttributes{
@@ -218,8 +218,7 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 			Timestamp: DB.NodeIndex[nodeID].Metadata.Timestamp,
 			Pagerank:  DB.NodeIndex[nodeID].Metadata.Pagerank,
 		}
-
-		NC[pubkey] = nodeAttr
+		NC.Store(pubkey, nodeAttr)
 	}
 
 	return NC, nil

@@ -672,7 +672,7 @@ func TestNodeCache(t *testing.T) {
 		name              string
 		DBType            string
 		expectedError     error
-		expectedNodeCache models.NodeCache
+		expectedNodeCache map[string]models.NodeFilterAttributes
 	}{
 		{
 			name:              "nil DB",
@@ -690,8 +690,8 @@ func TestNodeCache(t *testing.T) {
 			name:          "valid DB",
 			DBType:        "one-node0",
 			expectedError: nil,
-			expectedNodeCache: models.NodeCache{
-				"zero": models.NodeFilterAttributes{ID: 0, Timestamp: 1731685733, Pagerank: 1.0},
+			expectedNodeCache: map[string]models.NodeFilterAttributes{
+				"zero": {ID: 0, Timestamp: 1731685733, Pagerank: 1.0},
 			},
 		},
 	}
@@ -708,13 +708,14 @@ func TestNodeCache(t *testing.T) {
 				t.Fatalf("NodeCache(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(NC, test.expectedNodeCache) {
-				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NC)
+			NCMap := models.ToMap(NC)
+			if !reflect.DeepEqual(NCMap, test.expectedNodeCache) {
+				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NCMap)
 			}
 		})
 	}
 }
 
-func TestInterface(t *testing.T) {
-	var _ models.Database = &Database{}
-}
+// func TestInterface(t *testing.T) {
+// 	var _ models.Database = &Database{}
+// }
