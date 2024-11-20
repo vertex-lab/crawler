@@ -88,8 +88,8 @@ func NewNodeCache() NodeCache {
 }
 
 // ToMap returns a regular Go map with the same key-value pairs as the NodeCache.
-// In case the NodeCache is nil, it returns a nil map.
-// This function is used in tests to compare two NodeCaches using the reflect.DeepEqual
+// If the NodeCache is nil, it returns a nil map. This function is used in tests
+// to compare two NodeCaches using the reflect.DeepEqual
 func ToMap(NC NodeCache) map[string]NodeFilterAttributes {
 
 	if NC == nil {
@@ -99,7 +99,7 @@ func ToMap(NC NodeCache) map[string]NodeFilterAttributes {
 	goMap := make(map[string]NodeFilterAttributes, NC.Size())
 	NC.Range(func(key string, value NodeFilterAttributes) bool {
 		goMap[key] = value
-		return true //Continue iteration
+		return true
 	})
 
 	return goMap

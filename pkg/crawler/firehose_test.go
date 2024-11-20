@@ -1,24 +1,15 @@
-package main
+package crawler
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
-
-// PrintEvent is a simple function that gets passed to the Firehose for testing and debugging.
-func PrintEvent(event nostr.RelayEvent) error {
-	fmt.Printf("\nevent ID: %v\n", event.ID)
-	fmt.Printf("event pubkey: %v\n", event.PubKey)
-	return nil
-}
 
 func TestFirehose(t *testing.T) {
 	// I will manually change the follow list and see if the events get printed
@@ -32,6 +23,8 @@ func TestFirehose(t *testing.T) {
 	NC.Store(pip, nodeAttr)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT)
 
@@ -44,5 +37,5 @@ func TestFirehose(t *testing.T) {
 		}
 	}()
 
-	Firehose(ctx, cancel, Relays, NC, PrintEvent)
+	Firehose(ctx, Relays, NC, PrintEvent)
 }

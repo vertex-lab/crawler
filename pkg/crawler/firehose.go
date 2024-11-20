@@ -1,11 +1,46 @@
-package main
+package crawler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
+)
+
+var (
+	RelevantKinds = []int{nostr.KindFollowList}
+	Relays        = []string{
+		"wss://purplepag.es",
+		"wss://njump.me",
+		"wss://relay.snort.social",
+		"wss://relay.damus.io",
+		"wss://relay.primal.net",
+		"wss://relay.nostr.band",
+		"wss://nostr-pub.wellorder.net",
+		"wss://relay.nostr.net",
+		"wss://nostr.lu.ke",
+		"wss://nostr.at",
+		"wss://e.nos.lol",
+		"wss://nostr.lopp.social",
+		"wss://nostr.vulpem.com",
+		"wss://relay.nostr.bg",
+		"wss://wot.utxo.one",
+		"wss://nostrelites.org",
+		"wss://wot.nostr.party",
+		"wss://wot.sovbit.host",
+		"wss://wot.girino.org",
+		"wss://relay.lnau.net",
+		"wss://wot.siamstr.com",
+		"wss://wot.sudocarlos.com",
+		"wss://relay.otherstuff.fyi",
+		"wss://relay.lexingtonbitcoin.org",
+		"wss://wot.azzamo.net",
+		"wss://wot.swarmstr.com",
+		"wss://zap.watch",
+		"wss://satsage.xyz",
+	}
 )
 
 // pagerankThreshold returns the minimum pagerank a pubkey needs to have for its
@@ -24,29 +59,30 @@ without having to query the database.
 Finally, it uses the specified queueHandler function to send the events to the
 queue for further processing and/or to be written to the database.
 */
-func Firehose(ctx context.Context, cancel context.CancelFunc, relays []string,
+func Firehose(ctx context.Context, relays []string,
 	NC models.NodeCache, queueHandler func(event nostr.RelayEvent) error) {
 
 	pool := nostr.NewSimplePool(ctx)
 	stop := func() {
+		fmt.Printf("\n  > Closing relay connections... ")
 		pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
 			relay.Close()
 			return true
 		})
-		cancel()
+		fmt.Printf("All closed!")
 	}
 	defer stop()
 
 	ts := nostr.Timestamp(time.Now().Unix())
 	filters := nostr.Filters{{
-		Kinds: []int{nostr.KindFollowList},
+		Kinds: RelevantKinds,
 		Since: &ts,
 	}}
 
 	// iterate over the events
 	for event := range pool.SubMany(ctx, Relays, filters) {
 
-		// if the the author is NOT "reputable enough" to be in the DB, skip
+		// if the the author is not in the DB, skip
 		nodeAttr, exists := NC.Load(event.PubKey)
 		if !exists {
 			continue
@@ -57,7 +93,7 @@ func Firehose(ctx context.Context, cancel context.CancelFunc, relays []string,
 			continue
 		}
 
-		// if the author has NOT enough pagerank, skip
+		// if the author has not enough pagerank, skip
 		if nodeAttr.Pagerank < pagerankThreshold(NC.Size()) {
 			continue
 		}
@@ -72,4 +108,12 @@ func Firehose(ctx context.Context, cancel context.CancelFunc, relays []string,
 			return
 		}
 	}
+}
+
+// PrintEvent is a simple function that gets passed to the Firehose for testing and debugging.
+// It prints the event ID and PubKey.
+func PrintEvent(event nostr.RelayEvent) error {
+	fmt.Printf("\nevent ID: %v\n", event.ID)
+	fmt.Printf("event pubkey: %v\n", event.PubKey)
+	return nil
 }
