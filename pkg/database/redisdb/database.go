@@ -111,8 +111,8 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata)
 
 	// add successors and predecessors
-	SetSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
-	SetPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
+	AddSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
+	AddPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
 
 	// execute the transaction
 	if _, err := pipe.Exec(DB.ctx); err != nil {
@@ -122,52 +122,74 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	return uint32(nodeID), nil
 }
 
-// SetSuccessors() adds the successors of nodeID to the database
-func SetSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, succ []uint32) {
+// AddSuccessors() adds the successors of nodeID to the database
+func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedSucc []uint32) {
 
-	if len(succ) == 0 {
+	if len(addedSucc) == 0 {
 		return // early return to avoid errors
 	}
 
 	// format successors
-	strSucc := make([]string, 0, len(succ))
-	for _, s := range succ {
-		strSucc = append(strSucc, redisutils.FormatID(s))
+	strAddedSucc := make([]string, 0, len(addedSucc))
+	for _, s := range addedSucc {
+		strAddedSucc = append(strAddedSucc, redisutils.FormatID(s))
 	}
 
 	// add successors to the follows set of nodeID
-	pipe.SAdd(ctx, KeyFollows(nodeID), strSucc)
+	pipe.SAdd(ctx, KeyFollows(nodeID), strAddedSucc)
 
 	// add nodeID to the followers of the other nodes
-	for _, followedNodeID := range succ {
-		pipe.SAdd(ctx, KeyFollowers(followedNodeID), nodeID)
+	for _, added := range addedSucc {
+		pipe.SAdd(ctx, KeyFollowers(added), nodeID)
 	}
 }
 
-// SetPredecessors() adds the predecessors of nodeID to the database
-func SetPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, pred []uint32) {
+// RemoveSuccessors() adds the successors of nodeID to the database
+func RemoveSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, removedSucc []uint32) {
 
-	if len(pred) == 0 {
+	if len(removedSucc) == 0 {
+		return // early return to avoid errors
+	}
+
+	// format successors
+	strRemovedSucc := make([]string, 0, len(removedSucc))
+	for _, s := range removedSucc {
+		strRemovedSucc = append(strRemovedSucc, redisutils.FormatID(s))
+	}
+
+	// remove successors from the follows set of nodeID
+	pipe.SRem(ctx, KeyFollows(nodeID), strRemovedSucc)
+
+	// remove nodeID from the followers of the removedSucc
+	for _, removed := range removedSucc {
+		pipe.SRem(ctx, KeyFollowers(removed), nodeID)
+	}
+}
+
+// AddPredecessors() adds the predecessors of nodeID to the database
+func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedPred []uint32) {
+
+	if len(addedPred) == 0 {
 		return // early return to avoid errors
 	}
 
 	// format predecessors
-	strPred := make([]string, 0, len(pred))
-	for _, p := range pred {
-		strPred = append(strPred, redisutils.FormatID(p))
+	strAddedPred := make([]string, 0, len(addedPred))
+	for _, p := range addedPred {
+		strAddedPred = append(strAddedPred, redisutils.FormatID(p))
 	}
 
 	// add predecessors to the followers set of nodeID
-	pipe.SAdd(ctx, KeyFollowers(nodeID), strPred)
+	pipe.SAdd(ctx, KeyFollowers(nodeID), strAddedPred)
 
 	// add nodeID to the follows of the other nodes
-	for _, followersNodeID := range pred {
-		pipe.SAdd(ctx, KeyFollows(followersNodeID), nodeID)
+	for _, added := range addedPred {
+		pipe.SAdd(ctx, KeyFollows(added), nodeID)
 	}
 }
 
-// UpdateNode() updates the nodeID using the new values inside node.
-func (DB *Database) UpdateNode(nodeID uint32, node *models.Node) error {
+// UpdateNode() updates the nodeID using the new values inside the nodeDiff.
+func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 
 	if err := DB.validateFields(); err != nil {
 		return err
@@ -185,12 +207,12 @@ func (DB *Database) UpdateNode(nodeID uint32, node *models.Node) error {
 	// begin the transaction
 	pipe := DB.client.TxPipeline()
 
-	// update the node HASH
-	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata).Err()
+	// update the node HASH. Only the non empty fields will be updated, thanks to "omitempty"
+	pipe.HSet(DB.ctx, KeyNode(nodeID), nodeDiff.Metadata).Err()
 
 	// update successors and predecessors
-	SetSuccessors(DB.ctx, pipe, nodeID, node.Successors)
-	SetPredecessors(DB.ctx, pipe, nodeID, node.Predecessors)
+	AddSuccessors(DB.ctx, pipe, nodeID, nodeDiff.AddedSucc)
+	RemoveSuccessors(DB.ctx, pipe, nodeID, nodeDiff.RemovedSucc)
 
 	// execute the transaction
 	_, err = pipe.Exec(DB.ctx)

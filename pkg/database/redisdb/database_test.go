@@ -52,17 +52,17 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestSetSuccessors(t *testing.T) {
+func TestAddSuccessors(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
 	nodeID := uint32(0)
-	successors := []uint32{1, 2, 3}
+	addedSucc := []uint32{1, 2, 3}
 
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
 
-	SetSuccessors(ctx, pipe, nodeID, successors)
+	AddSuccessors(ctx, pipe, nodeID, addedSucc)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -82,12 +82,12 @@ func TestSetSuccessors(t *testing.T) {
 		followIDs = append(followIDs, followID)
 	}
 
-	if !reflect.DeepEqual(followIDs, successors) {
-		t.Fatalf("SetSuccessors(): expected %v, got %v", successors, followIDs)
+	if !reflect.DeepEqual(followIDs, addedSucc) {
+		t.Fatalf("AddSuccessors(): expected %v, got %v", addedSucc, followIDs)
 	}
 
 	// check the succ have nodeID as a follower
-	for _, succ := range successors {
+	for _, succ := range addedSucc {
 
 		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
 		if err != nil {
@@ -95,12 +95,81 @@ func TestSetSuccessors(t *testing.T) {
 		}
 
 		if !isMember {
-			t.Fatalf("SetSuccessors(): expected nodeID = %d part of followers:%d", nodeID, succ)
+			t.Fatalf("AddSuccessors(): expected nodeID = %d part of followers:%d", nodeID, succ)
 		}
 	}
 }
 
-func TestSetPredecessors(t *testing.T) {
+func TestRemoveSuccessors(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	nodeID := uint32(0)
+	succ := []uint32{0, 1, 2}
+	removedSucc := []uint32{1, 2, 3}
+	remainingSucc := []uint32{0} // {0,1,2} - {1,2,3} = {0}
+
+	// add succ to Redis
+	pipe := cl.TxPipeline()
+	ctx := context.Background()
+	AddSuccessors(ctx, pipe, nodeID, succ)
+	if _, err := pipe.Exec(ctx); err != nil {
+		t.Fatalf("Exec(): expected nil, got %v", err)
+	}
+
+	// remove succ from Redis
+	pipe = cl.TxPipeline()
+	ctx = context.Background()
+	RemoveSuccessors(ctx, pipe, nodeID, removedSucc)
+	if _, err := pipe.Exec(ctx); err != nil {
+		t.Fatalf("Exec(): expected nil, got %v", err)
+	}
+
+	// check the follows of nodeID are correctly added
+	follows, err := cl.SMembers(ctx, KeyFollows(nodeID)).Result()
+	if err != nil {
+		t.Errorf("SMembers(): expected nil, got %v", err)
+	}
+	// parse the follows
+	followIDs := make([]uint32, 0, len(follows))
+	for _, follow := range follows {
+		followID, err := redisutils.ParseID(follow)
+		if err != nil {
+			t.Fatalf("ParseID(%v): expected nil, got %v", follow, err)
+		}
+		followIDs = append(followIDs, followID)
+	}
+
+	if !reflect.DeepEqual(followIDs, remainingSucc) {
+		t.Fatalf("RemoveSuccessors(): expected %v, got %v", remainingSucc, followIDs)
+	}
+
+	// check the remainingSucc have nodeID as a follower
+	for _, succ := range remainingSucc {
+		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
+		if err != nil {
+			t.Errorf("IsMember(): expected nil, got %v", err)
+		}
+
+		if !isMember {
+			t.Fatalf("RemoveSuccessors(): expected nodeID = %d part of followers:%d", nodeID, succ)
+		}
+	}
+
+	// check the removedSucc DON'T have nodeID as a follower
+	for _, succ := range removedSucc {
+		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
+		if err != nil {
+			t.Errorf("IsMember(): expected nil, got %v", err)
+		}
+
+		if isMember {
+			t.Fatalf("RemoveSuccessors(): expected nodeID = %d NOT part of followers:%d", nodeID, succ)
+		}
+	}
+}
+
+func TestAddPredecessors(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -110,7 +179,7 @@ func TestSetPredecessors(t *testing.T) {
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
 
-	SetPredecessors(ctx, pipe, nodeID, predecessors)
+	AddPredecessors(ctx, pipe, nodeID, predecessors)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -131,7 +200,7 @@ func TestSetPredecessors(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(followerIDs, predecessors) {
-		t.Fatalf("SetSuccessors(): expected %v, got %v", predecessors, followerIDs)
+		t.Fatalf("AddSuccessors(): expected %v, got %v", predecessors, followerIDs)
 	}
 
 	// check the pred have nodeID as a follows
@@ -143,7 +212,7 @@ func TestSetPredecessors(t *testing.T) {
 		}
 
 		if !isMember {
-			t.Fatalf("SetSuccessors(): expected nodeID = %d part of follows:%d", nodeID, pred)
+			t.Fatalf("AddSuccessors(): expected nodeID = %d part of follows:%d", nodeID, pred)
 		}
 	}
 }
@@ -297,11 +366,12 @@ func TestUpdateNode(t *testing.T) {
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
-		name          string
-		DBType        string
-		nodeID        uint32
-		node          *models.Node
-		expectedError error
+		name             string
+		DBType           string
+		nodeID           uint32
+		nodeDiff         *models.NodeDiff
+		expectedNodeMeta *models.NodeMeta
+		expectedError    error
 	}{
 		{
 			name:          "nil DB",
@@ -319,8 +389,14 @@ func TestUpdateNode(t *testing.T) {
 			name:   "valid",
 			DBType: "one-node0",
 			nodeID: 0,
-			node: &models.Node{
-				Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 11}},
+			nodeDiff: &models.NodeDiff{
+				Metadata: models.NodeMeta{Timestamp: 11}},
+			expectedNodeMeta: &models.NodeMeta{
+				PubKey:    "zero",
+				Timestamp: 11, // the only field that changes
+				Status:    "idk",
+				Pagerank:  1.0,
+			},
 		},
 	}
 
@@ -331,9 +407,9 @@ func TestUpdateNode(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			err = DB.UpdateNode(test.nodeID, test.node)
+			err = DB.UpdateNode(test.nodeID, test.nodeDiff)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.node, test.expectedError, err)
+				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.nodeDiff, test.expectedError, err)
 			}
 
 			// check if node was updated correctly
@@ -348,8 +424,8 @@ func TestUpdateNode(t *testing.T) {
 					t.Errorf("Scan(): expected nil, got %v", err)
 				}
 
-				if !reflect.DeepEqual(nodeMeta, test.node.Metadata) {
-					t.Errorf("AddNode(): expected node %v \n got %v", test.node.Metadata, nodeMeta)
+				if !reflect.DeepEqual(&nodeMeta, test.expectedNodeMeta) {
+					t.Errorf("UpdateNode(): expected node %v \n got %v", test.expectedNodeMeta, &nodeMeta)
 				}
 			}
 		})
@@ -716,6 +792,6 @@ func TestNodeCache(t *testing.T) {
 	}
 }
 
-// func TestInterface(t *testing.T) {
-// 	var _ models.Database = &Database{}
-// }
+func TestInterface(t *testing.T) {
+	var _ models.Database = &Database{}
+}

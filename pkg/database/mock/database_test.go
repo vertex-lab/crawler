@@ -164,7 +164,8 @@ func TestUpdateNode(t *testing.T) {
 		name          string
 		DBType        string
 		nodeID        uint32
-		node          *models.Node
+		nodeDiff      *models.NodeDiff
+		expectedNode  *models.Node
 		expectedError error
 	}{
 		{
@@ -183,8 +184,16 @@ func TestUpdateNode(t *testing.T) {
 			name:   "valid",
 			DBType: "simple",
 			nodeID: 0,
-			node: &models.Node{
-				Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 11}},
+			nodeDiff: &models.NodeDiff{
+				Metadata:    models.NodeMeta{PubKey: "zero", Timestamp: 11},
+				AddedSucc:   []uint32{2},
+				RemovedSucc: []uint32{1},
+			},
+
+			expectedNode: &models.Node{
+				Metadata:   models.NodeMeta{PubKey: "zero", Timestamp: 11},
+				Successors: []uint32{2},
+			},
 		},
 	}
 
@@ -192,9 +201,9 @@ func TestUpdateNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			err := DB.UpdateNode(test.nodeID, test.node)
+			err := DB.UpdateNode(test.nodeID, test.nodeDiff)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.node, test.expectedError, err)
+				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.nodeDiff, test.expectedError, err)
 			}
 
 			// check if node was updated correctly
@@ -204,8 +213,8 @@ func TestUpdateNode(t *testing.T) {
 					t.Fatalf("Node(%d): expected nil, got %v", test.nodeID, err)
 				}
 
-				if !reflect.DeepEqual(node, test.node) {
-					t.Errorf("UpdateNode(%v): expected node %v \n got %v", test.nodeID, test.node, node)
+				if !reflect.DeepEqual(node, test.expectedNode) {
+					t.Errorf("UpdateNode(%v): expected node %v \n got %v", test.nodeID, test.expectedNode, node)
 				}
 			}
 		})

@@ -10,8 +10,7 @@ import (
 )
 
 var (
-	RelevantKinds = []int{nostr.KindFollowList}
-	Relays        = []string{
+	Relays = []string{
 		"wss://purplepag.es",
 		"wss://njump.me",
 		"wss://relay.snort.social",
@@ -42,13 +41,6 @@ var (
 		"wss://satsage.xyz",
 	}
 )
-
-// pagerankThreshold returns the minimum pagerank a pubkey needs to have for its
-// events to be processed.
-func pagerankThreshold(graphSize int) float64 {
-	_ = graphSize
-	return 0.0
-}
 
 /*
 Firehose connects to a list of relays and pulls recent kind:3 events.
@@ -93,13 +85,13 @@ func Firehose(ctx context.Context, relays []string,
 			continue
 		}
 
-		// if the author has not enough pagerank, skip
-		if nodeAttr.Pagerank < pagerankThreshold(NC.Size()) {
+		// if the signature doesn't match, skip
+		if match, err := event.CheckSignature(); err != nil || !match {
 			continue
 		}
 
-		// if the signature doesn't match, skip
-		if match, err := event.CheckSignature(); err != nil || !match {
+		// if the author has not enough pagerank, skip
+		if nodeAttr.Pagerank < pagerankThreshold(NC.Size()) {
 			continue
 		}
 
@@ -110,10 +102,9 @@ func Firehose(ctx context.Context, relays []string,
 	}
 }
 
-// PrintEvent is a simple function that gets passed to the Firehose for testing and debugging.
-// It prints the event ID and PubKey.
-func PrintEvent(event nostr.RelayEvent) error {
-	fmt.Printf("\nevent ID: %v\n", event.ID)
-	fmt.Printf("event pubkey: %v\n", event.PubKey)
-	return nil
+// pagerankThreshold returns the minimum pagerank a pubkey needs to have for its
+// events to be processed.
+func pagerankThreshold(graphSize int) float64 {
+	_ = graphSize
+	return 0.0
 }

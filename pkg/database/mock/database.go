@@ -69,7 +69,7 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 }
 
 // UpdateNode() updates the nodeID using the new values inside node.
-func (DB *Database) UpdateNode(nodeID uint32, node *models.Node) error {
+func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 
 	if err := DB.Validate(); err != nil {
 		return err
@@ -79,8 +79,55 @@ func (DB *Database) UpdateNode(nodeID uint32, node *models.Node) error {
 		return models.ErrNodeNotFoundDB
 	}
 
-	DB.NodeIndex[nodeID] = node
+	DB.updateNodeMeta(nodeID, nodeDiff)
+	DB.updateNodeSuccessors(nodeID, nodeDiff)
 	return nil
+}
+
+// updateNodeMeta() updates the node metadata using the nodeDiff
+func (DB *Database) updateNodeMeta(nodeID uint32, nodeDiff *models.NodeDiff) {
+
+	// update the fields only if not empty
+	if nodeDiff.Metadata.PubKey != "" {
+		DB.NodeIndex[nodeID].Metadata.PubKey = nodeDiff.Metadata.PubKey
+	}
+
+	if nodeDiff.Metadata.Timestamp > 0 {
+		DB.NodeIndex[nodeID].Metadata.Timestamp = nodeDiff.Metadata.Timestamp
+	}
+
+	if nodeDiff.Metadata.Status != "" {
+		DB.NodeIndex[nodeID].Metadata.Status = nodeDiff.Metadata.Status
+	}
+
+	if nodeDiff.Metadata.Pagerank > 0.0 {
+		DB.NodeIndex[nodeID].Metadata.Pagerank = nodeDiff.Metadata.Pagerank
+	}
+}
+
+// updateNodeSuccessors() updates the successors of nodeID by adding nodeDiff.AddedSucc
+// and removing nodeDiff.RemovedSucc.
+func (DB *Database) updateNodeSuccessors(nodeID uint32, nodeDiff *models.NodeDiff) {
+
+	oldSucc := DB.NodeIndex[nodeID].Successors
+
+	// adding new successors
+	for _, addedSucc := range nodeDiff.AddedSucc {
+		if !slices.Contains(oldSucc, addedSucc) {
+			oldSucc = append(oldSucc, addedSucc)
+		}
+	}
+
+	// removing successors
+	newSucc := make([]uint32, 0, len(oldSucc)-len(nodeDiff.RemovedSucc))
+	for _, succ := range oldSucc {
+
+		if !slices.Contains(nodeDiff.RemovedSucc, succ) {
+			newSucc = append(newSucc, succ)
+		}
+	}
+
+	DB.NodeIndex[nodeID].Successors = newSucc
 }
 
 // ContainsNode() returns whether nodeID is found in the DB

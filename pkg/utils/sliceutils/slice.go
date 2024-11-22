@@ -8,6 +8,28 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+// EqualElements() returns whether slice1 and slice2 are equal if they have
+// the same elements (possibly in different positions).
+// Empty and nil slices are considered equal.
+// Time complexity is O(n * logn + m * logm)  where n and m are the lengths of the slices.
+func EqualElements(slice1, slice2 []uint32) bool {
+
+	if len(slice1) != len(slice2) {
+		return false
+	}
+
+	slices.Sort(slice1)
+	slices.Sort(slice2)
+
+	for i := range slice1 {
+		if slice1[i] != slice2[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 /*
 returns the difference between slice1 and slice2; in set notation:
 

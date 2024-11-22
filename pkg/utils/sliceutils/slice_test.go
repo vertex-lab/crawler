@@ -9,6 +9,49 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+func TestEqualElements(t *testing.T) {
+	testCases := []struct {
+		name          string
+		slice1        []uint32
+		slice2        []uint32
+		expectedEqual bool
+	}{
+		{
+			name:          "both nil",
+			slice1:        nil,
+			slice2:        []uint32{},
+			expectedEqual: true,
+		},
+		{
+			name:          "both empty",
+			slice1:        []uint32{},
+			slice2:        []uint32{},
+			expectedEqual: true,
+		},
+		{
+			name:          "one nil, one empty",
+			slice1:        nil,
+			slice2:        []uint32{},
+			expectedEqual: true,
+		},
+		{
+			name:          "same elements",
+			slice1:        []uint32{0, 2, 1},
+			slice2:        []uint32{1, 0, 2},
+			expectedEqual: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			equal := EqualElements(test.slice1, test.slice2)
+			if equal != test.expectedEqual {
+				t.Fatalf("EqualElements(): expected %v, got %v", test.expectedEqual, equal)
+			}
+		})
+	}
+}
+
 func TestDifference(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -246,29 +289,6 @@ func TestSortWalks(t *testing.T) {
 
 // ---------------------------------BENCHMARKS---------------------------------
 
-func BenchmarkPartition(b *testing.B) {
-
-	size := int32(1000)
-	oldSlice := make([]uint32, size)
-	newSlice := make([]uint32, size)
-
-	// setup old and current IDs
-	for i := int32(0); i < size; i++ {
-
-		old := uint32(rand.Int31n(size * 2))
-		new := uint32(rand.Int31n(size * 2))
-
-		oldSlice = append(oldSlice, old)
-		newSlice = append(newSlice, new)
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		Partition(oldSlice, newSlice)
-	}
-}
-
 func BenchmarkDifference(b *testing.B) {
 
 	size := int32(1000)
@@ -289,6 +309,29 @@ func BenchmarkDifference(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		Difference(slice1, slice2)
+	}
+}
+
+func BenchmarkPartition(b *testing.B) {
+
+	size := int32(1000)
+	oldSlice := make([]uint32, size)
+	newSlice := make([]uint32, size)
+
+	// setup old and current IDs
+	for i := int32(0); i < size; i++ {
+
+		old := uint32(rand.Int31n(size * 2))
+		new := uint32(rand.Int31n(size * 2))
+
+		oldSlice = append(oldSlice, old)
+		newSlice = append(newSlice, new)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		Partition(oldSlice, newSlice)
 	}
 }
 
