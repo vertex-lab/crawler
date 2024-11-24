@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 func main() {
@@ -54,8 +54,8 @@ func main() {
 	// wg.Wait()
 	// fmt.Printf("\nExiting\n")
 
-	nodeMeta := models.NodeMeta{}
-	fmt.Printf(".timestamp = %v", nodeMeta.Timestamp)
+	eventMap := make(map[string]nostr.RelayEvent, 10)
+	fmt.Printf("ts: %v", eventMap["zero"])
 
 }
 
@@ -79,16 +79,6 @@ func main() {
 // 			}
 // 		}
 // 	}
-// }
-
-// // handleSignals listens for OS signals and triggers context cancellation.
-// func handleSignals(cancel context.CancelFunc) {
-// 	signalChan := make(chan os.Signal, 1)
-// 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-// 	<-signalChan // Block until a signal is received
-// 	fmt.Printf("\nSignal received. Shutting down...")
-// 	cancel()
 // }
 
 // pk := "503f9927838af9ae5701d96bc3eade86bb776582922b0394766a41a2ccee1c7a"

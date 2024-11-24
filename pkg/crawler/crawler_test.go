@@ -31,3 +31,14 @@ func TestFirehose(t *testing.T) {
 
 	Firehose(ctx, Relays, DB, 2000, PrintEvent)
 }
+
+func TestQueryAuthors(t *testing.T) {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go handleSignals(cancel)
+
+	pubkeys := []string{pip, calle, gigi, odell}
+	QueryAuthors(ctx, Relays, pubkeys, PrintEvent)
+}
