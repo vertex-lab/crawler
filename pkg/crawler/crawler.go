@@ -10,6 +10,10 @@ import (
 )
 
 var (
+	RelevantKinds = []int{
+		nostr.KindFollowList,
+	}
+
 	Relays = []string{
 		"wss://purplepag.es",
 		"wss://njump.me",
@@ -43,16 +47,16 @@ var (
 )
 
 /*
-Firehose connects to a list of relays and pulls recent kind:3 events.
+Firehose connects to a list of relays and pulls kind:3 events that are newer than
+current time - timeLimit.
 It efficiently filters events based on the pubkey "spamminess", determined by our
-own pagerank-based reputation system. It leverage a NodeCache to do these checks
-without having to query the database.
+own pagerank-based reputation system.
 
 Finally, it uses the specified queueHandler function to send the events to the
 queue for further processing and/or to be written to the database.
 */
-func Firehose(ctx context.Context, relays []string,
-	NC models.NodeCache, queueHandler func(event nostr.RelayEvent) error) {
+func Firehose(ctx context.Context, relays []string, DB models.Database,
+	timeLimit int64, queueHandler func(event nostr.RelayEvent) error) {
 
 	pool := nostr.NewSimplePool(ctx)
 	stop := func() {
@@ -65,7 +69,7 @@ func Firehose(ctx context.Context, relays []string,
 	}
 	defer stop()
 
-	ts := nostr.Timestamp(time.Now().Unix())
+	ts := nostr.Timestamp(time.Now().Unix() - timeLimit)
 	filters := nostr.Filters{{
 		Kinds: RelevantKinds,
 		Since: &ts,
@@ -74,24 +78,24 @@ func Firehose(ctx context.Context, relays []string,
 	// iterate over the events
 	for event := range pool.SubMany(ctx, Relays, filters) {
 
-		// if the the author is not in the DB, skip
-		nodeAttr, exists := NC.Load(event.PubKey)
-		if !exists {
-			continue
-		}
-
-		// if this event is older than what we have, skip
-		if event.CreatedAt.Time().Unix() < nodeAttr.Timestamp {
-			continue
-		}
-
 		// if the signature doesn't match, skip
 		if match, err := event.CheckSignature(); err != nil || !match {
 			continue
 		}
 
+		// query from the DB the node associated with that pubkey
+		nodeMeta, err := DB.NodeMeta(event.PubKey)
+		if err != nil {
+			continue
+		}
+
+		// if this event is older than what we have, skip
+		if event.CreatedAt.Time().Unix() < nodeMeta.Timestamp {
+			continue
+		}
+
 		// if the author has not enough pagerank, skip
-		if nodeAttr.Pagerank < pagerankThreshold(NC.Size()) {
+		if nodeMeta.Pagerank < pagerankThreshold(DB.Size()) {
 			continue
 		}
 
@@ -107,4 +111,11 @@ func Firehose(ctx context.Context, relays []string,
 func pagerankThreshold(graphSize int) float64 {
 	_ = graphSize
 	return 0.0
+}
+
+// PrintEvent is a simple function that prints the event ID and PubKey.
+func PrintEvent(event nostr.RelayEvent) error {
+	fmt.Printf("\nevent ID: %v", event.ID)
+	fmt.Printf("\nevent pubkey: %v\n", event.PubKey)
+	return nil
 }

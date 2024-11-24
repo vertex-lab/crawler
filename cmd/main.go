@@ -1,5 +1,11 @@
 package main
 
+import (
+	"fmt"
+
+	"github.com/vertex-lab/crawler/pkg/models"
+)
+
 func main() {
 	// fmt.Println("------------------------")
 	// fmt.Println("Nostr crawler is running")
@@ -47,6 +53,9 @@ func main() {
 	// }
 	// wg.Wait()
 	// fmt.Printf("\nExiting\n")
+
+	nodeMeta := models.NodeMeta{}
+	fmt.Printf(".timestamp = %v", nodeMeta.Timestamp)
 
 }
 

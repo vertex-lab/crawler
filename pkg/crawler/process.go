@@ -1,18 +1,10 @@
 package crawler
 
 import (
-	"fmt"
-
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
-)
-
-var (
-	RelevantKinds = []int{
-		nostr.KindFollowList,
-	}
 )
 
 /*
@@ -148,12 +140,5 @@ func checkInputs(DB models.Database, RWM *walks.RandomWalkManager,
 		return models.ErrNilNCPointer
 	}
 
-	return nil
-}
-
-// PrintEvent is a simple function that prints the event ID and PubKey.
-func PrintEvent(event nostr.RelayEvent) error {
-	fmt.Printf("\nevent ID: %v", event.ID)
-	fmt.Printf("\nevent pubkey: %v\n", event.PubKey)
 	return nil
 }

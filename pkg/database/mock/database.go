@@ -276,6 +276,11 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 
 // function that returns a DB setup based on the DBType
 func SetupDB(DBType string) *Database {
+
+	odell := "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
+	calle := "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63"
+	pip := "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
+
 	switch DBType {
 
 	case "nil":
@@ -327,11 +332,6 @@ func SetupDB(DBType string) *Database {
 		return DB
 
 	case "simple-with-pks":
-
-		odell := "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
-		calle := "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63"
-		pip := "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
-
 		DB := NewDatabase()
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
@@ -340,6 +340,12 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: calle, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
 		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 2
+		return DB
+
+	case "pip":
+		DB := NewDatabase()
+		DB.KeyIndex[pip] = 0
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
 		return DB
 
 	default:

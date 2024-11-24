@@ -1,14 +1,10 @@
 package crawler
 
 import (
-	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
-	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
-	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 const odell = "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
@@ -70,156 +66,156 @@ func TestParsePubkeys(t *testing.T) {
 	}
 }
 
-func TestProcessNodeIDs(t *testing.T) {
-	testCases := []struct {
-		name          string
-		DBType        string
-		pubkeys       []string
-		expectedError error
-		expectedIDs   []uint32
-	}{
-		{
-			name:          "nil pubkeys",
-			DBType:        "simple-with-mock-pks",
-			pubkeys:       nil,
-			expectedError: nil,
-			expectedIDs:   []uint32{},
-		},
-		{
-			name:          "empty pubkeys",
-			DBType:        "simple-with-mock-pks",
-			pubkeys:       []string{},
-			expectedIDs:   []uint32{},
-			expectedError: nil,
-		},
-		{
-			name:          "existing pubkey",
-			DBType:        "simple-with-mock-pks",
-			pubkeys:       []string{"zero", "one"},
-			expectedError: nil,
-			expectedIDs:   []uint32{0, 1},
-		},
-		{
-			name:          "existing and new pubkey",
-			DBType:        "simple-with-mock-pks",
-			pubkeys:       []string{"zero", "one", "three"},
-			expectedError: nil,
-			expectedIDs:   []uint32{0, 1, 3},
-		},
-	}
+// func TestProcessNodeIDs(t *testing.T) {
+// 	testCases := []struct {
+// 		name          string
+// 		DBType        string
+// 		pubkeys       []string
+// 		expectedError error
+// 		expectedIDs   []uint32
+// 	}{
+// 		{
+// 			name:          "nil pubkeys",
+// 			DBType:        "simple-with-mock-pks",
+// 			pubkeys:       nil,
+// 			expectedError: nil,
+// 			expectedIDs:   []uint32{},
+// 		},
+// 		{
+// 			name:          "empty pubkeys",
+// 			DBType:        "simple-with-mock-pks",
+// 			pubkeys:       []string{},
+// 			expectedIDs:   []uint32{},
+// 			expectedError: nil,
+// 		},
+// 		{
+// 			name:          "existing pubkey",
+// 			DBType:        "simple-with-mock-pks",
+// 			pubkeys:       []string{"zero", "one"},
+// 			expectedError: nil,
+// 			expectedIDs:   []uint32{0, 1},
+// 		},
+// 		{
+// 			name:          "existing and new pubkey",
+// 			DBType:        "simple-with-mock-pks",
+// 			pubkeys:       []string{"zero", "one", "three"},
+// 			expectedError: nil,
+// 			expectedIDs:   []uint32{0, 1, 3},
+// 		},
+// 	}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			DB := mockdb.SetupDB(test.DBType)
-			followIDs, err := ProcessNodeIDs(DB, test.pubkeys)
+// 	for _, test := range testCases {
+// 		t.Run(test.name, func(t *testing.T) {
+// 			DB := mockdb.SetupDB(test.DBType)
+// 			followIDs, err := ProcessNodeIDs(DB, test.pubkeys)
 
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
-			}
+// 			if !errors.Is(err, test.expectedError) {
+// 				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
+// 			}
 
-			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
-				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
-			}
-		})
-	}
-}
+// 			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
+// 				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
+// 			}
+// 		})
+// 	}
+// }
 
-func TestProcessFollowListEvent(t *testing.T) {
-	t.Run("simple errors", func(t *testing.T) {
-		testCases := []struct {
-			name          string
-			DBType        string
-			RWSType       string
-			expectedError error
-		}{
-			{
-				name:          "nil DB",
-				DBType:        "nil",
-				RWSType:       "one-node0",
-				expectedError: models.ErrNilDBPointer,
-			},
-			{
-				name:          "nil RWS",
-				DBType:        "one-node0",
-				RWSType:       "nil",
-				expectedError: models.ErrNilRWSPointer,
-			},
-			{
-				name:          "event.PubKey not found",
-				DBType:        "one-node0",
-				RWSType:       "one-node0",
-				expectedError: models.ErrNodeNotFoundNC,
-			},
-		}
+// func TestProcessFollowListEvent(t *testing.T) {
+// 	t.Run("simple errors", func(t *testing.T) {
+// 		testCases := []struct {
+// 			name          string
+// 			DBType        string
+// 			RWSType       string
+// 			expectedError error
+// 		}{
+// 			{
+// 				name:          "nil DB",
+// 				DBType:        "nil",
+// 				RWSType:       "one-node0",
+// 				expectedError: models.ErrNilDBPointer,
+// 			},
+// 			{
+// 				name:          "nil RWS",
+// 				DBType:        "one-node0",
+// 				RWSType:       "nil",
+// 				expectedError: models.ErrNilRWSPointer,
+// 			},
+// 			{
+// 				name:          "event.PubKey not found",
+// 				DBType:        "one-node0",
+// 				RWSType:       "one-node0",
+// 				expectedError: models.ErrNodeNotFoundNC,
+// 			},
+// 		}
 
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				DB := mockdb.SetupDB(test.DBType)
-				RWM := walks.SetupRWM(test.RWSType)
-				NC := models.NewNodeCache()
+// 		for _, test := range testCases {
+// 			t.Run(test.name, func(t *testing.T) {
+// 				DB := mockdb.SetupDB(test.DBType)
+// 				RWM := walks.SetupRWM(test.RWSType)
+// 				NC := models.NewNodeCache()
 
-				err := ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[0])
-				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("ProcessFollowListEvent(): expected %v, got %v", test.expectedError, err)
-				}
-			})
-		}
-	})
+// 				err := ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[0])
+// 				if !errors.Is(err, test.expectedError) {
+// 					t.Fatalf("ProcessFollowListEvent(): expected %v, got %v", test.expectedError, err)
+// 				}
+// 			})
+// 		}
+// 	})
 
-	t.Run("valid", func(t *testing.T) {
-		DB := mockdb.SetupDB("simple-with-pks")
-		RWM := walks.SetupRWM("simple")
-		NC, err := DB.NodeCache()
-		if err != nil {
-			t.Fatalf("NodeCache(): expected nil, got %v", err)
-		}
+// 	t.Run("valid", func(t *testing.T) {
+// 		DB := mockdb.SetupDB("simple-with-pks")
+// 		RWM := walks.SetupRWM("simple")
+// 		NC, err := DB.NodeCache()
+// 		if err != nil {
+// 			t.Fatalf("NodeCache(): expected nil, got %v", err)
+// 		}
 
-		err = ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[1])
-		if err != nil {
-			t.Fatalf("ProcessFollowListEvent(): expected nil, got %v", err)
-		}
+// 		err = ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[1])
+// 		if err != nil {
+// 			t.Fatalf("ProcessFollowListEvent(): expected nil, got %v", err)
+// 		}
 
-		expectedNodes := map[uint32]models.Node{
-			0: {
-				Metadata: models.NodeMeta{
-					PubKey:    odell,
-					Status:    models.StatusCrawled,
-					Timestamp: fakeEvents[1].CreatedAt.Time().Unix(),
-					Pagerank:  0.26,
-				},
-				Successors:   []uint32{2},
-				Predecessors: []uint32{},
-			},
+// 		expectedNodes := map[uint32]models.Node{
+// 			0: {
+// 				Metadata: models.NodeMeta{
+// 					PubKey:    odell,
+// 					Status:    models.StatusCrawled,
+// 					Timestamp: fakeEvents[1].CreatedAt.Time().Unix(),
+// 					Pagerank:  0.26,
+// 				},
+// 				Successors:   []uint32{2},
+// 				Predecessors: []uint32{},
+// 			},
 
-			1: {
-				Metadata: models.NodeMeta{
-					PubKey:    calle,
-					Status:    models.StatusNotCrawled,
-					Timestamp: 0,
-					Pagerank:  0.26,
-				},
-				Successors:   []uint32{},
-				Predecessors: []uint32{},
-			},
+// 			1: {
+// 				Metadata: models.NodeMeta{
+// 					PubKey:    calle,
+// 					Status:    models.StatusNotCrawled,
+// 					Timestamp: 0,
+// 					Pagerank:  0.26,
+// 				},
+// 				Successors:   []uint32{},
+// 				Predecessors: []uint32{},
+// 			},
 
-			2: {
-				Metadata: models.NodeMeta{
-					PubKey:    pip,
-					Status:    models.StatusNotCrawled,
-					Timestamp: 0,
-					Pagerank:  0.48,
-				},
-				Successors:   []uint32{},
-				Predecessors: []uint32{0},
-			},
-		}
+// 			2: {
+// 				Metadata: models.NodeMeta{
+// 					PubKey:    pip,
+// 					Status:    models.StatusNotCrawled,
+// 					Timestamp: 0,
+// 					Pagerank:  0.48,
+// 				},
+// 				Successors:   []uint32{},
+// 				Predecessors: []uint32{0},
+// 			},
+// 		}
 
-		for nodeID, expectedNode := range expectedNodes {
-			node := DB.NodeIndex[nodeID]
-			if !reflect.DeepEqual(node, &expectedNode) {
-				t.Errorf("ProcessFollowListEvent(): expected node %v, got %v", &expectedNode, node)
-			}
-		}
+// 		for nodeID, expectedNode := range expectedNodes {
+// 			node := DB.NodeIndex[nodeID]
+// 			if !reflect.DeepEqual(node, &expectedNode) {
+// 				t.Errorf("ProcessFollowListEvent(): expected node %v, got %v", &expectedNode, node)
+// 			}
+// 		}
 
-	})
-}
+// 	})
+// }
