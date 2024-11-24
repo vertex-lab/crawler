@@ -1,13 +1,5 @@
 package main
 
-import (
-	"context"
-	"fmt"
-
-	"github.com/nbd-wtf/go-nostr"
-	"github.com/vertex-lab/crawler/pkg/crawler"
-)
-
 func main() {
 	// fmt.Println("------------------------")
 	// fmt.Println("Nostr crawler is running")
@@ -56,40 +48,6 @@ func main() {
 	// wg.Wait()
 	// fmt.Printf("\nExiting\n")
 
-	pk := "503f9927838af9ae5701d96bc3eade86bb776582922b0394766a41a2ccee1c7a"
-	met := "ee9ba8b3dd0b2e8507d4ac6dfcd3fb2e7f0cc20f220f410a9ce3eccaac79fecd"
-
-	_ = pk
-	_ = met
-
-	pool := nostr.NewSimplePool(context.Background())
-	stop := func() {
-		fmt.Printf("\n  > Closing relay connections... ")
-		pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
-			relay.Close()
-			return true
-		})
-		fmt.Printf("All closed!")
-	}
-	defer stop()
-
-	filters := nostr.Filters{{
-		Kinds:   []int{3},
-		Authors: []string{met},
-	}}
-
-	// iterate over the events
-	for event := range pool.SubMany(context.Background(), crawler.Relays, filters) {
-
-		fmt.Printf("\nevent ID: %v", event.ID)
-		fmt.Printf("\nevent pubkey: %v", event.PubKey)
-		fmt.Printf("\nevent kind: %v", event.Kind)
-		fmt.Printf("\nevent createdAt: %v", event.CreatedAt)
-		fmt.Printf("\n\nevent tags: %v", event.Tags)
-		fmt.Printf("\n\nevent Content: %v", event.Content)
-		fmt.Printf("\nevent Signature: %v", event.Sig)
-		break
-	}
 }
 
 // // ProcessEvents processes events from the event channel until the context is canceled.
@@ -122,4 +80,39 @@ func main() {
 // 	<-signalChan // Block until a signal is received
 // 	fmt.Printf("\nSignal received. Shutting down...")
 // 	cancel()
+// }
+
+// pk := "503f9927838af9ae5701d96bc3eade86bb776582922b0394766a41a2ccee1c7a"
+// met := "ee9ba8b3dd0b2e8507d4ac6dfcd3fb2e7f0cc20f220f410a9ce3eccaac79fecd"
+
+// _ = pk
+// _ = met
+
+// pool := nostr.NewSimplePool(context.Background())
+// stop := func() {
+// 	fmt.Printf("\n  > Closing relay connections... ")
+// 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
+// 		relay.Close()
+// 		return true
+// 	})
+// 	fmt.Printf("All closed!")
+// }
+// defer stop()
+
+// filters := nostr.Filters{{
+// 	Kinds:   []int{3},
+// 	Authors: []string{met},
+// }}
+
+// // iterate over the events
+// for event := range pool.SubMany(context.Background(), crawler.Relays, filters) {
+
+// 	fmt.Printf("\nevent ID: %v", event.ID)
+// 	fmt.Printf("\nevent pubkey: %v", event.PubKey)
+// 	fmt.Printf("\nevent kind: %v", event.Kind)
+// 	fmt.Printf("\nevent createdAt: %v", event.CreatedAt)
+// 	fmt.Printf("\n\nevent tags: %v", event.Tags)
+// 	fmt.Printf("\n\nevent Content: %v", event.Content)
+// 	fmt.Printf("\nevent Signature: %v", event.Sig)
+// 	break
 // }

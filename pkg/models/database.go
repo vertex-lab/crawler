@@ -54,6 +54,9 @@ type Database interface {
 	// Validate() returns the appropriate error if the DB is nil or empty
 	Validate() error
 
+	// NodeMeta() retrieves a node by its pubkey.
+	NodeMeta(pubkey string) (NodeMeta, error)
+
 	// AddNode() adds a node to the database and returns its assigned nodeID
 	AddNode(*Node) (uint32, error)
 

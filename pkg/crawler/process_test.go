@@ -8,25 +8,36 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
-	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
+
+const odell = "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
+const calle = "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63"
+const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
+const gigi = "6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93"
 
 // A list of fake events used for testing.
 var fakeEvents = []nostr.Event{
 	{
-		ID:        "xxx",
-		PubKey:    "503f9927838af9ae5701d96bc3eade86bb776582922b0394766a41a2ccee1c7a",
+		PubKey:    odell,
 		Kind:      3,
 		CreatedAt: nostr.Timestamp(1713083262),
 		Tags: nostr.Tags{
-			nostr.Tag{"p", "503f9927838af9ae5701d96bc3eade86bb776582922b0394766a41a2ccee1c7a"},
-			nostr.Tag{"e", "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"},       // not a p tag
-			nostr.Tag{"p", "xxxee9ba8b3dd0b2e8507d4ac6dfcd3fb2e7f0cc20f220f410a9ce3eccaac79fecdxxx"}, // pubkey badly formatted
+			nostr.Tag{"p", gigi},
+			nostr.Tag{"e", calle},       // not a p tag
+			nostr.Tag{"p", pip + "xxx"}, // pubkey not valid
 		},
+	},
+	{
+		PubKey:    odell,
+		Kind:      3,
+		CreatedAt: nostr.Timestamp(11),
+		Tags: nostr.Tags{
+			nostr.Tag{"p", pip}},
 	},
 }
 
-func TestParseFollowList(t *testing.T) {
+func TestParsePubkeys(t *testing.T) {
 	testCases := []struct {
 		name            string
 		tags            nostr.Tags
@@ -45,14 +56,13 @@ func TestParseFollowList(t *testing.T) {
 		{
 			name:            "one valid tag",
 			tags:            fakeEvents[0].Tags,
-			expectedPubkeys: []string{"503f9927838af9ae5701d96bc3eade86bb776582922b0394766a41a2ccee1c7a"},
+			expectedPubkeys: []string{gigi},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
-			pubkeys := ParseFollowList(test.tags)
+			pubkeys := ParsePubkeys(test.tags)
 			if !reflect.DeepEqual(pubkeys, test.expectedPubkeys) {
 				t.Fatalf("ParseFollowList(): expected %v, got %v", test.expectedPubkeys, pubkeys)
 			}
@@ -60,7 +70,7 @@ func TestParseFollowList(t *testing.T) {
 	}
 }
 
-func TestProcessFollows(t *testing.T) {
+func TestProcessNodeIDs(t *testing.T) {
 	testCases := []struct {
 		name          string
 		DBType        string
@@ -101,14 +111,14 @@ func TestProcessFollows(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := mockdb.SetupDB(test.DBType)
-			followIDs, err := ProcessFollows(DB, test.pubkeys, 0)
+			followIDs, err := ProcessNodeIDs(DB, test.pubkeys)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("ProcessFollows(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
-				t.Errorf("ProcessFollows(): expected %v, got %v", test.expectedIDs, followIDs)
+				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
 			}
 		})
 	}
@@ -138,21 +148,78 @@ func TestProcessFollowListEvent(t *testing.T) {
 				name:          "event.PubKey not found",
 				DBType:        "one-node0",
 				RWSType:       "one-node0",
-				expectedError: models.ErrNodeNotFoundDB,
+				expectedError: models.ErrNodeNotFoundNC,
 			},
 		}
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
-				RWS := mockstore.SetupRWS(test.RWSType)
+				RWM := walks.SetupRWM(test.RWSType)
 				NC := models.NewNodeCache()
 
-				err := ProcessFollowListEvent(DB, RWS, NC, &fakeEvents[0])
+				err := ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[0])
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowListEvent(): expected %v, got %v", test.expectedError, err)
 				}
 			})
 		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		DB := mockdb.SetupDB("simple-with-pks")
+		RWM := walks.SetupRWM("simple")
+		NC, err := DB.NodeCache()
+		if err != nil {
+			t.Fatalf("NodeCache(): expected nil, got %v", err)
+		}
+
+		err = ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[1])
+		if err != nil {
+			t.Fatalf("ProcessFollowListEvent(): expected nil, got %v", err)
+		}
+
+		expectedNodes := map[uint32]models.Node{
+			0: {
+				Metadata: models.NodeMeta{
+					PubKey:    odell,
+					Status:    models.StatusCrawled,
+					Timestamp: fakeEvents[1].CreatedAt.Time().Unix(),
+					Pagerank:  0.26,
+				},
+				Successors:   []uint32{2},
+				Predecessors: []uint32{},
+			},
+
+			1: {
+				Metadata: models.NodeMeta{
+					PubKey:    calle,
+					Status:    models.StatusNotCrawled,
+					Timestamp: 0,
+					Pagerank:  0.26,
+				},
+				Successors:   []uint32{},
+				Predecessors: []uint32{},
+			},
+
+			2: {
+				Metadata: models.NodeMeta{
+					PubKey:    pip,
+					Status:    models.StatusNotCrawled,
+					Timestamp: 0,
+					Pagerank:  0.48,
+				},
+				Successors:   []uint32{},
+				Predecessors: []uint32{0},
+			},
+		}
+
+		for nodeID, expectedNode := range expectedNodes {
+			node := DB.NodeIndex[nodeID]
+			if !reflect.DeepEqual(node, &expectedNode) {
+				t.Errorf("ProcessFollowListEvent(): expected node %v, got %v", &expectedNode, node)
+			}
+		}
+
 	})
 }

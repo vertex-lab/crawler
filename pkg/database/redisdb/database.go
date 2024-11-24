@@ -78,6 +78,36 @@ func (DB *Database) Validate() error {
 	return nil
 }
 
+// NodeMeta() retrieves a node by its pubkey.
+func (DB *Database) NodeMeta(pubkey string) (models.NodeMeta, error) {
+
+	nodeMeta := models.NodeMeta{}
+	if err := DB.validateFields(); err != nil {
+		return nodeMeta, err
+	}
+
+	luaScript := `
+		local KeyIndex = KEYS[1]
+		local KeyNodePrefix = KEYS[2]
+		local pubkey = ARGV[1]
+
+		local nodeID = redis.call('HGET', KeyIndex, pubkey)
+		if not nodeID then
+			return nil
+		end
+
+		return redis.call('HGETALL', KeyNodePrefix .. nodeID)
+	`
+
+	keys := []string{KeyKeyIndex, KeyNodePrefix}
+	res, err := DB.client.Eval(DB.ctx, luaScript, keys, pubkey).Result()
+	if err != nil {
+		return nodeMeta, err
+	}
+
+	return redisutils.ParseNodeFromFlatArray(res)
+}
+
 // AddNode() adds a node to the database and returns its assigned nodeID.
 func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 
@@ -286,6 +316,10 @@ func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
 
 	if err := DB.validateFields(); err != nil {
 		return nil, err
+	}
+
+	if len(pubkeys) == 0 {
+		return []interface{}{}, nil
 	}
 
 	nodeIDs, err := DB.client.HMGet(DB.ctx, KeyKeyIndex, pubkeys...).Result()

@@ -146,10 +146,7 @@ func TestAddNode(t *testing.T) {
 
 			// check if data was added correctly
 			if nodeID != math.MaxUint32 {
-				node, err := DB.Node(nodeID)
-				if err != nil {
-					t.Fatalf("Node(%d): expected nil, got %v", nodeID, err)
-				}
+				node := DB.NodeIndex[nodeID]
 
 				if !reflect.DeepEqual(node, test.Node) {
 					t.Errorf("AddNode(%v): expected node %v \n got %v", test.Node, test.Node, node)
@@ -208,10 +205,7 @@ func TestUpdateNode(t *testing.T) {
 
 			// check if node was updated correctly
 			if err == nil {
-				node, err := DB.Node(test.nodeID)
-				if err != nil {
-					t.Fatalf("Node(%d): expected nil, got %v", test.nodeID, err)
-				}
+				node := DB.NodeIndex[test.nodeID]
 
 				if !reflect.DeepEqual(node, test.expectedNode) {
 					t.Errorf("UpdateNode(%v): expected node %v \n got %v", test.nodeID, test.expectedNode, node)
@@ -221,57 +215,58 @@ func TestUpdateNode(t *testing.T) {
 	}
 }
 
-func TestNode(t *testing.T) {
+func TestNodeMeta(t *testing.T) {
 	testCases := []struct {
-		name          string
-		DBType        string
-		expectedError error
-		expectedNode  *models.Node
+		name             string
+		DBType           string
+		pubkey           string
+		expectedError    error
+		expectedNodeMeta models.NodeMeta
 	}{
 		{
-			name:          "nil DB",
-			DBType:        "nil",
-			expectedError: models.ErrNilDBPointer,
+			name:             "nil DB",
+			DBType:           "nil",
+			pubkey:           "zero",
+			expectedError:    models.ErrNilDBPointer,
+			expectedNodeMeta: models.NodeMeta{},
 		},
 		{
-			name:          "empty DB",
-			DBType:        "empty",
-			expectedError: models.ErrEmptyDB,
+			name:             "empty DB",
+			DBType:           "empty",
+			pubkey:           "zero",
+			expectedError:    models.ErrEmptyDB,
+			expectedNodeMeta: models.NodeMeta{},
 		},
 		{
-			name:          "DB with node 0",
-			DBType:        "one-node0",
-			expectedError: models.ErrNodeNotFoundDB,
+			name:             "node not found",
+			DBType:           "simple-with-mock-pks",
+			pubkey:           "three",
+			expectedError:    models.ErrNodeNotFoundDB,
+			expectedNodeMeta: models.NodeMeta{},
 		},
 		{
-			name:          "DB with node 1",
-			DBType:        "one-node1",
+			name:          "node found",
+			DBType:        "simple-with-mock-pks",
+			pubkey:        "zero",
 			expectedError: nil,
-			expectedNode: &models.Node{
-				Metadata:   models.NodeMeta{Timestamp: 0},
-				Successors: []uint32{1}},
+			expectedNodeMeta: models.NodeMeta{
+				PubKey:    "zero",
+				Timestamp: 0,
+				Pagerank:  0.26},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			node, err := DB.Node(1)
+			node, err := DB.NodeMeta(test.pubkey)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Node(1): expected %v, got %v", test.expectedError, err)
 			}
 
-			// if provided, check that the expected result is equal to the result
-			if test.expectedNode != nil {
-
-				if node == nil {
-					t.Fatalf("Node(1): expected node, got nil")
-				}
-
-				if !reflect.DeepEqual(test.expectedNode, node) {
-					t.Errorf("Node(1): expected %v, got %v", test.expectedNode, node)
-				}
+			if !reflect.DeepEqual(test.expectedNodeMeta, node) {
+				t.Errorf("Node(1): expected %v, got %v", test.expectedNodeMeta, node)
 			}
 		})
 	}

@@ -39,6 +39,45 @@ func ParseWalk(strWalk string) (models.RandomWalk, error) {
 	return walk, nil
 }
 
+func ParseNodeFromFlatArray(res interface{}) (models.NodeMeta, error) {
+
+	nodeMeta := models.NodeMeta{}
+	var err error
+
+	// the result should be a slice { key1, val1, key2, val2, ... }
+	resSlice, ok := res.([]interface{})
+	if !ok {
+		return nodeMeta, fmt.Errorf("unexpected result type: %T", res)
+	}
+	if len(resSlice)%2 != 0 {
+		return nodeMeta, fmt.Errorf("unexpected Redis result format: %v", res)
+	}
+
+	for i := 0; i < len(resSlice); i += 2 {
+		key := resSlice[i].(string)
+		strVal := resSlice[i+1].(string)
+
+		switch key {
+		case "pubkey":
+			nodeMeta.PubKey = strVal
+		case "status":
+			nodeMeta.Status = strVal
+		case "timestamp":
+			nodeMeta.Timestamp, err = ParseInt64(strVal)
+			if err != nil {
+				return nodeMeta, err
+			}
+		case "pagerank":
+			nodeMeta.Pagerank, err = ParseFloat64(strVal)
+			if err != nil {
+				return nodeMeta, err
+			}
+		}
+	}
+
+	return nodeMeta, err
+}
+
 // FormatID() formats a nodeID or walkID (uint32) into a string
 func FormatID(ID uint32) string {
 	return strconv.FormatUint(uint64(ID), 10)
@@ -48,6 +87,12 @@ func FormatID(ID uint32) string {
 func ParseID(strVal string) (uint32, error) {
 	parsedVal, err := strconv.ParseUint(strVal, 10, 32)
 	return uint32(parsedVal), err
+}
+
+// ParseInt64() parses an int from the specified string
+func ParseInt64(strVal string) (int64, error) {
+	parsedVal, err := strconv.ParseInt(strVal, 10, 64)
+	return parsedVal, err
 }
 
 // ParseUint16() parses an uint16 from the specified string

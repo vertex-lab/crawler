@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
@@ -214,6 +215,72 @@ func TestAddPredecessors(t *testing.T) {
 		if !isMember {
 			t.Fatalf("AddSuccessors(): expected nodeID = %d part of follows:%d", nodeID, pred)
 		}
+	}
+}
+
+func TestNodeMeta(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name             string
+		DBType           string
+		pubkey           string
+		expectedError    error
+		expectedNodeMeta models.NodeMeta
+	}{
+		{
+			name:             "nil DB",
+			DBType:           "nil",
+			pubkey:           "zero",
+			expectedNodeMeta: models.NodeMeta{},
+			expectedError:    models.ErrNilDBPointer,
+		},
+		{
+			name:             "empty DB",
+			DBType:           "empty",
+			pubkey:           "zero",
+			expectedNodeMeta: models.NodeMeta{},
+			expectedError:    redis.Nil,
+		},
+		{
+			name:             "pubkey not found",
+			DBType:           "one-node0",
+			pubkey:           "one",
+			expectedNodeMeta: models.NodeMeta{},
+			expectedError:    redis.Nil,
+		},
+		{
+			name:   "valid",
+			DBType: "one-node0",
+			pubkey: "zero",
+			expectedNodeMeta: models.NodeMeta{
+				PubKey:    "zero",
+				Timestamp: 1731685733,
+				Status:    "idk",
+				Pagerank:  1.0,
+			},
+			expectedError: nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			nodeMeta, err := DB.NodeMeta(test.pubkey)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NodeMeta(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(nodeMeta, test.expectedNodeMeta) {
+				t.Errorf("NodeMeta(%v): expected %v, got %v", test.pubkey, test.expectedNodeMeta, nodeMeta)
+			}
+		})
 	}
 }
 
@@ -794,4 +861,25 @@ func TestNodeCache(t *testing.T) {
 
 func TestInterface(t *testing.T) {
 	var _ models.Database = &Database{}
+}
+
+// ------------------------------------BENCHMARKS------------------------------
+
+func BenchmarkNode(b *testing.B) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	_, err := SetupDB(cl, "one-node0")
+	if err != nil {
+		b.Fatalf("SetupDB(): expected nil, got %v", err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := cl.HGetAll(context.Background(), KeyNode(0)).Result()
+		if err != nil {
+			b.Fatalf("Benchmark failed(): %v", err)
+		}
+	}
 }

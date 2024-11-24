@@ -770,3 +770,20 @@ func TestPruneGraftWalk(t *testing.T) {
 func TestInterface(t *testing.T) {
 	var _ models.RandomWalkStore = &RandomWalkStore{}
 }
+
+// ------------------------------------BENCHMARKS------------------------------
+
+func BenchmarkVisitCount(b *testing.B) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	RWS, err := SetupRWS(cl, "triangle")
+	if err != nil {
+		b.Fatalf("SetupRWS(): expected nil, got %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		RWS.VisitCount(0)
+	}
+}

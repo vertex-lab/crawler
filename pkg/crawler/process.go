@@ -6,11 +6,13 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 var (
-	followPrefix  = "p"
-	RelevantKinds = []int{nostr.KindFollowList}
+	RelevantKinds = []int{
+		nostr.KindFollowList,
+	}
 )
 
 /*
@@ -19,16 +21,20 @@ ProcessFollowListEvent is responsible for:
 - updating the RandomWalkStore
 - re-computing pagerank and updating the NodeCache
 */
-func ProcessFollowListEvent(DB models.Database, RWS models.RandomWalkStore,
+func ProcessFollowListEvent(DB models.Database, RWM *walks.RandomWalkManager,
 	NC models.NodeCache, event *nostr.Event) error {
+
+	if err := checkInputs(DB, RWM, NC); err != nil {
+		return err
+	}
 
 	author, exists := NC.Load(event.PubKey)
 	if !exists {
-		return models.ErrNodeNotFoundDB
+		return models.ErrNodeNotFoundNC
 	}
 
-	followPubkeys := ParseFollowList(event.Tags)
-	newSucc, err := ProcessFollows(DB, followPubkeys, author.ID)
+	followPubkeys := ParsePubkeys(event.Tags)
+	newSucc, err := ProcessNodeIDs(DB, followPubkeys)
 	if err != nil {
 		return err
 	}
@@ -38,72 +44,74 @@ func ProcessFollowListEvent(DB models.Database, RWS models.RandomWalkStore,
 		return err
 	}
 
-	// if the successors are actually different, modify the DB
-	if !sliceutils.EqualElements(newSucc, oldSucc) {
+	removedSucc, _, addedSucc := sliceutils.Partition(oldSucc, newSucc)
 
-		authorNode := models.Node{
-			Metadata: models.NodeMeta{
-				PubKey:    event.PubKey,
-				Timestamp: event.CreatedAt.Time().Unix(),
-				Status:    models.StatusCrawled,
-			},
-		}
+	// update the author's node in the database
+	authorNodeDiff := models.NodeDiff{
+		Metadata: models.NodeMeta{
+			Timestamp: event.CreatedAt.Time().Unix(),
+			Status:    models.StatusCrawled,
+		},
+		AddedSucc:   addedSucc,
+		RemovedSucc: removedSucc,
+	}
 
-		_ = authorNode
+	if err := DB.UpdateNode(author.ID, &authorNodeDiff); err != nil {
+		return err
+	}
+
+	// update the random walks
+	if err := RWM.Update(DB, author.ID, oldSucc, newSucc); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// ProcessFollows() returns the nodeIDs of the specified followPubkeys.
+// ProcessNodeIDs() returns the nodeIDs of the specified pubkeys.
 // If a pubkey isn't found in the database, the corrisponding node is added.
-func ProcessFollows(DB models.Database, followPubkeys []string, nodeID uint32) ([]uint32, error) {
+func ProcessNodeIDs(DB models.Database, pubkeys []string) ([]uint32, error) {
 
-	if len(followPubkeys) == 0 {
-		return []uint32{}, nil
-	}
-
-	// get the nodeIDs of the followPubkeys
-	newSucc, err := DB.NodeIDs(followPubkeys)
+	InterfaceNodeIDs, err := DB.NodeIDs(pubkeys)
 	if err != nil {
 		return nil, err
 	}
 
-	succIDs := make([]uint32, len(newSucc))
-	for i, succ := range newSucc {
+	nodeIDs := make([]uint32, len(InterfaceNodeIDs))
+	for i, InterfaceNodeID := range InterfaceNodeIDs {
 
-		succID, ok := succ.(uint32)
+		nodeID, ok := InterfaceNodeID.(uint32)
 		// if it's not uin32, it means the pubkey wasn't found in the database
 		// so we add a new node to the database
 		if !ok {
 			node := models.Node{
 				Metadata: models.NodeMeta{
-					PubKey:    followPubkeys[i],
+					PubKey:    pubkeys[i],
 					Timestamp: 0,
 					Status:    models.StatusNotCrawled,
 					Pagerank:  0.0,
 				},
-				Successors:   nil,
-				Predecessors: []uint32{nodeID},
 			}
 
 			// add the node to the database, and assign it an ID
-			succID, err = DB.AddNode(&node)
+			nodeID, err = DB.AddNode(&node)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		succIDs[i] = succID
+		nodeIDs[i] = nodeID
 	}
 
-	return succIDs, nil
+	return nodeIDs, nil
 }
 
-// ParseFollowList returns the slice of followPubkeys that are correctly listed in the nostr.Tags.
+// ParsePubkeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
 // Badly formatted tags are ignored.
-func ParseFollowList(tags nostr.Tags) []string {
-	followPubkeys := make([]string, 0, len(tags))
+func ParsePubkeys(tags nostr.Tags) []string {
+	const followPrefix = "p"
+
+	pubkeys := make([]string, 0, len(tags))
 	for _, tag := range tags {
 
 		if len(tag) < 2 {
@@ -118,14 +126,32 @@ func ParseFollowList(tags nostr.Tags) []string {
 			continue
 		}
 
-		followPubkeys = append(followPubkeys, tag[1])
+		pubkeys = append(pubkeys, tag[1])
 	}
 
-	return followPubkeys
+	return pubkeys
 }
 
-// PrintEvent is a simple function that gets passed to the Firehose for testing and debugging.
-// It prints the event ID and PubKey.
+// checkInputs() checks the DB, RWM and NC, returning the appropriate error.
+func checkInputs(DB models.Database, RWM *walks.RandomWalkManager,
+	NC models.NodeCache) error {
+
+	if err := DB.Validate(); err != nil {
+		return err
+	}
+
+	if err := RWM.Store.Validate(false); err != nil {
+		return err
+	}
+
+	if NC == nil {
+		return models.ErrNilNCPointer
+	}
+
+	return nil
+}
+
+// PrintEvent is a simple function that prints the event ID and PubKey.
 func PrintEvent(event nostr.RelayEvent) error {
 	fmt.Printf("\nevent ID: %v", event.ID)
 	fmt.Printf("\nevent pubkey: %v\n", event.PubKey)
