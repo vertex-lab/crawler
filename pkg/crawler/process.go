@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -20,18 +21,19 @@ func ProcessFollowListEvent(DB models.Database, RWM *walks.RandomWalkManager,
 		return fmt.Errorf("nostr event is nil")
 	}
 
+	// Fetch node metadata and successors of the author
 	author, err := DB.NodeMetaWithID(event.PubKey)
 	if err != nil {
 		return err
 	}
-
 	oldSucc, err := DB.Successors(author.ID)
 	if err != nil {
 		return err
 	}
 
-	followPubkeys := ParsePubkeys(event.Tags)
-	newSucc, err := ProcessNodeIDs(DB, followPubkeys, newPubkeyHandler)
+	followPubkeys := ParsePubKeys(event.Tags)
+	pagerank := expectedPagerank(RWM.Store.Alpha(), author.Pagerank, len(followPubkeys))
+	newSucc, err := ProcessNodeIDs(DB, followPubkeys, pagerank, newPubkeyHandler)
 	if err != nil {
 		return err
 	}
@@ -64,7 +66,7 @@ func ProcessFollowListEvent(DB models.Database, RWM *walks.RandomWalkManager,
 // If a pubkey isn't found in the database:
 // - the corrisponding node is added to the DB
 // - the pubkey is sent to the newPubkeysQueue
-func ProcessNodeIDs(DB models.Database, pubkeys []string,
+func ProcessNodeIDs(DB models.Database, pubkeys []string, pagerank float64,
 	newPubkeyHandler func(pk string) error) ([]uint32, error) {
 
 	interfaceNodeIDs, err := DB.NodeIDs(pubkeys)
@@ -77,35 +79,51 @@ func ProcessNodeIDs(DB models.Database, pubkeys []string,
 
 		nodeID, ok := interfaceNodeID.(uint32)
 		// if it's not uin32, it means the pubkey wasn't found in the database
-		// so we add a new node to the database with default values.
 		if !ok {
-			node := models.Node{
-				Metadata: models.NodeMeta{
-					PubKey:    pubkeys[i],
-					Timestamp: 0,
-					Status:    models.StatusNotCrawled,
-					Pagerank:  0.0,
-				},
-			}
-
-			// add the node to the database, and assign it an ID
-			nodeID, err = DB.AddNode(&node)
+			nodeID, err = HandleMissingPubkey(DB, pubkeys[i], pagerank, newPubkeyHandler)
 			if err != nil {
 				return nil, err
 			}
 		}
-
 		nodeIDs[i] = nodeID
 	}
 
 	return nodeIDs, nil
 }
 
-//func AddNewPubkey()
+// HandleMissingPubkey() adds a new node to the database, and sends
+// the pubkey to the queue if the expected pagerank is higher than the threshold.
+func HandleMissingPubkey(DB models.Database, pubkey string,
+	pagerank float64, queueHandler func(pk string) error) (uint32, error) {
 
-// ParsePubkeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
+	// add a new node to the database, and assign it an ID
+	node := models.Node{
+		Metadata: models.NodeMeta{
+			PubKey:    pubkey,
+			Timestamp: 0,
+			Status:    models.StatusNotCrawled,
+			Pagerank:  0.0,
+		},
+	}
+
+	nodeID, err := DB.AddNode(&node)
+	if err != nil {
+		return math.MaxUint32, err
+	}
+
+	// if the pagerank is higher than the threshold, send to queue
+	if pagerank > pagerankThreshold(DB.Size()) {
+		if err := queueHandler(pubkey); err != nil {
+			return math.MaxUint32, err
+		}
+	}
+
+	return nodeID, nil
+}
+
+// ParsePubKeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
 // Badly formatted tags are ignored.
-func ParsePubkeys(tags nostr.Tags) []string {
+func ParsePubKeys(tags nostr.Tags) []string {
 	const followPrefix = "p"
 
 	pubkeys := make([]string, 0, len(tags))
@@ -129,21 +147,8 @@ func ParsePubkeys(tags nostr.Tags) []string {
 	return pubkeys
 }
 
-// // checkInputs() checks the DB, RWM and NC, returning the appropriate error.
-// func checkInputs(DB models.Database, RWM *walks.RandomWalkManager,
-// 	NC models.NodeCache) error {
-
-// 	if err := DB.Validate(); err != nil {
-// 		return err
-// 	}
-
-// 	if err := RWM.Store.Validate(false); err != nil {
-// 		return err
-// 	}
-
-// 	if NC == nil {
-// 		return models.ErrNilNCPointer
-// 	}
-
-// 	return nil
-// }
+// expectedPagerank() returns the expected pagerank that flows from a node with
+// specified pagerank to its follows.
+func expectedPagerank(alpha float32, pagerank float64, outDegree int) float64 {
+	return float64(alpha) * pagerank / float64(outDegree)
+}

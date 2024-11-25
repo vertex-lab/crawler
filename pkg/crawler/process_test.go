@@ -1,10 +1,12 @@
 package crawler
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/vertex-lab/crawler/pkg/database/mock"
 )
 
 const odell = "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
@@ -33,7 +35,7 @@ var fakeEvents = []nostr.Event{
 	},
 }
 
-func TestParsePubkeys(t *testing.T) {
+func TestParsePubKeys(t *testing.T) {
 	testCases := []struct {
 		name            string
 		tags            nostr.Tags
@@ -58,7 +60,7 @@ func TestParsePubkeys(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pubkeys := ParsePubkeys(test.tags)
+			pubkeys := ParsePubKeys(test.tags)
 			if !reflect.DeepEqual(pubkeys, test.expectedPubkeys) {
 				t.Fatalf("ParseFollowList(): expected %v, got %v", test.expectedPubkeys, pubkeys)
 			}
@@ -66,59 +68,74 @@ func TestParsePubkeys(t *testing.T) {
 	}
 }
 
-// func TestProcessNodeIDs(t *testing.T) {
-// 	testCases := []struct {
-// 		name          string
-// 		DBType        string
-// 		pubkeys       []string
-// 		expectedError error
-// 		expectedIDs   []uint32
-// 	}{
-// 		{
-// 			name:          "nil pubkeys",
-// 			DBType:        "simple-with-mock-pks",
-// 			pubkeys:       nil,
-// 			expectedError: nil,
-// 			expectedIDs:   []uint32{},
-// 		},
-// 		{
-// 			name:          "empty pubkeys",
-// 			DBType:        "simple-with-mock-pks",
-// 			pubkeys:       []string{},
-// 			expectedIDs:   []uint32{},
-// 			expectedError: nil,
-// 		},
-// 		{
-// 			name:          "existing pubkey",
-// 			DBType:        "simple-with-mock-pks",
-// 			pubkeys:       []string{"zero", "one"},
-// 			expectedError: nil,
-// 			expectedIDs:   []uint32{0, 1},
-// 		},
-// 		{
-// 			name:          "existing and new pubkey",
-// 			DBType:        "simple-with-mock-pks",
-// 			pubkeys:       []string{"zero", "one", "three"},
-// 			expectedError: nil,
-// 			expectedIDs:   []uint32{0, 1, 3},
-// 		},
-// 	}
+func TestProcessNodeIDs(t *testing.T) {
+	testCases := []struct {
+		name          string
+		DBType        string
+		pubkeys       []string
+		expectedError error
+		expectedIDs   []uint32
+		expectedQueue []string
+	}{
+		{
+			name:          "nil pubkeys",
+			DBType:        "simple-with-mock-pks",
+			pubkeys:       nil,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
+			expectedQueue: []string{},
+		},
+		{
+			name:          "empty pubkeys",
+			DBType:        "simple-with-mock-pks",
+			pubkeys:       []string{},
+			expectedError: nil,
+			expectedIDs:   []uint32{},
+			expectedQueue: []string{},
+		},
+		{
+			name:          "existing pubkey",
+			DBType:        "simple-with-mock-pks",
+			pubkeys:       []string{"zero", "one"},
+			expectedError: nil,
+			expectedIDs:   []uint32{0, 1},
+			expectedQueue: []string{},
+		},
+		{
+			name:          "existing and new pubkey",
+			DBType:        "simple-with-mock-pks",
+			pubkeys:       []string{"zero", "one", "three"},
+			expectedError: nil,
+			expectedIDs:   []uint32{0, 1, 3},
+			expectedQueue: []string{"three"},
+		},
+	}
 
-// 	for _, test := range testCases {
-// 		t.Run(test.name, func(t *testing.T) {
-// 			DB := mockdb.SetupDB(test.DBType)
-// 			followIDs, err := ProcessNodeIDs(DB, test.pubkeys)
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := mock.SetupDB(test.DBType)
+			queuePubkeys := []string{}
 
-// 			if !errors.Is(err, test.expectedError) {
-// 				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
-// 			}
+			followIDs, err := ProcessNodeIDs(DB, test.pubkeys, 1.0,
+				func(pk string) error {
+					queuePubkeys = append(queuePubkeys, pk)
+					return nil
+				})
 
-// 			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
-// 				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
-// 			}
-// 		})
-// 	}
-// }
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
+				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
+			}
+
+			if !reflect.DeepEqual(queuePubkeys, test.expectedQueue) {
+				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedQueue, queuePubkeys)
+			}
+		})
+	}
+}
 
 // func TestProcessFollowListEvent(t *testing.T) {
 // 	t.Run("simple errors", func(t *testing.T) {
