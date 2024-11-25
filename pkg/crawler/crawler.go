@@ -58,8 +58,12 @@ own pagerank-based reputation system.
 Finally, it uses the specified queueHandler function to send the events to the
 queue for further processing and/or to be written to the database.
 */
-func Firehose(ctx context.Context, relays []string, DB models.Database,
-	timeLimit int64, queueHandler func(event nostr.RelayEvent) error) {
+func Firehose(
+	ctx context.Context,
+	relays []string,
+	DB models.Database,
+	timeLimit int64,
+	queueHandler func(event nostr.RelayEvent) error) {
 
 	pool := nostr.NewSimplePool(ctx)
 	defer close(pool)
@@ -98,20 +102,58 @@ func Firehose(ctx context.Context, relays []string, DB models.Database,
 	}
 }
 
-// QueryAuthors() queries the follow lists of the specified pubkeys.
-// It sends the newest events for each pubkey to the queue using the provided queueHandler.
-func QueryAuthors(ctx context.Context, relays, pubkeys []string,
-	queueHandler func(event nostr.RelayEvent) error) error {
+// QueryNewPubkeys() extracts pubkeys from the pubkeyChan channel, and queries
+// for their events in batches of batchSize.
+func QueryNewPubkeys(
+	ctx context.Context,
+	relays []string,
+	pubkeyChan <-chan string,
+	batchSize int,
+	queueHandler func(event nostr.RelayEvent) error) {
 
-	if len(pubkeys) == 0 {
-		return nil
+	batch := make([]string, 0, batchSize)
+	pool := nostr.NewSimplePool(ctx)
+	defer close(pool)
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Printf("\n  > Stopping querying for new pubkeys... ")
+			return
+
+		case pubkey, ok := <-pubkeyChan:
+			if !ok {
+				fmt.Println("\n  > Pubkey channel closed, stopping processing.")
+				return
+			}
+
+			// add to the batch, until the size is big enough to query
+			batch = append(batch, pubkey)
+			if len(batch) >= batchSize {
+
+				err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler)
+				if err != nil {
+					fmt.Printf("\nError querying pubkeys: %v", err)
+				} else {
+					// reset the batch
+					batch = make([]string, 0, batchSize)
+				}
+			}
+		}
 	}
+}
+
+// QueryPubkeyBatch() queries the follow lists of the specified pubkeys.
+// It sends the newest events for each pubkey to the queue using the provided queueHandler.
+func QueryPubkeyBatch(
+	ctx context.Context,
+	pool *nostr.SimplePool,
+	relays []string,
+	pubkeys []string,
+	queueHandler func(event nostr.RelayEvent) error) error {
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-
-	pool := nostr.NewSimplePool(ctx)
-	defer close(pool)
 
 	filters := nostr.Filters{{
 		Kinds:   RelevantKinds,
@@ -168,8 +210,8 @@ func PrintEvent(event nostr.RelayEvent) error {
 	return nil
 }
 
-// handleSignals listens for OS signals and triggers context cancellation.
-func handleSignals(cancel context.CancelFunc) {
+// HandleSignals listens for OS signals and triggers context cancellation.
+func HandleSignals(cancel context.CancelFunc) {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 

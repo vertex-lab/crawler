@@ -1,12 +1,15 @@
 package crawler
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 const odell = "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
@@ -72,38 +75,64 @@ func TestProcessNodeIDs(t *testing.T) {
 	testCases := []struct {
 		name          string
 		DBType        string
+		RWMType       string
+		author        models.NodeMetaWithID
 		pubkeys       []string
 		expectedError error
 		expectedIDs   []uint32
 		expectedQueue []string
 	}{
 		{
-			name:          "nil pubkeys",
-			DBType:        "simple-with-mock-pks",
-			pubkeys:       nil,
+			name:    "nil pubkeys",
+			DBType:  "simple-with-mock-pks",
+			RWMType: "one-node0",
+			pubkeys: nil,
+			author: models.NodeMetaWithID{
+				NodeMeta: &models.NodeMeta{
+					Pagerank: 1.0,
+				},
+			},
 			expectedError: nil,
 			expectedIDs:   []uint32{},
 			expectedQueue: []string{},
 		},
 		{
-			name:          "empty pubkeys",
-			DBType:        "simple-with-mock-pks",
+			name:    "empty pubkeys",
+			DBType:  "simple-with-mock-pks",
+			RWMType: "one-node0",
+			author: models.NodeMetaWithID{
+				NodeMeta: &models.NodeMeta{
+					Pagerank: 1.0,
+				},
+			},
 			pubkeys:       []string{},
 			expectedError: nil,
 			expectedIDs:   []uint32{},
 			expectedQueue: []string{},
 		},
 		{
-			name:          "existing pubkey",
-			DBType:        "simple-with-mock-pks",
+			name:    "existing pubkey",
+			DBType:  "simple-with-mock-pks",
+			RWMType: "one-node0",
+			author: models.NodeMetaWithID{
+				NodeMeta: &models.NodeMeta{
+					Pagerank: 1.0,
+				},
+			},
 			pubkeys:       []string{"zero", "one"},
 			expectedError: nil,
 			expectedIDs:   []uint32{0, 1},
 			expectedQueue: []string{},
 		},
 		{
-			name:          "existing and new pubkey",
-			DBType:        "simple-with-mock-pks",
+			name:    "existing and new pubkey",
+			DBType:  "simple-with-mock-pks",
+			RWMType: "one-node0",
+			author: models.NodeMetaWithID{
+				NodeMeta: &models.NodeMeta{
+					Pagerank: 1.0,
+				},
+			},
 			pubkeys:       []string{"zero", "one", "three"},
 			expectedError: nil,
 			expectedIDs:   []uint32{0, 1, 3},
@@ -114,13 +143,13 @@ func TestProcessNodeIDs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := mock.SetupDB(test.DBType)
+			RWM := walks.SetupRWM(test.RWMType)
 			queuePubkeys := []string{}
 
-			followIDs, err := ProcessNodeIDs(DB, test.pubkeys, 1.0,
-				func(pk string) error {
-					queuePubkeys = append(queuePubkeys, pk)
-					return nil
-				})
+			followIDs, err := ProcessNodeIDs(context.Background(), DB, RWM, test.author, test.pubkeys, func(pk string) error {
+				queuePubkeys = append(queuePubkeys, pk)
+				return nil
+			})
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)

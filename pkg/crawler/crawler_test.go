@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/database/mock"
 )
 
@@ -32,13 +33,16 @@ func TestFirehose(t *testing.T) {
 	Firehose(ctx, Relays, DB, 2000, PrintEvent)
 }
 
-func TestQueryAuthors(t *testing.T) {
+func TestQueryPubkeyBatch(t *testing.T) {
+
+	pool := nostr.NewSimplePool(context.Background())
+	defer close(pool)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go handleSignals(cancel)
+	go HandleSignals(cancel)
 
 	pubkeys := []string{pip, calle, gigi, odell}
-	QueryAuthors(ctx, Relays, pubkeys, PrintEvent)
+	QueryPubkeyBatch(ctx, pool, Relays, pubkeys, PrintEvent)
 }
