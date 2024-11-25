@@ -66,7 +66,7 @@ func Firehose(
 	queueHandler func(event nostr.RelayEvent) error) {
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close(pool)
+	defer close("Firehose", pool)
 
 	ts := nostr.Timestamp(time.Now().Unix() - timeLimit)
 	filters := nostr.Filters{{
@@ -113,12 +113,11 @@ func QueryNewPubkeys(
 
 	batch := make([]string, 0, batchSize)
 	pool := nostr.NewSimplePool(ctx)
-	defer close(pool)
+	defer close("QueryNewPubkeys", pool)
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("\n  > Stopping querying for new pubkeys... ")
 			return
 
 		case pubkey, ok := <-pubkeyChan:
@@ -186,8 +185,8 @@ func QueryPubkeyBatch(
 }
 
 // close iterates over the relays in the pool and closes all connections.
-func close(pool *nostr.SimplePool) {
-	fmt.Printf("\n  > Closing relay connections... ")
+func close(funcName string, pool *nostr.SimplePool) {
+	fmt.Printf("\n  > %v :closing relay connections... ", funcName)
 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
 		relay.Close()
 		return true

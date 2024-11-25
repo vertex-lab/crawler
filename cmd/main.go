@@ -49,7 +49,7 @@ func main() {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, crawler.Relays, DB, 10000, func(event nostr.RelayEvent) error {
+		crawler.Firehose(ctx, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
 			eventChan <- event
 			return nil
 		})
@@ -80,7 +80,7 @@ func DisplayStats(
 	eventChan <-chan nostr.RelayEvent,
 	pubkeyChan <-chan string,
 ) {
-	ticker := time.NewTicker(5 * time.Second) // Update stats every 5 seconds
+	ticker := time.NewTicker(10 * time.Second) // Update stats every 5 seconds
 	defer ticker.Stop()
 
 	for {

@@ -36,7 +36,7 @@ func TestFirehose(t *testing.T) {
 func TestQueryPubkeyBatch(t *testing.T) {
 
 	pool := nostr.NewSimplePool(context.Background())
-	defer close(pool)
+	defer close("QueryPubkeyBatch", pool)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
