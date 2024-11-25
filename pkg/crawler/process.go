@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
@@ -17,6 +18,7 @@ func ProcessFollowListEvents(
 	eventChan chan nostr.RelayEvent,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
+	eventCounter *xsync.Counter,
 	newPubkeyHandler func(pk string) error) {
 
 	for {
@@ -30,6 +32,7 @@ func ProcessFollowListEvents(
 				fmt.Println("\n  > Event channel closed, stopping processing.")
 				return
 			}
+			eventCounter.Inc()
 
 			if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
 				fmt.Printf("\nError processing the event: %v", err)
