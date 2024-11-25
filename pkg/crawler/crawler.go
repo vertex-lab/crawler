@@ -70,27 +70,24 @@ func Firehose(ctx context.Context, relays []string, DB models.Database,
 		Since: &ts,
 	}}
 
-	// iterate over the events
 	for event := range pool.SubMany(ctx, relays, filters) {
-
-		// if the signature doesn't match, skip
 		if match, err := event.CheckSignature(); err != nil || !match {
 			continue
 		}
 
-		// query from the DB the node associated with that pubkey
-		nodeMeta, err := DB.NodeMeta(event.PubKey)
+		// query from the DB the node associated with the pubkey; If it's not found, skip (err != nil)
+		node, err := DB.NodeMetaWithID(event.PubKey)
 		if err != nil {
 			continue
 		}
 
 		// if this event is older than what we have, skip
-		if event.CreatedAt.Time().Unix() < nodeMeta.Timestamp {
+		if event.CreatedAt.Time().Unix() < node.Timestamp {
 			continue
 		}
 
-		// if the author has not enough pagerank, skip
-		if nodeMeta.Pagerank < pagerankThreshold(DB.Size()) {
+		// if the author has not been crawled AND has low pagerank, skip.
+		if node.Status != models.StatusCrawled && node.Pagerank < pagerankThreshold(DB.Size()) {
 			continue
 		}
 
@@ -106,6 +103,10 @@ func Firehose(ctx context.Context, relays []string, DB models.Database,
 func QueryAuthors(ctx context.Context, relays, pubkeys []string,
 	queueHandler func(event nostr.RelayEvent) error) error {
 
+	if len(pubkeys) == 0 {
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
@@ -118,22 +119,22 @@ func QueryAuthors(ctx context.Context, relays, pubkeys []string,
 	}}
 
 	// a map that associates each pubkey with the newest follow list
-	eventMap := make(map[string]nostr.RelayEvent, len(pubkeys))
+	newestEvents := make(map[string]nostr.RelayEvent, len(pubkeys))
 	for event := range pool.SubManyEose(ctx, relays, filters) {
 
-		newestEvent, exists := eventMap[event.PubKey]
+		newestEvent, exists := newestEvents[event.PubKey]
 		if !exists {
-			eventMap[event.PubKey] = event
+			newestEvents[event.PubKey] = event
 			continue
 		}
 
 		if event.CreatedAt.Time().Unix() > newestEvent.CreatedAt.Time().Unix() {
-			eventMap[event.PubKey] = event
+			newestEvents[event.PubKey] = event
 		}
 	}
 
 	// send only the newest events to the queue.
-	for _, event := range eventMap {
+	for _, event := range newestEvents {
 		if err := queueHandler(event); err != nil {
 			return err
 		}

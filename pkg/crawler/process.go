@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"fmt"
+
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
@@ -8,30 +10,28 @@ import (
 )
 
 /*
-ProcessFollowListEvent is responsible for:
-- writing to the Database
-- updating the RandomWalkStore
-- re-computing pagerank and updating the NodeCache
+ProcessFollowListEvent() adds to the database the author and its follows to the database.
+It updates the node metadata of the author, and updates the random walks.
 */
 func ProcessFollowListEvent(DB models.Database, RWM *walks.RandomWalkManager,
-	NC models.NodeCache, event *nostr.Event) error {
+	event *nostr.Event, newPubkeyHandler func(pk string) error) error {
 
-	if err := checkInputs(DB, RWM, NC); err != nil {
-		return err
+	if event == nil {
+		return fmt.Errorf("nostr event is nil")
 	}
 
-	author, exists := NC.Load(event.PubKey)
-	if !exists {
-		return models.ErrNodeNotFoundNC
-	}
-
-	followPubkeys := ParsePubkeys(event.Tags)
-	newSucc, err := ProcessNodeIDs(DB, followPubkeys)
+	author, err := DB.NodeMetaWithID(event.PubKey)
 	if err != nil {
 		return err
 	}
 
 	oldSucc, err := DB.Successors(author.ID)
+	if err != nil {
+		return err
+	}
+
+	followPubkeys := ParsePubkeys(event.Tags)
+	newSucc, err := ProcessNodeIDs(DB, followPubkeys, newPubkeyHandler)
 	if err != nil {
 		return err
 	}
@@ -61,20 +61,23 @@ func ProcessFollowListEvent(DB models.Database, RWM *walks.RandomWalkManager,
 }
 
 // ProcessNodeIDs() returns the nodeIDs of the specified pubkeys.
-// If a pubkey isn't found in the database, the corrisponding node is added.
-func ProcessNodeIDs(DB models.Database, pubkeys []string) ([]uint32, error) {
+// If a pubkey isn't found in the database:
+// - the corrisponding node is added to the DB
+// - the pubkey is sent to the newPubkeysQueue
+func ProcessNodeIDs(DB models.Database, pubkeys []string,
+	newPubkeyHandler func(pk string) error) ([]uint32, error) {
 
-	InterfaceNodeIDs, err := DB.NodeIDs(pubkeys)
+	interfaceNodeIDs, err := DB.NodeIDs(pubkeys)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeIDs := make([]uint32, len(InterfaceNodeIDs))
-	for i, InterfaceNodeID := range InterfaceNodeIDs {
+	nodeIDs := make([]uint32, len(interfaceNodeIDs))
+	for i, interfaceNodeID := range interfaceNodeIDs {
 
-		nodeID, ok := InterfaceNodeID.(uint32)
+		nodeID, ok := interfaceNodeID.(uint32)
 		// if it's not uin32, it means the pubkey wasn't found in the database
-		// so we add a new node to the database
+		// so we add a new node to the database with default values.
 		if !ok {
 			node := models.Node{
 				Metadata: models.NodeMeta{
@@ -97,6 +100,8 @@ func ProcessNodeIDs(DB models.Database, pubkeys []string) ([]uint32, error) {
 
 	return nodeIDs, nil
 }
+
+//func AddNewPubkey()
 
 // ParsePubkeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
 // Badly formatted tags are ignored.
@@ -124,21 +129,21 @@ func ParsePubkeys(tags nostr.Tags) []string {
 	return pubkeys
 }
 
-// checkInputs() checks the DB, RWM and NC, returning the appropriate error.
-func checkInputs(DB models.Database, RWM *walks.RandomWalkManager,
-	NC models.NodeCache) error {
+// // checkInputs() checks the DB, RWM and NC, returning the appropriate error.
+// func checkInputs(DB models.Database, RWM *walks.RandomWalkManager,
+// 	NC models.NodeCache) error {
 
-	if err := DB.Validate(); err != nil {
-		return err
-	}
+// 	if err := DB.Validate(); err != nil {
+// 		return err
+// 	}
 
-	if err := RWM.Store.Validate(false); err != nil {
-		return err
-	}
+// 	if err := RWM.Store.Validate(false); err != nil {
+// 		return err
+// 	}
 
-	if NC == nil {
-		return models.ErrNilNCPointer
-	}
+// 	if NC == nil {
+// 		return models.ErrNilNCPointer
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

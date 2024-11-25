@@ -218,7 +218,7 @@ func TestAddPredecessors(t *testing.T) {
 	}
 }
 
-func TestNodeMeta(t *testing.T) {
+func TestNodeMetaWithID(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -227,38 +227,41 @@ func TestNodeMeta(t *testing.T) {
 		DBType           string
 		pubkey           string
 		expectedError    error
-		expectedNodeMeta models.NodeMeta
+		expectedNodeMeta models.NodeMetaWithID
 	}{
 		{
 			name:             "nil DB",
 			DBType:           "nil",
 			pubkey:           "zero",
-			expectedNodeMeta: models.NodeMeta{},
+			expectedNodeMeta: models.NodeMetaWithID{},
 			expectedError:    models.ErrNilDBPointer,
 		},
 		{
 			name:             "empty DB",
 			DBType:           "empty",
 			pubkey:           "zero",
-			expectedNodeMeta: models.NodeMeta{},
+			expectedNodeMeta: models.NodeMetaWithID{},
 			expectedError:    redis.Nil,
 		},
 		{
 			name:             "pubkey not found",
 			DBType:           "one-node0",
 			pubkey:           "one",
-			expectedNodeMeta: models.NodeMeta{},
+			expectedNodeMeta: models.NodeMetaWithID{},
 			expectedError:    redis.Nil,
 		},
 		{
 			name:   "valid",
 			DBType: "one-node0",
 			pubkey: "zero",
-			expectedNodeMeta: models.NodeMeta{
-				PubKey:    "zero",
-				Timestamp: 1731685733,
-				Status:    "idk",
-				Pagerank:  1.0,
+			expectedNodeMeta: models.NodeMetaWithID{
+				ID: 0,
+				NodeMeta: &models.NodeMeta{
+					PubKey:    "zero",
+					Timestamp: 1731685733,
+					Status:    "idk",
+					Pagerank:  1.0,
+				},
 			},
 			expectedError: nil,
 		},
@@ -272,13 +275,13 @@ func TestNodeMeta(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeMeta(test.pubkey)
+			nodeMeta, err := DB.NodeMetaWithID(test.pubkey)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NodeMeta(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
+				t.Fatalf("NodeMetaWithID(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(nodeMeta, test.expectedNodeMeta) {
-				t.Errorf("NodeMeta(%v): expected %v, got %v", test.pubkey, test.expectedNodeMeta, nodeMeta)
+				t.Errorf("NodeMetaWithID(%v): expected %v, got %v", test.pubkey, test.expectedNodeMeta, nodeMeta)
 			}
 		})
 	}

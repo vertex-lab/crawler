@@ -27,6 +27,12 @@ type NodeMeta struct {
 	Pagerank  float64 `redis:"pagerank,omitempty"`
 }
 
+// NodeMetaWithID is like NodeMeta but has the extra field ID.
+type NodeMetaWithID struct {
+	ID uint32
+	*NodeMeta
+}
+
 // Node represent the basic structure of a node in the graph
 type Node struct {
 	Metadata     NodeMeta
@@ -38,7 +44,7 @@ type Node struct {
 type NodeDiff struct {
 
 	// Only the specified metadata fields will be changed; the others will
-	// mantain the old value, thanks to "omitempty"
+	// mantain the old value thanks to "omitempty".
 	Metadata NodeMeta
 
 	// The slice of nodeIDs to be added to the node's successors
@@ -54,8 +60,8 @@ type Database interface {
 	// Validate() returns the appropriate error if the DB is nil or empty
 	Validate() error
 
-	// NodeMeta() retrieves a node by its pubkey.
-	NodeMeta(pubkey string) (NodeMeta, error)
+	// NodeMetaWith() retrieves a node by its pubkey.
+	NodeMetaWithID(pubkey string) (NodeMetaWithID, error)
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
 	AddNode(*Node) (uint32, error)

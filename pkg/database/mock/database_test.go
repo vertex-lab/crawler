@@ -215,51 +215,54 @@ func TestUpdateNode(t *testing.T) {
 	}
 }
 
-func TestNodeMeta(t *testing.T) {
+func TestNodeMetaWithID(t *testing.T) {
 	testCases := []struct {
 		name             string
 		DBType           string
 		pubkey           string
 		expectedError    error
-		expectedNodeMeta models.NodeMeta
+		expectedNodeMeta models.NodeMetaWithID
 	}{
 		{
 			name:             "nil DB",
 			DBType:           "nil",
 			pubkey:           "zero",
 			expectedError:    models.ErrNilDBPointer,
-			expectedNodeMeta: models.NodeMeta{},
+			expectedNodeMeta: models.NodeMetaWithID{},
 		},
 		{
 			name:             "empty DB",
 			DBType:           "empty",
 			pubkey:           "zero",
 			expectedError:    models.ErrEmptyDB,
-			expectedNodeMeta: models.NodeMeta{},
+			expectedNodeMeta: models.NodeMetaWithID{},
 		},
 		{
 			name:             "node not found",
 			DBType:           "simple-with-mock-pks",
 			pubkey:           "three",
 			expectedError:    models.ErrNodeNotFoundDB,
-			expectedNodeMeta: models.NodeMeta{},
+			expectedNodeMeta: models.NodeMetaWithID{},
 		},
 		{
 			name:          "node found",
 			DBType:        "simple-with-mock-pks",
 			pubkey:        "zero",
 			expectedError: nil,
-			expectedNodeMeta: models.NodeMeta{
-				PubKey:    "zero",
-				Timestamp: 0,
-				Pagerank:  0.26},
+			expectedNodeMeta: models.NodeMetaWithID{
+				ID: 0,
+				NodeMeta: &models.NodeMeta{
+					PubKey:    "zero",
+					Timestamp: 0,
+					Pagerank:  0.26,
+				}},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			node, err := DB.NodeMeta(test.pubkey)
+			node, err := DB.NodeMetaWithID(test.pubkey)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Node(1): expected %v, got %v", test.expectedError, err)

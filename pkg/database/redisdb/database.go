@@ -78,12 +78,11 @@ func (DB *Database) Validate() error {
 	return nil
 }
 
-// NodeMeta() retrieves a node by its pubkey.
-func (DB *Database) NodeMeta(pubkey string) (models.NodeMeta, error) {
+// NodeMetaWithID() retrieves a node by its pubkey.
+func (DB *Database) NodeMetaWithID(pubkey string) (models.NodeMetaWithID, error) {
 
-	nodeMeta := models.NodeMeta{}
 	if err := DB.validateFields(); err != nil {
-		return nodeMeta, err
+		return models.NodeMetaWithID{}, err
 	}
 
 	luaScript := `
@@ -96,16 +95,16 @@ func (DB *Database) NodeMeta(pubkey string) (models.NodeMeta, error) {
 			return nil
 		end
 
-		return redis.call('HGETALL', KeyNodePrefix .. nodeID)
+		return {nodeID, redis.call('HGETALL', KeyNodePrefix .. nodeID)}
 	`
 
 	keys := []string{KeyKeyIndex, KeyNodePrefix}
 	res, err := DB.client.Eval(DB.ctx, luaScript, keys, pubkey).Result()
 	if err != nil {
-		return nodeMeta, err
+		return models.NodeMetaWithID{}, err
 	}
 
-	return redisutils.ParseNodeFromFlatArray(res)
+	return redisutils.ParseNodeMetaWithID(res)
 }
 
 // AddNode() adds a node to the database and returns its assigned nodeID.

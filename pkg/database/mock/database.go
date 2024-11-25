@@ -141,19 +141,24 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 	return exist
 }
 
-// NodeMeta() retrieves a node by its pubkey.
-func (DB *Database) NodeMeta(pubkey string) (models.NodeMeta, error) {
+// NodeMetaWithID() retrieves a node by its pubkey.
+func (DB *Database) NodeMetaWithID(pubkey string) (models.NodeMetaWithID, error) {
 
 	if err := DB.Validate(); err != nil {
-		return models.NodeMeta{}, err
+		return models.NodeMetaWithID{}, err
 	}
 
 	nodeID, exists := DB.KeyIndex[pubkey]
 	if !exists {
-		return models.NodeMeta{}, models.ErrNodeNotFoundDB
+		return models.NodeMetaWithID{}, models.ErrNodeNotFoundDB
 	}
 
-	return DB.NodeIndex[nodeID].Metadata, nil
+	node := models.NodeMetaWithID{
+		ID:       nodeID,
+		NodeMeta: &DB.NodeIndex[nodeID].Metadata,
+	}
+
+	return node, nil
 }
 
 // IsDandling returns whether a node has no successors (dandling).
@@ -345,7 +350,7 @@ func SetupDB(DBType string) *Database {
 	case "pip":
 		DB := NewDatabase()
 		DB.KeyIndex[pip] = 0
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusCrawled, Timestamp: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
 		return DB
 
 	default:
