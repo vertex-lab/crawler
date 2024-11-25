@@ -17,18 +17,18 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-const fiatjaf = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-
 func main() {
 	PrintTitle()
-
+	ctx := context.Background()
 	cl := redisutils.SetupClient()
-	DB, err := redisdb.NewDatabase(context.Background(), cl)
+	defer redisutils.CleanupRedis(cl)
+
+	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
 		panic(err)
 	}
 
-	RWS, err := redistore.NewRWS(context.Background(), cl, 0.85, 10)
+	RWS, err := redistore.SetupRWS(cl, "one-node0")
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +40,6 @@ func main() {
 
 	eventChan := make(chan nostr.RelayEvent, 1000)
 	pubkeyChan := make(chan string, 1000)
-	pubkeyChan <- fiatjaf
 
 	eventCounter := xsync.NewCounter()
 
@@ -102,8 +101,8 @@ func DisplayStats(
 
 			fmt.Printf("\n--- System Stats ---\n")
 			fmt.Printf("Database Size: %d nodes\n", DB.Size())
-			fmt.Printf("Event Channel: %d/%d (used/total)\n", eventChanLen, eventChanCap)
-			fmt.Printf("Pubkey Channel: %d/%d (used/total)\n", pubkeyChanLen, pubkeyChanCap)
+			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
+			fmt.Printf("Pubkey Channel: %d/%d\n", pubkeyChanLen, pubkeyChanCap)
 			fmt.Printf("Processed Events: %d\n", eventCounter.Value())
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
