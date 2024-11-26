@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -30,19 +31,23 @@ func ProcessFollowListEvents(
 
 		case event, ok := <-eventChan:
 			if !ok {
-				fmt.Println("\n  > Event channel closed, stopping processing.")
+				fmt.Printf("\n  > Event channel closed, stopping processing.")
 				return
 			}
+
 			eventCounter.Inc()
+			if eventCounter.Value()%1000 == 0 {
+				log.Printf("INFO: processed %v events", eventCounter.Value())
+			}
 
 			if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
-				fmt.Printf("\nError processing the eventID %v: %v", event.ID, err)
+				log.Printf("ERROR: Error processing the eventID %v: %v", event.ID, err)
 
 				// re add event to the queue
 				select {
 				case eventChan <- event:
 				default:
-					fmt.Printf("Channel is full, dropping eventID: %v\n", event.ID)
+					log.Printf("WARNING: Channel is full, dropping eventID: %v\n", event.ID)
 				}
 			}
 		}

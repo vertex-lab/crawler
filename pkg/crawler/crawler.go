@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -91,12 +92,13 @@ func Firehose(
 		}
 
 		// if the author has not been crawled AND has low pagerank, skip.
-		if node.Status != models.StatusCrawled && node.Pagerank < pagerankThreshold(DB.Size()) {
+		if node.Pagerank < pagerankThreshold(DB.Size()) {
 			continue
 		}
 
 		// send the event to the queue
 		if err := queueHandler(event); err != nil {
+			log.Printf("ERROR: %v", err)
 			return
 		}
 	}
@@ -132,9 +134,9 @@ func QueryNewPubkeys(
 
 				err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler)
 				if err != nil {
-					fmt.Printf("\nError querying pubkeys: %v", err)
+					log.Printf("ERROR: error querying pubkeys: %v", err)
 				} else {
-					// reset the batch
+					// reset the batch only if successful, otherwise retry
 					batch = make([]string, 0, batchSize)
 				}
 			}
@@ -151,7 +153,7 @@ func QueryPubkeyBatch(
 	pubkeys []string,
 	queueHandler func(event nostr.RelayEvent) error) error {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
 	filters := nostr.Filters{{
@@ -216,5 +218,6 @@ func HandleSignals(cancel context.CancelFunc) {
 
 	<-signalChan // Block until a signal is received
 	fmt.Printf("\nSignal received. Shutting down...")
+	log.Printf("INFO: Signal received. Shutting down...")
 	cancel()
 }

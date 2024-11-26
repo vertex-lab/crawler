@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -17,8 +19,11 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
+const logFile = "app.log"
+
 func main() {
-	PrintTitle()
+	Start()
+
 	ctx := context.Background()
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
@@ -39,7 +44,7 @@ func main() {
 	defer cancel()
 
 	eventChan := make(chan nostr.RelayEvent, 1000)
-	pubkeyChan := make(chan string, 1000)
+	pubkeyChan := make(chan string, 100000)
 
 	eventCounter := xsync.NewCounter()
 
@@ -57,7 +62,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryNewPubkeys(ctx, crawler.Relays, pubkeyChan, 50, func(event nostr.RelayEvent) error {
+		crawler.QueryNewPubkeys(ctx, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
 			eventChan <- event
 			return nil
 		})
@@ -70,6 +75,7 @@ func main() {
 
 	wg.Wait()
 	fmt.Printf("\nExiting\n")
+	log.Printf("INFO: Exiting")
 }
 
 func DisplayStats(
@@ -123,6 +129,23 @@ func DisplayStats(
 			firstDisplay = false
 		}
 	}
+}
+
+func Start() {
+	InitLogger(logFile)
+	PrintTitle()
+}
+
+// InitLogger() returns a logger
+func InitLogger(filePath string) {
+	// Open the log file or create it if it doesn't exist
+	logFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		panic(err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+	log.Println("INFO: Nostr crawler is starting up")
 }
 
 // PrintTitle() prints a title.
