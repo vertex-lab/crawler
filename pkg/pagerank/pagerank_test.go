@@ -131,7 +131,7 @@ func BenchmarkPagerank(b *testing.B) {
 		rng := rand.New(rand.NewSource(69))
 
 		// Different DB sizes
-		for _, nodesSize := range []int{1000, 2000, 5000} {
+		for _, nodesSize := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
 
 				DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)

@@ -3,6 +3,7 @@ package redistore
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
@@ -273,34 +274,51 @@ func TestContainsNode(t *testing.T) {
 	}
 }
 
-func TestVisitCount(t *testing.T) {
+func TestVisitCounts(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name           string
 		RWSType        string
-		expectedVisits int
+		nodeIDs        []uint32
+		expectedVisits map[uint32]int
+		expectedError  error
 	}{
 		{
 			name:           "nil RWS",
 			RWSType:        "nil",
-			expectedVisits: 0,
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{},
+			expectedError:  models.ErrNilRWSPointer,
 		},
 		{
 			name:           "empty RWS",
 			RWSType:        "empty",
-			expectedVisits: 0,
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{0: 0},
+			expectedError:  nil,
+		},
+		{
+			name:           "empty nodeIDs",
+			RWSType:        "one-node0",
+			nodeIDs:        []uint32{},
+			expectedVisits: map[uint32]int{},
+			expectedError:  nil,
 		},
 		{
 			name:           "one node RWS",
-			RWSType:        "one-walk0",
-			expectedVisits: 1,
+			RWSType:        "one-node0",
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{0: 1},
+			expectedError:  nil,
 		},
 		{
 			name:           "triangle RWS",
 			RWSType:        "triangle",
-			expectedVisits: 3,
+			nodeIDs:        []uint32{0, 1, 2, 99}, // 99 is not in the RWS
+			expectedVisits: map[uint32]int{0: 3, 1: 3, 2: 3, 99: 0},
+			expectedError:  nil,
 		},
 	}
 
@@ -311,8 +329,13 @@ func TestVisitCount(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			if RWS.VisitCount(0) != test.expectedVisits {
-				t.Errorf("VisitCount(0): expected %v, got %v", test.expectedVisits, RWS.VisitCount(0))
+			visits, err := RWS.VisitCounts(test.nodeIDs)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(visits, test.expectedVisits) {
+				t.Errorf("VisitCount(0): expected %v, got %v", test.expectedVisits, visits)
 			}
 		})
 	}
@@ -773,17 +796,40 @@ func TestInterface(t *testing.T) {
 
 // ------------------------------------BENCHMARKS------------------------------
 
-func BenchmarkVisitCount(b *testing.B) {
+func BenchmarkVisitCounts(b *testing.B) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
-	RWS, err := SetupRWS(cl, "triangle")
+	const walksPerNode = 10
+	const alpha = 0.85
+	const nodeNum = 100
+	const walkLenght = 7
+
+	RWS, err := NewRWS(context.Background(), cl, alpha, walksPerNode)
 	if err != nil {
-		b.Fatalf("SetupRWS(): expected nil, got %v", err)
+		b.Fatalf("NewRWS: benchmark failed: %v", err)
+	}
+
+	// add some walks to the RWS
+	for i := 0; i < nodeNum*10; i++ {
+
+		walk := make(models.RandomWalk, walkLenght)
+		for j := 0; j < walkLenght; j++ {
+			walk = append(walk, uint32(rand.Intn(nodeNum)))
+		}
+		RWS.AddWalk(walk)
+	}
+
+	nodeIDs := make([]uint32, 0, nodeNum)
+	for i := uint32(0); i < nodeNum; i++ {
+		nodeIDs = append(nodeIDs, i)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		RWS.VisitCount(0)
+		_, err := RWS.VisitCounts(nodeIDs)
+		if err != nil {
+			b.Fatalf("VisitCounts: benchmark failed: %v", err)
+		}
 	}
 }

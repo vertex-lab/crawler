@@ -57,7 +57,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryNewPubkeys(ctx, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
+		crawler.QueryNewPubkeys(ctx, crawler.Relays, pubkeyChan, 50, func(event nostr.RelayEvent) error {
 			eventChan <- event
 			return nil
 		})
@@ -80,7 +80,7 @@ func DisplayStats(
 	eventChan <-chan nostr.RelayEvent,
 	pubkeyChan <-chan string,
 ) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	firstDisplay := true

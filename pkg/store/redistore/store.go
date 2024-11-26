@@ -177,20 +177,35 @@ func (RWS *RandomWalkStore) validateFields() error {
 	return nil
 }
 
-// VisitCount() returns the number of times nodeID has been visited by a walk.
-// intentionally, returning 0 in case of any Redis or context issues.
-func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
+// VisitCounts() returns a map that associates each nodeID with the number of
+// times it was visited by a walk.
+func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error) {
 
 	if RWS == nil || RWS.client == nil {
-		return 0
+		return map[uint32]int{}, models.ErrNilRWSPointer
 	}
 
-	visits, err := RWS.client.SCard(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
-	if err != nil {
-		return 0
+	if len(nodeIDs) == 0 {
+		return map[uint32]int{}, nil
 	}
 
-	return int(visits)
+	pipe := RWS.client.Pipeline()
+
+	cmdMap := make(map[uint32]*redis.IntCmd, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+		cmdMap[nodeID] = pipe.SCard(RWS.ctx, KeyWalksVisiting(nodeID))
+	}
+
+	if _, err := pipe.Exec(RWS.ctx); err != nil {
+		return map[uint32]int{}, err
+	}
+
+	visitMap := make(map[uint32]int, len(nodeIDs))
+	for nodeID, cmd := range cmdMap {
+		visitMap[nodeID] = int(cmd.Val())
+	}
+
+	return visitMap, nil
 }
 
 // Walks() returns a map of walks by walksID that visit nodeID.

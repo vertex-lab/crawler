@@ -18,24 +18,26 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (PagerankMap, erro
 		return nil, err
 	}
 
-	pagerank := make(PagerankMap, DB.Size())
-	totalVisits := 0.0
-
-	// iterate over the RWS
 	nodeIDs, err := DB.AllNodes()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, nodeID := range nodeIDs {
-		nodeVisits := float64(RWS.VisitCount(nodeID))
-		pagerank[nodeID] = nodeVisits
-		totalVisits += nodeVisits
+	visitMap, err := RWS.VisitCounts(nodeIDs)
+	if err != nil {
+		return nil, err
 	}
 
-	// normalize
-	for nodeID, nodeVisits := range pagerank {
-		pagerank[nodeID] = nodeVisits / totalVisits
+	// get the total visits
+	totalVisits := 0.0
+	for _, visits := range visitMap {
+		totalVisits += float64(visits)
+	}
+
+	// compute the pagerank as the frequency of visits
+	pagerank := make(PagerankMap, len(nodeIDs))
+	for nodeID, visits := range visitMap {
+		pagerank[nodeID] = float64(visits) / totalVisits
 	}
 
 	return pagerank, nil

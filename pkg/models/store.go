@@ -44,8 +44,8 @@ type RandomWalkStore interface {
 	// an appropriate error based on the requirement.
 	Validate(expectEmptyRWS bool) error
 
-	// VisitCount() returns the number of times nodeID has been visited by a walk
-	VisitCount(nodeID uint32) int
+	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
+	VisitCounts(nodeIDs []uint32) (map[uint32]int, error)
 
 	// Walks() returns a map of walks by walksID that visit nodeID.
 	// - if limit > 0, the map contains up to that many key-value pairs.

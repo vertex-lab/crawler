@@ -130,16 +130,30 @@ func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
 	return nil
 }
 
-// VisitCount() returns the number of times nodeID has been visited by a walk.
-func (RWS *RandomWalkStore) VisitCount(nodeID uint32) int {
+// VisitCounts() returns a map that associates each nodeID with the number of
+// times it was visited by a walk.
+func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error) {
 	if RWS == nil || RWS.NodeWalkIDSet == nil {
-		return 0
+		return map[uint32]int{}, models.ErrNilRWSPointer
 	}
 
-	if walkIDs, exist := RWS.NodeWalkIDSet[nodeID]; exist {
-		return walkIDs.Cardinality()
+	if len(nodeIDs) == 0 {
+		return map[uint32]int{}, nil
 	}
-	return 0
+
+	visitMap := make(map[uint32]int, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+
+		walkSet, exists := RWS.NodeWalkIDSet[nodeID]
+		if !exists {
+			visitMap[nodeID] = 0
+			continue
+		}
+
+		visitMap[nodeID] = walkSet.Cardinality()
+	}
+
+	return visitMap, nil
 }
 
 // WalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to

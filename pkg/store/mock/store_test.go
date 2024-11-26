@@ -357,31 +357,48 @@ func TestValidate(t *testing.T) {
 	})
 }
 
-func TestVisitCount(t *testing.T) {
+func TestVisitCounts(t *testing.T) {
 	testCases := []struct {
 		name           string
 		RWSType        string
-		expectedVisits int
+		nodeIDs        []uint32
+		expectedVisits map[uint32]int
+		expectedError  error
 	}{
 		{
 			name:           "nil RWS",
 			RWSType:        "nil",
-			expectedVisits: 0,
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{},
+			expectedError:  models.ErrNilRWSPointer,
 		},
 		{
 			name:           "empty RWS",
 			RWSType:        "empty",
-			expectedVisits: 0,
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{0: 0},
+			expectedError:  nil,
+		},
+		{
+			name:           "empty nodeIDs",
+			RWSType:        "one-node0",
+			nodeIDs:        []uint32{},
+			expectedVisits: map[uint32]int{},
+			expectedError:  nil,
 		},
 		{
 			name:           "one node RWS",
 			RWSType:        "one-node0",
-			expectedVisits: 1,
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{0: 1},
+			expectedError:  nil,
 		},
 		{
-			name:           "triangle RWS",
+			name:           "triangle RWS, one node not in the RWS",
 			RWSType:        "triangle",
-			expectedVisits: 3,
+			nodeIDs:        []uint32{0, 1, 2, 99},
+			expectedVisits: map[uint32]int{0: 3, 1: 3, 2: 3, 99: 0},
+			expectedError:  nil,
 		},
 	}
 
@@ -389,8 +406,14 @@ func TestVisitCount(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
 
-			if RWS.VisitCount(0) != test.expectedVisits {
-				t.Errorf("VisitCount(0): expected %v, got %v", test.expectedVisits, RWS.VisitCount(0))
+			visits, err := RWS.VisitCounts(test.nodeIDs)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(visits, test.expectedVisits) {
+				t.Errorf("VisitCounts(): expected %v, got %v", test.expectedVisits, visits)
 			}
 		})
 	}
