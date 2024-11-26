@@ -100,22 +100,22 @@ func TestCountAndNormalize(t *testing.T) {
 	testCases := []struct {
 		name       string
 		longWalk   []uint32
-		expectedPP PagerankMap
+		expectedPP models.PagerankMap
 	}{
 		{
 			name:       "nil walk",
 			longWalk:   nil,
-			expectedPP: PagerankMap{},
+			expectedPP: models.PagerankMap{},
 		},
 		{
 			name:       "empty walk",
 			longWalk:   []uint32{},
-			expectedPP: PagerankMap{},
+			expectedPP: models.PagerankMap{},
 		},
 		{
 			name:     "normal walk",
 			longWalk: []uint32{0, 1, 2, 0, 1},
-			expectedPP: PagerankMap{
+			expectedPP: models.PagerankMap{
 				0: 2.0 / 5.0,
 				1: 2.0 / 5.0,
 				2: 1.0 / 5.0,
@@ -127,7 +127,7 @@ func TestCountAndNormalize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			pp := countAndNormalize(test.longWalk)
-			if Distance(test.expectedPP, pp) > 1e-10 {
+			if models.Distance(test.expectedPP, pp) > 1e-10 {
 				t.Fatalf("countAndNormalize(): expected %v, got %v", test.expectedPP, pp)
 			}
 		})

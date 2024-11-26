@@ -6,7 +6,6 @@ import (
 
 	"github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/pagerank"
 )
 
 /*
@@ -49,8 +48,8 @@ func SetupOldState(DB *mock.Database,
 // TestSetup now includes potential changes that you can randomly select from.
 type TestSetup struct {
 	DB               *mock.Database
-	ExpectedPR       pagerank.PagerankMap
-	ExpectedPPR0     pagerank.PagerankMap
+	ExpectedPR       models.PagerankMap
+	ExpectedPPR0     models.PagerankMap
 	PotentialChanges map[uint32][]Change
 }
 
@@ -73,8 +72,8 @@ potentialChanges should not include oldSuccessors that make the corrisponding gr
 */
 func SetupGraph(graphType string) TestSetup {
 	DB := mock.NewDatabase()
-	var expectedPR pagerank.PagerankMap
-	var expectedPPR0 pagerank.PagerankMap
+	var expectedPR models.PagerankMap
+	var expectedPPR0 models.PagerankMap
 	potentialChanges := make(map[uint32][]Change)
 
 	switch graphType {
@@ -84,14 +83,14 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[3] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[4] = &models.Node{Successors: []uint32{}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.20,
 			1: 0.20,
 			2: 0.20,
 			3: 0.20,
 			4: 0.20,
 		}
-		expectedPPR0 = pagerank.PagerankMap{
+		expectedPPR0 = models.PagerankMap{
 			0: 1.0,
 			1: 0.0,
 			2: 0.0,
@@ -110,7 +109,7 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}}
 		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}}
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{0}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.3333,
 			1: 0.3333,
 			2: 0.3333,
@@ -121,7 +120,7 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}}
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{0}}
 		DB.NodeIndex[3] = &models.Node{Successors: []uint32{}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.29700319989476004,
 			1: 0.20616253803697476,
 			2: 0.2552206288779828,
@@ -134,14 +133,14 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{3}}
 		DB.NodeIndex[3] = &models.Node{Successors: []uint32{1}}
 		DB.NodeIndex[4] = &models.Node{Successors: []uint32{}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.11185368285521291,
 			1: 0.36950360789646736,
 			2: 0.15943176539450626,
 			3: 0.24735726099860061,
 			4: 0.11185368285521291,
 		}
-		expectedPPR0 = pagerank.PagerankMap{
+		expectedPPR0 = models.PagerankMap{
 			0: 0.39709199748768864,
 			1: 0.2906949630265446,
 			2: 0.16876345947470478,
@@ -180,7 +179,7 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[3] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[4] = &models.Node{Successors: []uint32{3, 5}}
 		DB.NodeIndex[5] = &models.Node{Successors: []uint32{}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.12987025255292317,
 			1: 0.18506487372353833,
 			2: 0.18506487372353833,
@@ -188,7 +187,7 @@ func SetupGraph(graphType string) TestSetup {
 			3: 0.18506487372353833,
 			5: 0.18506487372353833,
 		}
-		expectedPPR0 = pagerank.PagerankMap{
+		expectedPPR0 = models.PagerankMap{
 			0: 0.5405393205897051,
 			1: 0.22973033970514745,
 			2: 0.22973033970514745,
@@ -225,13 +224,13 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[3] = &models.Node{Successors: []uint32{1, 2}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.17543839772251532,
 			1: 0.32456160227748454,
 			2: 0.32456160227748454,
 			3: 0.17543839772251532,
 		}
-		expectedPPR0 = pagerank.PagerankMap{
+		expectedPPR0 = models.PagerankMap{
 			0: 0.5405396591260619,
 			1: 0.22973017043696903,
 			2: 0.22973017043696903,
@@ -255,13 +254,13 @@ func SetupGraph(graphType string) TestSetup {
 		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
 		DB.NodeIndex[3] = &models.Node{Successors: []uint32{1}}
-		expectedPR = pagerank.PagerankMap{
+		expectedPR = models.PagerankMap{
 			0: 0.17543839772251535,
 			1: 0.3991232045549693,
 			2: 0.25,
 			3: 0.17543839772251535,
 		}
-		expectedPPR0 = pagerank.PagerankMap{
+		expectedPPR0 = models.PagerankMap{
 			0: 0.5405396591260619,
 			1: 0.22973017043696903,
 			2: 0.22973017043696903,
@@ -285,8 +284,8 @@ func SetupGraph(graphType string) TestSetup {
 	case "cyclicLong50":
 		// it implements the simple cyclic graph with 50 nodes.
 		// 0 --> 1 --> 2 --> ... --> 48 --> 49 --> 0
-		expectedPR = make(pagerank.PagerankMap, 50)
-		expectedPPR0 = make(pagerank.PagerankMap, 50)
+		expectedPR = make(models.PagerankMap, 50)
+		expectedPPR0 = make(models.PagerankMap, 50)
 		for nodeID := uint32(0); nodeID < 49; nodeID++ {
 			DB.NodeIndex[nodeID] = &models.Node{Successors: []uint32{nodeID + 1}}
 
@@ -315,8 +314,8 @@ func SetupGraph(graphType string) TestSetup {
 	default:
 		// just one node
 		DB.NodeIndex[0] = &models.Node{Successors: []uint32{}}
-		expectedPR = pagerank.PagerankMap{0: 1.0}
-		expectedPPR0 = pagerank.PagerankMap{0: 1.0}
+		expectedPR = models.PagerankMap{0: 1.0}
+		expectedPPR0 = models.PagerankMap{0: 1.0}
 	}
 
 	return TestSetup{

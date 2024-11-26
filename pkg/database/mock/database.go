@@ -277,6 +277,25 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 	return NC, nil
 }
 
+// SetPagerank() set the pagerank in the database according to the pagerankMap
+func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
+
+	if err := DB.Validate(); err != nil {
+		return err
+	}
+
+	for nodeID, rank := range pagerankMap {
+		// if nodeID doesn't exists, skip
+		if _, exists := DB.NodeIndex[nodeID]; !exists {
+			return models.ErrNodeNotFoundDB
+		}
+
+		DB.NodeIndex[nodeID].Metadata.Pagerank = rank
+	}
+
+	return nil
+}
+
 // ------------------------------------HELPERS----------------------------------
 
 // function that returns a DB setup based on the DBType

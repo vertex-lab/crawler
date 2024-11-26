@@ -3,6 +3,7 @@ package stochastictest
 import (
 	"testing"
 
+	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -72,7 +73,7 @@ func TestPagerankStatic(t *testing.T) {
 			}
 
 			// compute the error
-			distance := pagerank.Distance(expectedPR, pr)
+			distance := models.Distance(expectedPR, pr)
 			if distance > maxExpectedDistance {
 				t.Errorf("Pagerank(): expected distance %v, pr %v\n", maxExpectedDistance, distance)
 				t.Errorf("expected %v \npr %v", expectedPR, pr)
@@ -159,7 +160,7 @@ func TestPagerankDynamic(t *testing.T) {
 			}
 
 			// check the error
-			distance := pagerank.Distance(expectedPR, pr)
+			distance := models.Distance(expectedPR, pr)
 			if distance > maxExpectedDistance {
 				t.Errorf("Pagerank(): expected distance %v, pr %v\n\n", maxExpectedDistance, distance)
 				t.Errorf("expected %v\n; pr %v\n\n", expectedPR, pr)

@@ -5,10 +5,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
-// a map that associates each nodeID with its corrisponding pagerank value
-type PagerankMap map[uint32]float64
-
-func Pagerank(DB models.Database, RWS models.RandomWalkStore) (PagerankMap, error) {
+func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMap, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -35,7 +32,7 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (PagerankMap, erro
 	}
 
 	// compute the pagerank as the frequency of visits
-	pagerank := make(PagerankMap, len(nodeIDs))
+	pagerank := make(models.PagerankMap, len(nodeIDs))
 	for nodeID, visits := range visitMap {
 		pagerank[nodeID] = float64(visits) / totalVisits
 	}

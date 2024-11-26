@@ -623,6 +623,81 @@ func TestNodeCache(t *testing.T) {
 	}
 }
 
+func TestSetPagerank(t *testing.T) {
+
+	type testCases struct {
+		name          string
+		DBType        string
+		pagerank      models.PagerankMap
+		expectedError error
+	}
+
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []testCases{
+			{
+				name:          "nil DB",
+				DBType:        "nil",
+				pagerank:      models.PagerankMap{0: 1.0},
+				expectedError: models.ErrNilDBPointer,
+			},
+			{
+				name:          "empty DB",
+				DBType:        "empty",
+				pagerank:      models.PagerankMap{0: 1.0},
+				expectedError: models.ErrEmptyDB,
+			},
+			{
+				name:          "node not found DB",
+				DBType:        "one-node0",
+				pagerank:      models.PagerankMap{99: 1.0},
+				expectedError: models.ErrNodeNotFoundDB,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+
+				DB := SetupDB(test.DBType)
+				err := DB.SetPagerank(test.pagerank)
+
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("SetPagerank(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		testCases := []testCases{
+			{
+				name:          "valid",
+				DBType:        "triangle",
+				pagerank:      models.PagerankMap{0: 0.33, 1: 0.44, 2: 1.0}, // random values
+				expectedError: nil,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				DB := SetupDB(test.DBType)
+				err := DB.SetPagerank(test.pagerank)
+
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("SetPagerank(): expected %v, got %v", test.expectedError, err)
+				}
+
+				for nodeID, rank := range test.pagerank {
+					p := DB.NodeIndex[nodeID].Metadata.Pagerank
+					if p != rank {
+						t.Errorf("Pagerank(%d): expected %v, got %v", nodeID, rank, p)
+					}
+				}
+
+			})
+		}
+	})
+}
+
 func TestInterface(t *testing.T) {
 	var _ models.Database = &Database{}
 }

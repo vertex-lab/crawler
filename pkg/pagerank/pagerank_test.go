@@ -17,7 +17,7 @@ func TestPagerank(t *testing.T) {
 		name             string
 		DBType           string
 		RWSType          string
-		expectedPagerank PagerankMap
+		expectedPagerank models.PagerankMap
 		expectedError    error
 	}{
 		{
@@ -49,7 +49,7 @@ func TestPagerank(t *testing.T) {
 			DBType:        "one-node0",
 			RWSType:       "one-node0",
 			expectedError: nil,
-			expectedPagerank: PagerankMap{
+			expectedPagerank: models.PagerankMap{
 				0: 1.0,
 			},
 		},
@@ -58,7 +58,7 @@ func TestPagerank(t *testing.T) {
 			DBType:        "simple",
 			RWSType:       "simple",
 			expectedError: nil,
-			expectedPagerank: PagerankMap{
+			expectedPagerank: models.PagerankMap{
 				0: 0.5,
 				1: 0.5,
 				2: 0.0,
@@ -69,7 +69,7 @@ func TestPagerank(t *testing.T) {
 			DBType:        "triangle",
 			RWSType:       "triangle",
 			expectedError: nil,
-			expectedPagerank: PagerankMap{
+			expectedPagerank: models.PagerankMap{
 				0: 1.0 / 3.0,
 				1: 1.0 / 3.0,
 				2: 1.0 / 3.0,
@@ -89,7 +89,7 @@ func TestPagerank(t *testing.T) {
 
 			// if provided, check the pagerank is equal to the expected
 			if test.expectedPagerank != nil {
-				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
+				if models.Distance(pagerank, test.expectedPagerank) > 1e-10 {
 					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
 				}
 			}

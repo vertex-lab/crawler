@@ -37,7 +37,7 @@ random walks stored in the RandomWalkStore.
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func Personalized(DB models.Database, RWS models.RandomWalkStore,
-	nodeID uint32, topK uint16) (PagerankMap, error) {
+	nodeID uint32, topK uint16) (models.PagerankMap, error) {
 
 	if err := checkInputs(DB, RWS, nodeID, topK); err != nil {
 		return nil, err
@@ -50,10 +50,10 @@ func Personalized(DB models.Database, RWS models.RandomWalkStore,
 
 // personalized() implements the internal logic of the Personalized Pagerank function
 func personalized(DB models.Database, RWS models.RandomWalkStore,
-	nodeID uint32, topK uint16, rng *rand.Rand) (PagerankMap, error) {
+	nodeID uint32, topK uint16, rng *rand.Rand) (models.PagerankMap, error) {
 
 	if DB.IsDandling(nodeID) {
-		return PagerankMap{nodeID: 1.0}, nil
+		return models.PagerankMap{nodeID: 1.0}, nil
 	}
 
 	pWalk, err := personalizedWalk(DB, RWS, nodeID, requiredLenght(topK), rng)
@@ -204,10 +204,10 @@ func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
 
 // count the number of times each node is visited in the pWalk and computes their frequencies.
 // Returns an empty map if pWalk is nil or empty.
-func countAndNormalize(pWalk models.RandomWalk) PagerankMap {
+func countAndNormalize(pWalk models.RandomWalk) models.PagerankMap {
 
 	// count the frequency of each nodeID
-	pp := make(PagerankMap, (len(pWalk)))
+	pp := make(models.PagerankMap, (len(pWalk)))
 	for _, node := range pWalk {
 		pp[node]++
 	}
@@ -257,6 +257,25 @@ func checkInputs(DB models.Database, RWS models.RandomWalkStore,
 	}
 
 	return nil
+}
+
+// function that set up a PersonalizedWalk based on the provided type and required lenght
+func SetupPWalk(pWalkType string, targetLenght int) *PersonalizedWalk {
+
+	switch pWalkType {
+
+	case "one-node0":
+		return NewPersonalizedWalk(0, targetLenght)
+
+	case "triangle":
+		pWalk := NewPersonalizedWalk(0, targetLenght)
+		pWalk.currentNodeID = 2
+		pWalk.currentWalk = []uint32{0, 1, 2}
+		return pWalk
+
+	default:
+		return NewPersonalizedWalk(0, targetLenght)
+	}
 }
 
 // ---------------------------------ERROR-CODES--------------------------------

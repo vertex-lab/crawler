@@ -437,6 +437,50 @@ func (DB *Database) NodeCache() (models.NodeCache, error) {
 	return models.FromJSON(JSONNodeCache)
 }
 
+func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
+
+	if err := DB.validateFields(); err != nil {
+		return err
+	}
+
+	if len(pagerankMap) == 0 {
+		return nil
+	}
+
+	// prepare the keys and values for the Lua script
+	keys := make([]string, 0, len(pagerankMap))
+	values := make([]interface{}, 0, len(pagerankMap))
+	for nodeID, rank := range pagerankMap {
+		keys = append(keys, KeyNode(nodeID))
+		values = append(values, rank)
+	}
+
+	luaScript := `
+	for i = 1, #KEYS do
+		if redis.call('EXISTS', KEYS[i]) == 0 then
+			return KEYS[i]
+		end
+		redis.call('HSET', KEYS[i], 'pagerank', ARGV[i])
+	end
+	return 'OK'
+    `
+
+	res, err := DB.client.Eval(DB.ctx, luaScript, keys, values...).Result()
+	if err != nil {
+		return err
+	}
+
+	resStr, ok := res.(string)
+	if !ok {
+		return fmt.Errorf("unexpected return type %T", res)
+	}
+	if resStr != "OK" {
+		return fmt.Errorf("%w: %v", models.ErrNodeNotFoundDB, res.(string))
+	}
+
+	return nil
+}
+
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	ctx := context.Background()

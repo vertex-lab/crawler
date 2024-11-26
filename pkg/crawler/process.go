@@ -8,6 +8,7 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -100,7 +101,14 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	// TO DO, RECOMPUTE PAGERANK
+	// recompute pagerank and update the DB
+	pagerank, err := pagerank.Pagerank(DB, RWM.Store)
+	if err != nil {
+		return err
+	}
+	if err := DB.SetPagerank(pagerank); err != nil {
+		return err
+	}
 
 	return nil
 }

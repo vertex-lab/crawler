@@ -167,6 +167,41 @@ func (WC *WalkCache) NextWalk(nodeID uint32) (models.RandomWalk, error) {
 	return nextWalk, nil
 }
 
+// function that set up a WalkCache based on the provided WalkCache type
+func SetupWC(WCType string) *WalkCache {
+
+	switch WCType {
+
+	case "nil":
+		return nil
+
+	case "empty":
+		return NewWalkCache()
+
+	case "one-node0":
+		WC := NewWalkCache()
+		WC.NodeWalks[0] = []models.RandomWalk{{0}}
+		WC.LoadedWalkIDs.Add(0)
+		return WC
+
+	case "all-used":
+		WC := NewWalkCache()
+		WC.NodeWalks[0] = []models.RandomWalk{{0}}
+		WC.LoadedWalkIDs.Add(0)
+		WC.NodeWalkIndex[0] = 1 // all used
+		return WC
+
+	case "triangle":
+		WC := NewWalkCache()
+		WC.NodeWalks[0] = []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
+		WC.LoadedWalkIDs.Append(0, 1, 2)
+		return WC
+
+	default:
+		return nil
+	}
+}
+
 // ---------------------------------ERROR-CODES--------------------------------
 
 var ErrNilWCPointer = errors.New("nil walk cache pointer")
