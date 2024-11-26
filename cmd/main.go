@@ -80,13 +80,23 @@ func DisplayStats(
 	eventChan <-chan nostr.RelayEvent,
 	pubkeyChan <-chan string,
 ) {
-	ticker := time.NewTicker(10 * time.Second) // Update stats every 5 seconds
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+
+	firstDisplay := true
+	const statsLines = 9
+	clearStats := func() {
+		if !firstDisplay {
+			// Move the cursor up by `statsLines` and clear those lines
+			fmt.Printf("\033[%dA", statsLines)
+			fmt.Print("\033[J")
+		}
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("\n  > Stopping stats display...")
+			fmt.Printf("\n  > Stopping stats display...")
 			return
 
 		case <-ticker.C:
@@ -99,6 +109,8 @@ func DisplayStats(
 			memStats := new(runtime.MemStats)
 			runtime.ReadMemStats(memStats)
 
+			clearStats()
+
 			fmt.Printf("\n--- System Stats ---\n")
 			fmt.Printf("Database Size: %d nodes\n", DB.Size())
 			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
@@ -107,6 +119,8 @@ func DisplayStats(
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
 			fmt.Println("---------------------")
+
+			firstDisplay = false
 		}
 	}
 }

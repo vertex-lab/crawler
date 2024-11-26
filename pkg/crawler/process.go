@@ -35,7 +35,7 @@ func ProcessFollowListEvents(
 			eventCounter.Inc()
 
 			if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
-				fmt.Printf("\nError processing the event: %v", err)
+				fmt.Printf("\nError processing the eventID %v: %v", event.ID, err)
 
 				// re add event to the queue
 				select {

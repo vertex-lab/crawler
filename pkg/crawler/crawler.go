@@ -186,7 +186,7 @@ func QueryPubkeyBatch(
 
 // close iterates over the relays in the pool and closes all connections.
 func close(funcName string, pool *nostr.SimplePool) {
-	fmt.Printf("\n  > %v :closing relay connections... ", funcName)
+	fmt.Printf("\n  > %v: closing relay connections... ", funcName)
 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
 		relay.Close()
 		return true
