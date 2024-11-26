@@ -11,9 +11,9 @@ import (
 )
 
 /*
-computes the personalized pagerank of nodeID by simulating a long random walkSegment starting at
-and resetting to itself. This long walkSegment is generated from the
-random walks stored in the RandomWalkManager.
+computes the personalized pagerank of nodeID by simulating a long random walk starting at
+and resetting to itself. This long walk is generated from the
+random walks stored in the RandomWalkStore.
 
 # INPUTS
 
@@ -21,7 +21,7 @@ random walks stored in the RandomWalkManager.
 	The interface of the graph database
 
 	> RWS models.RandomWalkStore
-	The structure that manages the random walks for each node
+	The interface of the store.
 
 	> nodeID uint32
 	The ID of the node we are going to compute the personalized pagerank
