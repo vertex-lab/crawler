@@ -19,7 +19,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-const logFile = "app.log"
+const logFile = "crawler.log"
 
 func main() {
 	Start()

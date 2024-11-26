@@ -153,7 +153,7 @@ func QueryPubkeyBatch(
 	pubkeys []string,
 	queueHandler func(event nostr.RelayEvent) error) error {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
 	filters := nostr.Filters{{
