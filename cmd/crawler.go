@@ -25,7 +25,9 @@ func main() {
 	defer logFile.Close()
 	PrintTitle(logger)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -40,23 +42,23 @@ func main() {
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
 
-	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	eventChan := make(chan nostr.RelayEvent, 1000)
-	pubkeyChan := make(chan string, 100000)
-
+	pubkeyChan := make(chan string, 10000)
 	eventCounter := xsync.NewCounter()
 
 	go crawler.HandleSignals(cancel, logger)
 	go DisplayStats(ctx, logger, DB, RWM, eventCounter, eventChan, pubkeyChan)
 
+	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
-			eventChan <- event
+			select {
+			case eventChan <- event:
+			default:
+				logger.Warn("Firehose: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+			}
 			return nil
 		})
 	}()
@@ -64,19 +66,28 @@ func main() {
 	go func() {
 		defer wg.Done()
 		crawler.QueryNewPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
-			eventChan <- event
+			select {
+			case eventChan <- event:
+			default:
+				logger.Warn("QueryNewPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+			}
 			return nil
 		})
 	}()
 
 	crawler.ProcessFollowListEvents(ctx, logger, eventChan, DB, RWM, eventCounter, func(pubkey string) error {
-		pubkeyChan <- pubkey
+		select {
+		case pubkeyChan <- pubkey:
+		default:
+			logger.Warn("Process: Channel is full, dropping pubkey: %v", pubkey)
+		}
 		return nil
 	})
 
 	wg.Wait()
 	fmt.Printf("\nExiting\n")
-	logger.Info("Exiting\n")
+	logger.Info("Exiting")
+	logger.Info("--------------------------------------------------------------------------------------------------------------------------------")
 }
 
 func DisplayStats(
@@ -138,5 +149,7 @@ func PrintTitle(l *logger.Aggregate) {
 	fmt.Println("------------------------")
 	fmt.Println("Nostr crawler is running")
 	fmt.Println("------------------------")
+
+	l.Info("--------------------------------------------------------------------------------------------------------------------------------")
 	l.Info("Nostr crawler is starting up")
 }

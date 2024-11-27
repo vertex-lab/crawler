@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
@@ -54,7 +55,7 @@ func ProcessFollowListEvents(
 				select {
 				case eventChan <- event:
 				default:
-					logger.Warn("Channel is full, dropping eventID: %v\n", event.ID)
+					logger.Warn("Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 				}
 			}
 		}
@@ -82,7 +83,7 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	followPubkeys := ParsePubKeys(event.Tags)
+	followPubkeys := ParsePubkeys(event.Tags)
 	newSucc, err := ProcessNodeIDs(ctx, DB, RWM, author, followPubkeys, newPubkeyHandler)
 	if err != nil {
 		return err
@@ -198,26 +199,31 @@ func HandleMissingPubkey(
 }
 
 // ParsePubKeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
-// Badly formatted tags are ignored.
-func ParsePubKeys(tags nostr.Tags) []string {
+// Badly formatted tags are ignored. Pubkeys will be uniquely added (no repetitions).
+func ParsePubkeys(tags nostr.Tags) []string {
 	const followPrefix = "p"
 
 	pubkeys := make([]string, 0, len(tags))
 	for _, tag := range tags {
-
 		if len(tag) < 2 {
 			continue
 		}
 
-		if tag[0] != followPrefix {
+		prefix, pubkey := tag[0], tag[1]
+		if prefix != followPrefix {
 			continue
 		}
 
-		if !nostr.IsValidPublicKey(tag[1]) {
+		// pubkeys should be unique in the follow list
+		if slices.Contains(pubkeys, pubkey) {
 			continue
 		}
 
-		pubkeys = append(pubkeys, tag[1])
+		if !nostr.IsValidPublicKey(pubkey) {
+			continue
+		}
+
+		pubkeys = append(pubkeys, pubkey)
 	}
 
 	return pubkeys
