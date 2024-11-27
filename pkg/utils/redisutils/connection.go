@@ -11,7 +11,7 @@ import (
 // SetupRedis() initializes a new Redis client for testing purposes.
 func SetupClient() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr: "localhost:6379", // Update if needed for your test Redis server
+		Addr: "localhost:6379",
 	})
 }
 

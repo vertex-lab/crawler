@@ -341,6 +341,42 @@ func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
 	return nodeIDs, err
 }
 
+// Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
+// If a nodeID is not found, nil is returned
+func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
+
+	if err := DB.validateFields(); err != nil {
+		return nil, err
+	}
+
+	if len(nodeIDs) == 0 {
+		return []interface{}{}, nil
+	}
+
+	pipe := DB.client.Pipeline()
+	cmds := make([]*redis.StringCmd, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		cmds[i] = pipe.HGet(DB.ctx, KeyNode(nodeID), "pubkey")
+	}
+
+	// if the error is redis.Nil, deal with it later
+	if _, err := pipe.Exec(DB.ctx); err != nil && err != redis.Nil {
+		return []interface{}{}, err
+	}
+
+	pubkeys := make([]interface{}, 0, len(nodeIDs))
+	for _, cmd := range cmds {
+
+		if cmd.Err() == redis.Nil {
+			pubkeys = append(pubkeys, nil)
+			continue
+		}
+		pubkeys = append(pubkeys, cmd.Val())
+	}
+
+	return pubkeys, nil
+}
+
 // AllNodes() returns a slice with the IDs of all nodes in the DB
 func (DB *Database) AllNodes() ([]uint32, error) {
 

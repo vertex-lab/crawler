@@ -209,6 +209,33 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 	return node.Successors, nil
 }
 
+// Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
+// If a pubkey is not found, nil is returned.
+func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
+
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	pubkeys := make([]interface{}, 0, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+
+		node, exist := DB.NodeIndex[nodeID]
+		if !exist {
+			pubkeys = append(pubkeys, nil)
+			continue
+		}
+
+		pubkeys = append(pubkeys, node.Metadata.PubKey)
+	}
+
+	return pubkeys, nil
+}
+
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 // If a pubkey is not found, nil is returned
 func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {

@@ -82,6 +82,10 @@ type Database interface {
 	// If a pubkey is not found, nil is returned
 	NodeIDs(pubkeys []string) ([]interface{}, error)
 
+	// Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
+	// If a nodeID is not found, nil is returned
+	Pubkeys(nodeIDs []uint32) ([]interface{}, error)
+
 	// AllNodes() returns a slice with the IDs of all nodes in the DB
 	AllNodes() ([]uint32, error)
 
