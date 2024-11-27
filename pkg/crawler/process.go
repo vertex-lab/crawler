@@ -3,11 +3,11 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"log"
 	"math"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
@@ -17,6 +17,7 @@ import (
 // ProcessFollowListEvents() process one event at the time from the eventChannel.
 func ProcessFollowListEvents(
 	ctx context.Context,
+	logger *logger.Aggregate,
 	eventChan chan nostr.RelayEvent,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
@@ -32,22 +33,28 @@ func ProcessFollowListEvents(
 		case event, ok := <-eventChan:
 			if !ok {
 				fmt.Printf("\n  > Event channel closed, stopping processing.")
+				logger.Warn("Event channel closed, stopping processing.")
 				return
+			}
+
+			if event.Event == nil {
+				logger.Warn("event is nil")
+				continue
 			}
 
 			eventCounter.Inc()
 			if eventCounter.Value()%1000 == 0 {
-				log.Printf("INFO: processed %v events", eventCounter.Value())
+				logger.Info("processed %d events", eventCounter.Value())
 			}
 
 			if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
-				log.Printf("ERROR: Error processing the eventID %v: %v", event.ID, err)
+				logger.Error("Error processing the eventID %v: %v", event.ID, err)
 
 				// re add event to the queue
 				select {
 				case eventChan <- event:
 				default:
-					log.Printf("WARNING: Channel is full, dropping eventID: %v\n", event.ID)
+					logger.Warn("Channel is full, dropping eventID: %v\n", event.ID)
 				}
 			}
 		}
@@ -64,10 +71,6 @@ func ProcessFollowListEvent(
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	newPubkeyHandler func(pk string) error) error {
-
-	if event == nil {
-		return fmt.Errorf("event is nil")
-	}
 
 	// Fetch node metadata and successors of the author
 	author, err := DB.NodeMetaWithID(event.PubKey)

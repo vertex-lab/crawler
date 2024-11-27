@@ -3,13 +3,13 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
@@ -61,6 +61,7 @@ queue for further processing and/or to be written to the database.
 */
 func Firehose(
 	ctx context.Context,
+	logger *logger.Aggregate,
 	relays []string,
 	DB models.Database,
 	timeLimit int64,
@@ -98,7 +99,7 @@ func Firehose(
 
 		// send the event to the queue
 		if err := queueHandler(event); err != nil {
-			log.Printf("ERROR: %v", err)
+			logger.Error("Firehose queue Handler: %v", err)
 			return
 		}
 	}
@@ -108,6 +109,7 @@ func Firehose(
 // for their events in batches of batchSize.
 func QueryNewPubkeys(
 	ctx context.Context,
+	logger *logger.Aggregate,
 	relays []string,
 	pubkeyChan <-chan string,
 	batchSize int,
@@ -125,6 +127,7 @@ func QueryNewPubkeys(
 		case pubkey, ok := <-pubkeyChan:
 			if !ok {
 				fmt.Println("\n  > Pubkey channel closed, stopping processing.")
+				logger.Warn("Pubkey channel closed, stopping processing.")
 				return
 			}
 
@@ -134,7 +137,7 @@ func QueryNewPubkeys(
 
 				err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler)
 				if err != nil {
-					log.Printf("ERROR: error querying pubkeys: %v", err)
+					logger.Error("error querying pubkeys: %v", err)
 				} else {
 					// reset the batch only if successful, otherwise retry
 					batch = make([]string, 0, batchSize)
@@ -212,12 +215,12 @@ func PrintEvent(event nostr.RelayEvent) error {
 }
 
 // HandleSignals listens for OS signals and triggers context cancellation.
-func HandleSignals(cancel context.CancelFunc) {
+func HandleSignals(cancel context.CancelFunc, logger *logger.Aggregate) {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-signalChan // Block until a signal is received
 	fmt.Printf("\nSignal received. Shutting down...")
-	log.Printf("INFO: Signal received. Shutting down...")
+	logger.Info("Signal received. Shutting down...")
 	cancel()
 }

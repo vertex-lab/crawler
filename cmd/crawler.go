@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -13,16 +12,20 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
+	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-const logFile = "crawler.log"
+const logFilePath = "crawler.log"
 
 func main() {
-	Start()
+	logger, logFile := logger.Init(logFilePath)
+	defer logFile.Close()
+
+	PrintTitle(logger)
 
 	ctx := context.Background()
 	cl := redisutils.SetupClient()
@@ -48,7 +51,7 @@ func main() {
 
 	eventCounter := xsync.NewCounter()
 
-	go crawler.HandleSignals(cancel)
+	go crawler.HandleSignals(cancel, logger)
 	go DisplayStats(ctx, DB, RWM, eventCounter, eventChan, pubkeyChan)
 
 	wg.Add(2)
@@ -131,26 +134,10 @@ func DisplayStats(
 	}
 }
 
-func Start() {
-	InitLogger(logFile)
-	PrintTitle()
-}
-
-// InitLogger() returns a logger
-func InitLogger(filePath string) {
-	// Open the log file or create it if it doesn't exist
-	logFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		panic(err)
-	}
-	defer logFile.Close()
-	log.SetOutput(logFile)
-	log.Println("INFO: Nostr crawler is starting up")
-}
-
 // PrintTitle() prints a title.
-func PrintTitle() {
+func PrintTitle(l *logger.Aggregate) {
 	fmt.Println("------------------------")
 	fmt.Println("Nostr crawler is running")
 	fmt.Println("------------------------")
+	l.Info("Nostr crawler is starting up")
 }
