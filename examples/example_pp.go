@@ -39,6 +39,7 @@ func PersonalizedPagerank(
 		return map[string]float64{}, fmt.Errorf("unexpected format: %v (type %T)", node, node)
 	}
 
+	// pp is a map nodeID --> rank; we need pubkey --> rank.
 	pp, err := pagerank.Personalized(DB, RWS, nodeID, topK)
 	if err != nil {
 		return map[string]float64{}, err
@@ -52,11 +53,13 @@ func PersonalizedPagerank(
 		ranks = append(ranks, rank)
 	}
 
+	// get the pubkeys that correspond to the nodeIDs. This operation preserve order
 	pubkeys, err := DB.Pubkeys(nodeIDs)
 	if err != nil {
 		return map[string]float64{}, err
 	}
 
+	// build the map pubkey --> rank.
 	personalizedPagerank := make(map[string]float64, len(pubkeys))
 	for i, pubkey := range pubkeys {
 
