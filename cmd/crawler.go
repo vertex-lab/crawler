@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -24,7 +23,6 @@ const logFilePath = "crawler.log"
 func main() {
 	logger, logFile := logger.Init(logFilePath)
 	defer logFile.Close()
-
 	PrintTitle(logger)
 
 	ctx := context.Background()
@@ -52,12 +50,12 @@ func main() {
 	eventCounter := xsync.NewCounter()
 
 	go crawler.HandleSignals(cancel, logger)
-	go DisplayStats(ctx, DB, RWM, eventCounter, eventChan, pubkeyChan)
+	go DisplayStats(ctx, logger, DB, RWM, eventCounter, eventChan, pubkeyChan)
 
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
+		crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
 			eventChan <- event
 			return nil
 		})
@@ -65,24 +63,25 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryNewPubkeys(ctx, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
+		crawler.QueryNewPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
 			eventChan <- event
 			return nil
 		})
 	}()
 
-	crawler.ProcessFollowListEvents(ctx, eventChan, DB, RWM, eventCounter, func(pubkey string) error {
+	crawler.ProcessFollowListEvents(ctx, logger, eventChan, DB, RWM, eventCounter, func(pubkey string) error {
 		pubkeyChan <- pubkey
 		return nil
 	})
 
 	wg.Wait()
 	fmt.Printf("\nExiting\n")
-	log.Printf("INFO: Exiting")
+	logger.Info("Exiting\n")
 }
 
 func DisplayStats(
 	ctx context.Context,
+	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	eventCounter *xsync.Counter,
@@ -92,8 +91,8 @@ func DisplayStats(
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	firstDisplay := true
 	const statsLines = 9
+	firstDisplay := true
 	clearStats := func() {
 		if !firstDisplay {
 			// Move the cursor up by `statsLines` and clear those lines

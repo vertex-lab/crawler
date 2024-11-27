@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"log"
 	"os"
 )
@@ -12,10 +13,10 @@ type Aggregate struct {
 }
 
 // New() returns an initialized Logger
-func New(file *os.File) *Aggregate {
-	infoLogger := log.New(file, "INFO: ", log.LstdFlags)
-	warnLogger := log.New(file, "WARN: ", log.LstdFlags)
-	errorLogger := log.New(file, "ERROR: ", log.LstdFlags)
+func New(out io.Writer) *Aggregate {
+	infoLogger := log.New(out, "INFO: ", log.LstdFlags)
+	warnLogger := log.New(out, "WARN: ", log.LstdFlags)
+	errorLogger := log.New(out, "ERROR: ", log.LstdFlags)
 
 	return &Aggregate{
 		infoLogger:  infoLogger,
@@ -25,18 +26,18 @@ func New(file *os.File) *Aggregate {
 }
 
 // Info() prints an INFO log
-func (l *Aggregate) Info(v ...interface{}) {
-	l.infoLogger.Println(v...)
+func (l *Aggregate) Info(s string, v ...interface{}) {
+	l.infoLogger.Printf(s, v...)
 }
 
 // Warn() prints an WARN log
-func (l *Aggregate) Warn(v ...interface{}) {
-	l.warnLogger.Println(v...)
+func (l *Aggregate) Warn(s string, v ...interface{}) {
+	l.warnLogger.Printf(s, v...)
 }
 
 // Error() prints an ERROR log
-func (l *Aggregate) Error(v ...interface{}) {
-	l.errorLogger.Println(v...)
+func (l *Aggregate) Error(s string, v ...interface{}) {
+	l.errorLogger.Printf(s, v...)
 }
 
 // Init() initialise the logger and the file it prints to.
