@@ -3,13 +3,16 @@ package crawler
 import (
 	"context"
 	"errors"
+	"math"
 	"math/rand/v2"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/vertex-lab/crawler/pkg/database/mock"
+	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
@@ -107,6 +110,94 @@ func TestParsePubkeys(t *testing.T) {
 	}
 }
 
+func TestHandleMissingPubkey(t *testing.T) {
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []struct {
+			name           string
+			DBType         string
+			RWSType        string
+			pubkey         string
+			expectedError  error
+			expectedNodeID uint32
+		}{
+			{
+				name:           "nil DB",
+				DBType:         "nil",
+				RWSType:        "one-node0",
+				pubkey:         "zero",
+				expectedError:  models.ErrNilDBPointer,
+				expectedNodeID: math.MaxUint32,
+			},
+			{
+				name:           "nil RWM",
+				DBType:         "empty",
+				RWSType:        "nil",
+				pubkey:         "zero",
+				expectedError:  models.ErrNilRWSPointer,
+				expectedNodeID: math.MaxUint32,
+			},
+			{
+				name:           "node already in DB",
+				DBType:         "simple-with-mock-pks",
+				RWSType:        "simple",
+				pubkey:         "zero",
+				expectedError:  models.ErrNodeAlreadyInDB,
+				expectedNodeID: math.MaxUint32,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				DB := mockdb.SetupDB(test.DBType)
+				RWM := walks.SetupRWM(test.RWSType)
+
+				queue := []string{}
+				nodeID, err := HandleMissingPubkey(context.Background(), DB, RWM, test.pubkey, 1.0, func(pk string) error {
+					queue = append(queue, pk)
+					return nil
+				})
+
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("HandleMissingPubkey: expected %v, got %v", test.expectedError, err)
+				}
+
+				if nodeID != test.expectedNodeID {
+					t.Errorf("HandleMissingPubkey: expected %v, got %v", test.expectedNodeID, nodeID)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		DB := mockdb.SetupDB("pip")
+		RWS := mockstore.SetupRWS("one-node0")
+		RWM := &walks.RandomWalkManager{
+			Store: RWS,
+		}
+
+		queue := []string{}
+		nodeID, err := HandleMissingPubkey(context.Background(), DB, RWM, calle, 1.0, func(pk string) error {
+			queue = append(queue, pk)
+			return nil
+		})
+
+		if err != nil {
+			t.Fatalf("HandleMissingPubkey(): expected nil, got %v", err)
+		}
+
+		if nodeID != 1 {
+			t.Errorf("expected nodeID %v, got %v", 1, nodeID)
+		}
+
+		for walkID, walk := range RWS.WalkIndex {
+			expectedWalk := models.RandomWalk{walkID}
+			if !reflect.DeepEqual(walk, expectedWalk) {
+				t.Errorf("expected walk %v, got %v", expectedWalk, walk)
+			}
+		}
+	})
+}
+
 func TestProcessNodeIDs(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -178,7 +269,7 @@ func TestProcessNodeIDs(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			DB := mock.SetupDB(test.DBType)
+			DB := mockdb.SetupDB(test.DBType)
 			RWM := walks.SetupRWM(test.RWMType)
 			queuePubkeys := []string{}
 
@@ -217,22 +308,16 @@ func TestProcessFollowListEvent(t *testing.T) {
 				expectedError: models.ErrNilDBPointer,
 			},
 			{
-				name:          "nil RWS",
-				DBType:        "one-node0",
-				RWSType:       "nil",
-				expectedError: models.ErrNilRWSPointer,
-			},
-			{
 				name:          "event.PubKey not found",
 				DBType:        "one-node0",
 				RWSType:       "one-node0",
-				expectedError: models.ErrNodeNotFoundNC,
+				expectedError: models.ErrNodeNotFoundDB,
 			},
 		}
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				DB := mock.SetupDB(test.DBType)
+				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupRWM(test.RWSType)
 
 				err := ProcessFollowListEvent(context.Background(), &validEvent, DB, RWM, func(pk string) error {
@@ -247,49 +332,106 @@ func TestProcessFollowListEvent(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-		DB := mock.SetupDB("pip")
-		RWM := walks.SetupRWM("empty")
+		DB := mockdb.SetupDB("pip")
+		RWS := mockstore.SetupRWS("empty")
+		RWM := &walks.RandomWalkManager{
+			Store: RWS,
+		}
+
 		if err := RWM.GenerateAll(DB); err != nil {
 			t.Fatalf("GenerateAll(): expected nil, got %v", err)
 		}
 
-		event1 := nostr.Event{
-			PubKey: pip,
-			Tags: nostr.Tags{
-				nostr.Tag{"p", calle},
+		// one after the other, the graph will be built: pip --> calle --> odell --> pip
+		events := []*nostr.Event{
+			{
+				PubKey:    pip,
+				CreatedAt: nostr.Timestamp(1),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", calle},
+				},
+			},
+			{
+				PubKey:    calle,
+				CreatedAt: nostr.Timestamp(2),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", odell},
+				},
+			},
+			{
+				PubKey:    odell,
+				CreatedAt: nostr.Timestamp(3),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", pip},
+				},
 			},
 		}
 
-		event2 := nostr.Event{
-			PubKey: calle,
-			Tags: nostr.Tags{
-				nostr.Tag{"p", odell},
+		expectedQueue := map[int][]string{
+			0: {calle},
+			1: {calle, odell},
+			2: {calle, odell},
+		}
+
+		expectedNodeIDs := map[int][]uint32{
+			0: {0, 1},
+			1: {0, 1, 2},
+			2: {0, 1, 2},
+		}
+
+		expectedWalks := map[int]map[uint32]models.RandomWalk{
+			0: { // walks at iteration 0
+				0: {0, 1},
+				1: {1},
+			},
+			1: { // walks at iteration 1
+				0: {0, 1, 2},
+				1: {1, 2},
+				2: {2},
+			},
+			2: { // walks at iteration 2
+				0: {0, 1, 2},
+				1: {1, 2, 0},
+				2: {2, 0, 1},
 			},
 		}
 
-		event3 := nostr.Event{
-			PubKey: odell,
-			Tags: nostr.Tags{
-				nostr.Tag{"p", odell},
-			},
+		_ = expectedWalks
+
+		queue := []string{}
+		for i, event := range events {
+
+			err := ProcessFollowListEvent(context.Background(), event, DB, RWM, func(pk string) error {
+				queue = append(queue, pk)
+				return nil
+			})
+
+			if err != nil {
+				t.Fatalf("ProcessFollowListEvent(event%d): expected nil, got %v", i, err)
+			}
+
+			if !reflect.DeepEqual(queue, expectedQueue[i]) {
+				t.Fatalf("expected queue %v, got %v", expectedQueue[i], queue)
+			}
+
+			nodeIDs, err := DB.AllNodes()
+			if err != nil {
+				t.Fatalf("AllNodes(): expected nil, got %v", err)
+			}
+			slices.Sort(nodeIDs) // sort nodeIDs before comparing them.
+
+			if !reflect.DeepEqual(nodeIDs, expectedNodeIDs[i]) {
+				t.Fatalf("expected nodeIDs %v, got %v", expectedNodeIDs[i], nodeIDs)
+			}
+
+			// The following test fails 55% of the times, due to the random nature of the walks,
+			// for walkID, walk := range RWS.WalkIndex {
+			// 	expectedWalk := expectedWalks[i][walkID]
+			// 	if !reflect.DeepEqual(walk, expectedWalk) {
+			// 		t.Errorf("Iteration %d: expected walk %v, got %v", i, expectedWalk, walk)
+			// 	}
+			// }
 		}
-
-		_ = event1
-		_ = event2
-		_ = event3
-
-		// err = ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[1])
-		// if err != nil {
-		// 	t.Fatalf("ProcessFollowListEvent(): expected nil, got %v", err)
-		// }
-
-		// for nodeID, expectedNode := range expectedNodes {
-		// 	node := DB.NodeIndex[nodeID]
-		// 	if !reflect.DeepEqual(node, &expectedNode) {
-		// 		t.Errorf("ProcessFollowListEvent(): expected node %v, got %v", &expectedNode, node)
-		// 	}
-		// }
-
 	})
 }
 

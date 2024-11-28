@@ -43,6 +43,11 @@ func ProcessFollowListEvents(
 				continue
 			}
 
+			if event.Kind != nostr.KindFollowList {
+				logger.Warn("event kind is not %d", nostr.KindFollowList)
+				continue
+			}
+
 			eventCounter.Inc()
 			if eventCounter.Value()%1000 == 0 {
 				logger.Info("processed %d events", eventCounter.Value())
@@ -184,12 +189,13 @@ func HandleMissingPubkey(
 		return math.MaxUint32, err
 	}
 
-	if err := RWM.Generate(DB, nodeID); err != nil {
-		return math.MaxUint32, err
-	}
-
-	// if the pagerank is higher than the threshold, send to queue
+	// if the pagerank is higher than the threshold, generate walks and send to the queue.
 	if pagerank > pagerankThreshold(DB.Size()) {
+
+		if err := RWM.Generate(DB, nodeID); err != nil {
+			return math.MaxUint32, err
+		}
+
 		if err := queueHandler(pubkey); err != nil {
 			return math.MaxUint32, err
 		}
