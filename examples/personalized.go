@@ -8,7 +8,29 @@ import (
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
+	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
+
+func main() {
+
+	// creates a new Redis client and flush the database when finished
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
+	pp, err := PersonalizedPagerank(
+		context.Background(),
+		cl,
+		pip,
+		100,
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("personalized pagerank of pip: %v\n", pp)
+}
 
 func PersonalizedPagerank(
 	ctx context.Context,
@@ -18,7 +40,7 @@ func PersonalizedPagerank(
 
 	_ = ctx // we'll use the ctx in the future, after I (pip) will use it more consistently
 
-	// The names are bad, should be ConnectDatabase/RWS. Will change them
+	// Setup the DB and RWS with just the pip key (fucking narcissist)
 	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
 		return map[string]float64{}, err
@@ -28,7 +50,8 @@ func PersonalizedPagerank(
 		return map[string]float64{}, err
 	}
 
-	node, err := DB.NodeIDs([]string{pubkey}) // the result is a slice of empty interfaces, which is an uint32 (nodeID) if the pubkey was found in the DB, nil otherwise
+	// the result is a slice of empty interfaces, which is an uint32 (nodeID) if the pubkey was found in the DB, nil otherwise
+	node, err := DB.NodeIDs([]string{pubkey})
 	if err != nil {
 		return map[string]float64{}, err
 	}
