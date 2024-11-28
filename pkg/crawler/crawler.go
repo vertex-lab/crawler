@@ -168,6 +168,10 @@ func QueryPubkeyBatch(
 	newestEvents := make(map[string]nostr.RelayEvent, len(pubkeys))
 	for event := range pool.SubManyEose(ctx, relays, filters) {
 
+		if match, err := event.CheckSignature(); err != nil || !match {
+			continue
+		}
+
 		newestEvent, exists := newestEvents[event.PubKey]
 		if !exists {
 			newestEvents[event.PubKey] = event
