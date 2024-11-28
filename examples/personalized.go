@@ -12,10 +12,18 @@ import (
 )
 
 func main() {
-
-	// creates a new Redis client and flush the database when finished
 	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
+
+	// DO THIS ONLY ONCE, THEN COMMENT OUT.
+	// Setup the DB and RWS with just the pip key (fucking narcissist).
+	_, err := redisdb.SetupDB(cl, "pip")
+	if err != nil {
+		panic(err)
+	}
+	_, err = redistore.SetupRWS(cl, "pip")
+	if err != nil {
+		panic(err)
+	}
 
 	const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
 	pp, err := PersonalizedPagerank(
@@ -24,7 +32,6 @@ func main() {
 		pip,
 		100,
 	)
-
 	if err != nil {
 		panic(err)
 	}
@@ -40,12 +47,12 @@ func PersonalizedPagerank(
 
 	_ = ctx // we'll use the ctx in the future, after I (pip) will use it more consistently
 
-	// Setup the DB and RWS with just the pip key (fucking narcissist)
-	DB, err := redisdb.SetupDB(cl, "pip")
+	// Create new DB and RWS connections; Names are bad, I know... I will change them
+	DB, err := redisdb.NewDatabase(context.Background(), cl)
 	if err != nil {
 		return map[string]float64{}, err
 	}
-	RWS, err := redistore.SetupRWS(cl, "pip")
+	RWS, err := redistore.LoadRWS(context.Background(), cl)
 	if err != nil {
 		return map[string]float64{}, err
 	}
