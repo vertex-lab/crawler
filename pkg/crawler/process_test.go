@@ -29,7 +29,6 @@ var badlyFormattedEvent = nostr.Event{
 		nostr.Tag{"p", pip + "xxx"}, // pubkey not valid
 	},
 }
-
 var multipleFollowEvent = nostr.Event{
 	PubKey:    odell,
 	Kind:      3,
@@ -38,7 +37,6 @@ var multipleFollowEvent = nostr.Event{
 		nostr.Tag{"p", pip},
 		nostr.Tag{"p", pip}}, // added two times
 }
-
 var validEvent = nostr.Event{
 	PubKey:    calle,
 	Kind:      3,
@@ -230,62 +228,62 @@ func TestProcessFollowListEvent(t *testing.T) {
 		}
 	})
 
-	// t.Run("valid", func(t *testing.T) {
-	// 	DB := mock.SetupDB("simple-with-pks")
-	// 	RWM := walks.SetupRWM("simple")
-	// 	NC, err := DB.NodeCache()
-	// 	if err != nil {
-	// 		t.Fatalf("NodeCache(): expected nil, got %v", err)
-	// 	}
+	t.Run("valid", func(t *testing.T) {
+		DB := mock.SetupDB("simple-with-pks")
+		RWM := walks.SetupRWM("simple")
+		NC, err := DB.NodeCache()
+		if err != nil {
+			t.Fatalf("NodeCache(): expected nil, got %v", err)
+		}
 
-	// 	err = ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[1])
-	// 	if err != nil {
-	// 		t.Fatalf("ProcessFollowListEvent(): expected nil, got %v", err)
-	// 	}
+		err = ProcessFollowListEvent(DB, RWM, NC, &fakeEvents[1])
+		if err != nil {
+			t.Fatalf("ProcessFollowListEvent(): expected nil, got %v", err)
+		}
 
-	// 	expectedNodes := map[uint32]models.Node{
-	// 		0: {
-	// 			Metadata: models.NodeMeta{
-	// 				PubKey:    odell,
-	// 				Status:    models.StatusCrawled,
-	// 				Timestamp: fakeEvents[1].CreatedAt.Time().Unix(),
-	// 				Pagerank:  0.26,
-	// 			},
-	// 			Successors:   []uint32{2},
-	// 			Predecessors: []uint32{},
-	// 		},
+		expectedNodes := map[uint32]models.Node{
+			0: {
+				Metadata: models.NodeMeta{
+					PubKey:    odell,
+					Status:    models.StatusCrawled,
+					Timestamp: fakeEvents[1].CreatedAt.Time().Unix(),
+					Pagerank:  0.26,
+				},
+				Successors:   []uint32{2},
+				Predecessors: []uint32{},
+			},
 
-	// 		1: {
-	// 			Metadata: models.NodeMeta{
-	// 				PubKey:    calle,
-	// 				Status:    models.StatusNotCrawled,
-	// 				Timestamp: 0,
-	// 				Pagerank:  0.26,
-	// 			},
-	// 			Successors:   []uint32{},
-	// 			Predecessors: []uint32{},
-	// 		},
+			1: {
+				Metadata: models.NodeMeta{
+					PubKey:    calle,
+					Status:    models.StatusNotCrawled,
+					Timestamp: 0,
+					Pagerank:  0.26,
+				},
+				Successors:   []uint32{},
+				Predecessors: []uint32{},
+			},
 
-	// 		2: {
-	// 			Metadata: models.NodeMeta{
-	// 				PubKey:    pip,
-	// 				Status:    models.StatusNotCrawled,
-	// 				Timestamp: 0,
-	// 				Pagerank:  0.48,
-	// 			},
-	// 			Successors:   []uint32{},
-	// 			Predecessors: []uint32{0},
-	// 		},
-	// 	}
+			2: {
+				Metadata: models.NodeMeta{
+					PubKey:    pip,
+					Status:    models.StatusNotCrawled,
+					Timestamp: 0,
+					Pagerank:  0.48,
+				},
+				Successors:   []uint32{},
+				Predecessors: []uint32{0},
+			},
+		}
 
-	// 	for nodeID, expectedNode := range expectedNodes {
-	// 		node := DB.NodeIndex[nodeID]
-	// 		if !reflect.DeepEqual(node, &expectedNode) {
-	// 			t.Errorf("ProcessFollowListEvent(): expected node %v, got %v", &expectedNode, node)
-	// 		}
-	// 	}
+		for nodeID, expectedNode := range expectedNodes {
+			node := DB.NodeIndex[nodeID]
+			if !reflect.DeepEqual(node, &expectedNode) {
+				t.Errorf("ProcessFollowListEvent(): expected node %v, got %v", &expectedNode, node)
+			}
+		}
 
-	// })
+	})
 }
 
 // ---------------------------------BENCHMARKS----------------------------------
