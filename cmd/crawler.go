@@ -42,8 +42,8 @@ func main() {
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
 
-	eventChan := make(chan nostr.RelayEvent, 1000)
-	pubkeyChan := make(chan string, 10000)
+	eventChan := make(chan nostr.RelayEvent, 10000)
+	pubkeyChan := make(chan string, 100000)
 	eventCounter := xsync.NewCounter()
 
 	go crawler.HandleSignals(cancel, logger)
