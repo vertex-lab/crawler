@@ -35,7 +35,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 	RWS, err := redistore.SetupRWS(cl, "one-node0")
 	if err != nil {
 		panic(err)
@@ -43,7 +42,7 @@ func main() {
 	RWM := &walks.RandomWalkManager{Store: RWS}
 
 	eventChan := make(chan nostr.RelayEvent, 10000)
-	pubkeyChan := make(chan string, 100000)
+	pubkeyChan := make(chan string, 1000000)
 	eventCounter := xsync.NewCounter()
 
 	go crawler.HandleSignals(cancel, logger)
@@ -87,7 +86,7 @@ func main() {
 	wg.Wait()
 	fmt.Printf("\nExiting\n")
 	logger.Info("Exiting")
-	logger.Info("--------------------------------------------------------------------------------------------------------------------------------")
+	logger.Info("------------------------------------------------------")
 }
 
 func DisplayStats(
@@ -150,6 +149,6 @@ func PrintTitle(l *logger.Aggregate) {
 	fmt.Println("Nostr crawler is running")
 	fmt.Println("------------------------")
 
-	l.Info("--------------------------------------------------------------------------------------------------------------------------------")
+	l.Info("------------------------------------------------------")
 	l.Info("Nostr crawler is starting up")
 }

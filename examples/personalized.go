@@ -19,11 +19,11 @@ func PersonalizedPagerank(
 	_ = ctx // we'll use the ctx in the future, after I (pip) will use it more consistently
 
 	// The names are bad, should be ConnectDatabase/RWS. Will change them
-	DB, err := redisdb.NewDatabase(context.Background(), cl)
+	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
 		return map[string]float64{}, err
 	}
-	RWS, err := redistore.LoadRWS(context.Background(), cl)
+	RWS, err := redistore.SetupRWS(cl, "pip")
 	if err != nil {
 		return map[string]float64{}, err
 	}

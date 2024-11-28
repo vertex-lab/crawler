@@ -486,6 +486,10 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 			return nil, err
 		}
 
+		if err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyLastWalkID, 1).Err(); err != nil {
+			return nil, err
+		}
+
 		return RWS, nil
 
 	case "one-walk0":
@@ -504,6 +508,10 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 			if err := cl.SAdd(ctx, KeyWalksVisiting(nodeID), 0).Err(); err != nil {
 				return nil, err
 			}
+		}
+
+		if err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyLastWalkID, 1).Err(); err != nil {
+			return nil, err
 		}
 
 		return RWS, nil
@@ -539,6 +547,19 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 			if err := RWS.AddWalk(walk); err != nil {
 				return nil, err
 			}
+		}
+		return RWS, nil
+
+	case "pip":
+		ctx := context.Background()
+		RWS, err := NewRWS(ctx, cl, 0.85, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		walk := models.RandomWalk{0}
+		if err := RWS.AddWalk(walk); err != nil {
+			return nil, err
 		}
 		return RWS, nil
 
