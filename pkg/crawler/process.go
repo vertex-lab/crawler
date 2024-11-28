@@ -83,7 +83,7 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	followPubkeys := ParsePubkeys(event.Tags)
+	followPubkeys := ParsePubkeys(event)
 	newSucc, err := ProcessNodeIDs(ctx, DB, RWM, author, followPubkeys, newPubkeyHandler)
 	if err != nil {
 		return err
@@ -199,18 +199,29 @@ func HandleMissingPubkey(
 }
 
 // ParsePubKeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
-// Badly formatted tags are ignored. Pubkeys will be uniquely added (no repetitions).
-func ParsePubkeys(tags nostr.Tags) []string {
+// - Badly formatted tags are ignored.
+// - Pubkeys will be uniquely added (no repetitions).
+// - The author of the event will be removed from the followed pubkeys if present.
+func ParsePubkeys(event *nostr.Event) []string {
 	const followPrefix = "p"
 
-	pubkeys := make([]string, 0, len(tags))
-	for _, tag := range tags {
+	if event == nil || len(event.Tags) == 0 {
+		return []string{}
+	}
+
+	pubkeys := make([]string, 0, len(event.Tags))
+	for _, tag := range event.Tags {
 		if len(tag) < 2 {
 			continue
 		}
 
 		prefix, pubkey := tag[0], tag[1]
 		if prefix != followPrefix {
+			continue
+		}
+
+		// remove the author from the followed pubkeys, as that is no signal
+		if pubkey == event.PubKey {
 			continue
 		}
 
