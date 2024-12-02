@@ -392,16 +392,16 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: odell, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: calle, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusNotCrawled, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: odell, Status: models.StatusActive, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: calle, Status: models.StatusActive, Timestamp: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusActive, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "pip":
 		DB := NewDatabase()
 		DB.KeyIndex[pip] = 0
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusCrawled, Timestamp: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusActive, Timestamp: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 0
 		return DB
 

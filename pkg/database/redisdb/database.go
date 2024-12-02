@@ -608,7 +608,7 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 			Metadata: models.NodeMeta{
 				PubKey:    fiatjaf,
 				Timestamp: 0,
-				Status:    models.StatusNotCrawled,
+				Status:    models.StatusActive,
 				Pagerank:  1.0,
 			},
 			Successors:   []uint32{},
@@ -632,7 +632,7 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 			Metadata: models.NodeMeta{
 				PubKey:    pip,
 				Timestamp: 0,
-				Status:    models.StatusNotCrawled,
+				Status:    models.StatusActive,
 				Pagerank:  1.0,
 			},
 			Successors:   []uint32{},

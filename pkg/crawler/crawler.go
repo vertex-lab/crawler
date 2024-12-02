@@ -3,7 +3,6 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -223,13 +222,15 @@ URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func pagerankThreshold(graphSize int) float64 {
 
-	// the exponent
-	const b float64 = 0.76
+	// // the exponent
+	// const b float64 = 0.76
 
-	// cutting the bottom 5%
-	const percentageCut float64 = 0.95
+	// // cutting the bottom 5%
+	// const percentageCut float64 = 0.95
 
-	return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
+	// return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
+	_ = graphSize
+	return 0.0
 }
 
 // PrintEvent is a simple function that prints the event ID, PubKey and Timestamp.

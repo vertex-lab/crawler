@@ -16,8 +16,8 @@ import (
 	"errors"
 )
 
-const StatusCrawled = "crawled" // when at least one follow list has been processed
-const StatusNotCrawled = "not-crawled"
+const StatusActive = "active" // we generate random walks from this node.
+const StatusInactive = "inactive"
 
 // NodeMeta contains the metadata about a node, meaning everything that is not a relationship
 type NodeMeta struct {
@@ -64,7 +64,7 @@ type Database interface {
 	NodeMetaWithID(pubkey string) (NodeMetaWithID, error)
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
-	AddNode(*Node) (uint32, error)
+	AddNode(node *Node) (uint32, error)
 
 	// UpdateNode() updates the nodeID using the new values inside node.
 	UpdateNode(nodeID uint32, nodeDiff *NodeDiff) error

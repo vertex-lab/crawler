@@ -108,7 +108,7 @@ The following table shows the relative speed of this script vs the `HMGET` comma
 | 10k        | 30ms                 | 30ms         |
 | 100k       | 240ms                | 120ms        |
 
-For small batches, the strings are faster, however for big batches the single hash approach is faster.
+For small batches, the strings are faster, however for big batches the single hash approach is faster, and it's non-blocking.
 
 ---
 

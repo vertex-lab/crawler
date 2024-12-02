@@ -100,7 +100,6 @@ func ProcessFollowListEvent(
 	authorNodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
 			Timestamp: event.CreatedAt.Time().Unix(),
-			Status:    models.StatusCrawled,
 		},
 		AddedSucc:   addedSucc,
 		RemovedSucc: removedSucc,
@@ -181,7 +180,7 @@ func HandleMissingPubkey(
 		Metadata: models.NodeMeta{
 			PubKey:    pubkey,
 			Timestamp: 0,
-			Status:    models.StatusNotCrawled,
+			Status:    models.StatusInactive,
 			Pagerank:  0.0,
 		},
 	}
@@ -214,6 +213,11 @@ func ParsePubkeys(event *nostr.Event) []string {
 	const followPrefix = "p"
 
 	if event == nil || len(event.Tags) == 0 {
+		return []string{}
+	}
+
+	// if it's massively big, skip
+	if len(event.Tags) > 100000 {
 		return []string{}
 	}
 
@@ -252,4 +256,108 @@ func ParsePubkeys(event *nostr.Event) []string {
 // specified pagerank to its follows.
 func InheritedPagerank(alpha float32, pagerank float64, outDegree int) float64 {
 	return float64(alpha) * pagerank / float64(outDegree)
+}
+
+// NodeArbiter() scans through all the nodes in the database, and promotes or
+// demotes them based on their pagerank.
+func NodeArbiter(
+	ctx context.Context,
+	logger logger.Aggregate,
+	DB models.Database,
+	RWM *walks.RandomWalkManager,
+	queueHandler func(pk string) error) {
+
+	var threshold float64 = pagerankThreshold(DB.Size())
+
+	// Scan all nodes
+	cursor := uint64(0)
+	for {
+		nodeIDs, cursor, err := DB.ScanNodes(cursor, 1000)
+		if err != nil {
+			logger.Error("Error scanning nodes: %v", err)
+			break
+		}
+
+		// If the cursor returns to 0, the scan is complete
+		if cursor == 0 {
+			break
+		}
+
+		for _, nodeID := range nodeIDs {
+			node, err := DB.NodeByID(nodeID)
+			if err != nil {
+				logger.Error("Error querying nodeID %d: %v", nodeID, err)
+				break
+			}
+
+			// Active --> Inactive
+			if node.Status == models.StatusActive && node.Pagerank < threshold {
+				if err := DemoteNode(ctx, DB, RWM, nodeID); err != nil {
+					logger.Error("Error demoting nodeID %d: %v", nodeID, err)
+					break
+				}
+			}
+
+			// Inactive --> Active
+			if node.Status == models.StatusInactive && node.Pagerank > threshold {
+				if err := PromoteNode(ctx, DB, RWM, nodeID); err != nil {
+					logger.Error("Error promoting nodeID %d: %v", nodeID, err)
+					break
+				}
+
+				if err := queueHandler(node.PubKey); err != nil {
+					logger.Error("Error sending to queue: %v", err)
+				}
+			}
+		}
+	}
+}
+
+// PromoteNode() generates random walks for the specified node and sets it to "active".
+func PromoteNode(
+	ctx context.Context,
+	DB models.Database,
+	RWM *walks.RandomWalkManager,
+	nodeID uint32) error {
+
+	if err := RWM.Generate(DB, nodeID); err != nil {
+		return err
+	}
+
+	nodeDiff := models.NodeDiff{
+		Metadata: models.NodeMeta{
+			Status: "active",
+		},
+	}
+
+	if err := DB.UpdateNode(nodeID, &nodeDiff); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DemoteNode() sets a node to "inactive". In the future this function will also
+// remove the walks that starts from that node.
+func DemoteNode(
+	ctx context.Context,
+	DB models.Database,
+	RWM *walks.RandomWalkManager,
+	nodeID uint32) error {
+
+	// if err := RWM.Remove(DB, nodeID); err != nil {
+	// 	return err
+	// }
+
+	nodeDiff := models.NodeDiff{
+		Metadata: models.NodeMeta{
+			Status: "inactive",
+		},
+	}
+
+	if err := DB.UpdateNode(nodeID, &nodeDiff); err != nil {
+		return err
+	}
+
+	return nil
 }

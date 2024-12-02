@@ -20,9 +20,9 @@ func (RWM *RandomWalkManager) Generate(DB models.Database, nodeID uint32) error 
 	}
 
 	// if the node is already in the RWS, don't do anything
-	if RWM.Store.ContainsNode(nodeID) {
-		return nil
-	}
+	// if RWM.Store.ContainsNode(nodeID) {
+	// 	return nil
+	// }
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return RWM.generateWalks(DB, []uint32{nodeID}, rng)
