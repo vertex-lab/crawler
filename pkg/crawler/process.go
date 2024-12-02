@@ -142,7 +142,7 @@ func ProcessNodeIDs(
 	// Each pubkey will inherit this pagerank from the event's author.
 	pr := InheritedPagerank(RWM.Store.Alpha(), author.Pagerank, len(pubkeys))
 
-	IDs, err := DB.NodeIDs(pubkeys) // IDs can be uint32 or nil, if the pubkey is not found in the database
+	IDs, err := DB.NodeIDs(pubkeys)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +164,10 @@ func ProcessNodeIDs(
 	return nodeIDs, nil
 }
 
-// HandleMissingPubkey() adds a new node to the database, generates walks for it,
-// and sends the pubkey to the queue if the expected pagerank is higher than the threshold.
+// HandleMissingPubkey() adds a new node to the database,
+// If the expected pagerank is higher than the threshold:
+// - generates walks for it,
+// - sends the pubkey to the queue
 func HandleMissingPubkey(
 	ctx context.Context,
 	DB models.Database,
@@ -189,7 +191,7 @@ func HandleMissingPubkey(
 		return math.MaxUint32, err
 	}
 
-	// if the pagerank is higher than the threshold, generate walks and send to the queue.
+	// if the iherited pagerank is higher than the threshold, generate walks and send to the queue.
 	if pagerank > pagerankThreshold(DB.Size()) {
 
 		if err := RWM.Generate(DB, nodeID); err != nil {

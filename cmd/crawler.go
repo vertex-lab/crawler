@@ -41,7 +41,7 @@ func main() {
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
 
-	eventChan := make(chan nostr.RelayEvent, 10000)
+	eventChan := make(chan nostr.RelayEvent, 100000)
 	pubkeyChan := make(chan string, 1000000)
 	eventCounter := xsync.NewCounter()
 
@@ -64,11 +64,11 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryNewPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
 			select {
 			case eventChan <- event:
 			default:
-				logger.Warn("QueryNewPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+				logger.Warn("QueryPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 			}
 			return nil
 		})
