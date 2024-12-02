@@ -22,8 +22,7 @@ func ProcessEvents(
 	eventChan chan nostr.RelayEvent,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	eventCounter *xsync.Counter,
-	newPubkeyHandler func(pk string) error) {
+	eventCounter *xsync.Counter) {
 
 	for {
 		select {
@@ -51,7 +50,7 @@ func ProcessEvents(
 			// process event based on its kind
 			switch event.Kind {
 			case nostr.KindFollowList:
-				if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
+				if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM); err != nil {
 					logger.Error("Error processing the eventID %v: %v", event.ID, err)
 
 					// re-add event to the queue
@@ -74,8 +73,7 @@ func ProcessFollowListEvent(
 	ctx context.Context,
 	event *nostr.Event,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
-	newPubkeyHandler func(pk string) error) error {
+	RWM *walks.RandomWalkManager) error {
 
 	author, err := DB.NodeByKey(event.PubKey)
 	if err != nil {

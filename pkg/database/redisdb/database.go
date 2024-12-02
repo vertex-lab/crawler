@@ -155,6 +155,7 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	if err != nil {
 		return math.MaxUint32, err
 	}
+	node.Metadata.ID = uint32(nodeID)
 
 	// begin the transaction
 	pipe := DB.client.TxPipeline()

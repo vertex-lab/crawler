@@ -6,7 +6,6 @@ import (
 	"math/rand/v2"
 	"os"
 	"reflect"
-	"slices"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -192,9 +191,7 @@ func TestProcessFollowListEvent(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupRWM(test.RWSType)
 
-				err := ProcessFollowListEvent(context.Background(), &validEvent, DB, RWM, func(pk string) error {
-					return nil
-				})
+				err := ProcessFollowListEvent(context.Background(), &validEvent, DB, RWM)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowListEvent(): expected %v, got %v", test.expectedError, err)
@@ -204,12 +201,17 @@ func TestProcessFollowListEvent(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
+		maxDist := 0.01
+
 		DB := mockdb.SetupDB("pip")
-		RWS := mockstore.SetupRWS("empty")
+		RWS, err := mockstore.NewRWS(0.85, 1000)
+		if err != nil {
+			t.Fatalf("NewRWS(): expected nil, got %v", err)
+		}
+
 		RWM := &walks.RandomWalkManager{
 			Store: RWS,
 		}
-
 		if err := RWM.GenerateAll(DB); err != nil {
 			t.Fatalf("GenerateAll(): expected nil, got %v", err)
 		}
@@ -239,70 +241,29 @@ func TestProcessFollowListEvent(t *testing.T) {
 			},
 		}
 
-		expectedQueue := map[int][]string{
-			0: {calle},
-			1: {calle, odell},
-			2: {calle, odell},
+		expectedPagerank := map[int]models.PagerankMap{
+			0: {0: 0.54, 1: 0.46},
+			1: {0: 0.389, 1: 0.33, 2: 0.2809},
+			2: {0: 0.389, 1: 0.33, 2: 0.2809},
 		}
 
-		expectedNodeIDs := map[int][]uint32{
-			0: {0, 1},
-			1: {0, 1, 2},
-			2: {0, 1, 2},
-		}
-
-		expectedWalks := map[int]map[uint32]models.RandomWalk{
-			0: { // walks at iteration 0
-				0: {0, 1},
-				1: {1},
-			},
-			1: { // walks at iteration 1
-				0: {0, 1, 2},
-				1: {1, 2},
-				2: {2},
-			},
-			2: { // walks at iteration 2
-				0: {0, 1, 2},
-				1: {1, 2, 0},
-				2: {2, 0, 1},
-			},
-		}
-
-		_ = expectedWalks
-
-		queue := []string{}
 		for i, event := range events {
 
-			err := ProcessFollowListEvent(context.Background(), event, DB, RWM, func(pk string) error {
-				queue = append(queue, pk)
-				return nil
-			})
-
+			err := ProcessFollowListEvent(context.Background(), event, DB, RWM)
 			if err != nil {
 				t.Fatalf("ProcessFollowListEvent(event%d): expected nil, got %v", i, err)
 			}
 
-			if !reflect.DeepEqual(queue, expectedQueue[i]) {
-				t.Fatalf("expected queue %v, got %v", expectedQueue[i], queue)
+			pagerank := models.PagerankMap{}
+			for nodeID, node := range DB.NodeIndex {
+				pagerank[nodeID] = node.Metadata.Pagerank
 			}
 
-			nodeIDs, err := DB.AllNodes()
-			if err != nil {
-				t.Fatalf("AllNodes(): expected nil, got %v", err)
+			distance := models.Distance(pagerank, expectedPagerank[i])
+			if distance > maxDist {
+				t.Errorf("Expected distance %v, got %v", maxDist, distance)
+				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], pagerank)
 			}
-			slices.Sort(nodeIDs) // sort nodeIDs before comparing them.
-
-			if !reflect.DeepEqual(nodeIDs, expectedNodeIDs[i]) {
-				t.Fatalf("expected nodeIDs %v, got %v", expectedNodeIDs[i], nodeIDs)
-			}
-
-			// The following test fails 55% of the times, due to the random nature of the walks,
-			// for walkID, walk := range RWS.WalkIndex {
-			// 	expectedWalk := expectedWalks[i][walkID]
-			// 	if !reflect.DeepEqual(walk, expectedWalk) {
-			// 		t.Errorf("Iteration %d: expected walk %v, got %v", i, expectedWalk, walk)
-			// 	}
-			// }
 		}
 	})
 }

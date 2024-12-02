@@ -64,6 +64,7 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	DB.KeyIndex[node.Metadata.Pubkey] = nodeID
 
 	// add the node to the NodeIndex
+	node.Metadata.ID = nodeID
 	DB.NodeIndex[nodeID] = node
 	return nodeID, nil
 }
