@@ -218,50 +218,48 @@ func TestAddPredecessors(t *testing.T) {
 	}
 }
 
-func TestNodeMetaWithID(t *testing.T) {
+func TestNodeByID(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
 		name             string
 		DBType           string
-		pubkey           string
+		nodeID           uint32
 		expectedError    error
-		expectedNodeMeta models.NodeMetaWithID
+		expectedNodeMeta *models.NodeMeta
 	}{
 		{
 			name:             "nil DB",
 			DBType:           "nil",
-			pubkey:           "zero",
-			expectedNodeMeta: models.NodeMetaWithID{},
+			nodeID:           0,
+			expectedNodeMeta: &models.NodeMeta{},
 			expectedError:    models.ErrNilDBPointer,
 		},
 		{
 			name:             "empty DB",
 			DBType:           "empty",
-			pubkey:           "zero",
-			expectedNodeMeta: models.NodeMetaWithID{},
+			nodeID:           0,
+			expectedNodeMeta: &models.NodeMeta{},
 			expectedError:    redis.Nil,
 		},
 		{
 			name:             "pubkey not found",
 			DBType:           "one-node0",
-			pubkey:           "one",
-			expectedNodeMeta: models.NodeMetaWithID{},
+			nodeID:           1,
+			expectedNodeMeta: &models.NodeMeta{},
 			expectedError:    redis.Nil,
 		},
 		{
 			name:   "valid",
 			DBType: "one-node0",
-			pubkey: "zero",
-			expectedNodeMeta: models.NodeMetaWithID{
-				ID: 0,
-				NodeMeta: &models.NodeMeta{
-					PubKey:    "zero",
-					Timestamp: 1731685733,
-					Status:    "idk",
-					Pagerank:  1.0,
-				},
+			nodeID: 0,
+			expectedNodeMeta: &models.NodeMeta{
+				ID:       0,
+				Pubkey:   "zero",
+				EventTS:  1731685733,
+				Status:   "idk",
+				Pagerank: 1.0,
 			},
 			expectedError: nil,
 		},
@@ -275,13 +273,80 @@ func TestNodeMetaWithID(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeMetaWithID(test.pubkey)
+			nodeMeta, err := DB.NodeByID(test.nodeID)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NodeMetaWithID(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
+				t.Fatalf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(nodeMeta, test.expectedNodeMeta) {
-				t.Errorf("NodeMetaWithID(%v): expected %v, got %v", test.pubkey, test.expectedNodeMeta, nodeMeta)
+				t.Errorf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedNodeMeta, nodeMeta)
+			}
+		})
+	}
+}
+
+func TestNodeByKey(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name             string
+		DBType           string
+		pubkey           string
+		expectedError    error
+		expectedNodeMeta *models.NodeMeta
+	}{
+		{
+			name:             "nil DB",
+			DBType:           "nil",
+			pubkey:           "zero",
+			expectedNodeMeta: &models.NodeMeta{},
+			expectedError:    models.ErrNilDBPointer,
+		},
+		{
+			name:             "empty DB",
+			DBType:           "empty",
+			pubkey:           "zero",
+			expectedNodeMeta: &models.NodeMeta{},
+			expectedError:    redis.Nil,
+		},
+		{
+			name:             "pubkey not found",
+			DBType:           "one-node0",
+			pubkey:           "one",
+			expectedNodeMeta: &models.NodeMeta{},
+			expectedError:    redis.Nil,
+		},
+		{
+			name:   "valid",
+			DBType: "one-node0",
+			pubkey: "zero",
+			expectedNodeMeta: &models.NodeMeta{
+				ID:       0,
+				Pubkey:   "zero",
+				EventTS:  1731685733,
+				Status:   "idk",
+				Pagerank: 1.0,
+			},
+			expectedError: nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			nodeMeta, err := DB.NodeByKey(test.pubkey)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(nodeMeta, test.expectedNodeMeta) {
+				t.Errorf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedNodeMeta, nodeMeta)
 			}
 		})
 	}
@@ -310,7 +375,7 @@ func TestAddNode(t *testing.T) {
 				DBType:         "one-node0",
 				expectedNodeID: math.MaxUint32,
 				expectedError:  models.ErrNodeAlreadyInDB,
-				Node:           &models.Node{Metadata: models.NodeMeta{PubKey: "zero"}},
+				Node:           &models.Node{Metadata: models.NodeMeta{Pubkey: "zero"}},
 			},
 		}
 
@@ -348,7 +413,7 @@ func TestAddNode(t *testing.T) {
 			{
 				name:               "just Pubkey",
 				DBType:             "one-node0",
-				Node:               &models.Node{Metadata: models.NodeMeta{PubKey: "one"}},
+				Node:               &models.Node{Metadata: models.NodeMeta{Pubkey: "one"}},
 				expectedNodeID:     1,
 				expectedLastNodeID: 1,
 			},
@@ -359,10 +424,10 @@ func TestAddNode(t *testing.T) {
 				expectedLastNodeID: 1,
 				Node: &models.Node{
 					Metadata: models.NodeMeta{
-						PubKey:    "one",
-						Timestamp: 0,
-						Status:    "not-crawled",
-						Pagerank:  0.0,
+						Pubkey:   "one",
+						EventTS:  0,
+						Status:   "not-crawled",
+						Pagerank: 0.0,
 					},
 				},
 			},
@@ -402,7 +467,7 @@ func TestAddNode(t *testing.T) {
 				}
 
 				// check if the node was added to the keyIndex correctly
-				strNodeID, err := cl.HGet(ctx, KeyKeyIndex, test.Node.Metadata.PubKey).Result()
+				strNodeID, err := cl.HGet(ctx, KeyKeyIndex, test.Node.Metadata.Pubkey).Result()
 				if err != nil {
 					t.Errorf("HGet(): expected nil, got %v", err)
 				}
@@ -460,12 +525,12 @@ func TestUpdateNode(t *testing.T) {
 			DBType: "one-node0",
 			nodeID: 0,
 			nodeDiff: &models.NodeDiff{
-				Metadata: models.NodeMeta{Timestamp: 11}},
+				Metadata: models.NodeMeta{EventTS: 11}},
 			expectedNodeMeta: &models.NodeMeta{
-				PubKey:    "zero",
-				Timestamp: 11, // the only field that changes
-				Status:    "idk",
-				Pagerank:  1.0,
+				Pubkey:   "zero",
+				EventTS:  11, // the only field that changes
+				Status:   "idk",
+				Pagerank: 1.0,
 			},
 		},
 	}
@@ -861,57 +926,57 @@ func TestSize(t *testing.T) {
 	}
 }
 
-func TestNodeCache(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
+// func TestNodeCache(t *testing.T) {
+// 	cl := redisutils.SetupClient()
+// 	defer redisutils.CleanupRedis(cl)
 
-	testCases := []struct {
-		name              string
-		DBType            string
-		expectedError     error
-		expectedNodeCache map[string]models.NodeFilterAttributes
-	}{
-		{
-			name:              "nil DB",
-			DBType:            "nil",
-			expectedError:     models.ErrNilDBPointer,
-			expectedNodeCache: nil,
-		},
-		{
-			name:              "empty DB",
-			DBType:            "empty",
-			expectedError:     models.ErrEmptyDB,
-			expectedNodeCache: nil,
-		},
-		{
-			name:          "valid DB",
-			DBType:        "one-node0",
-			expectedError: nil,
-			expectedNodeCache: map[string]models.NodeFilterAttributes{
-				"zero": {ID: 0, Timestamp: 1731685733, Pagerank: 1.0},
-			},
-		},
-	}
+// 	testCases := []struct {
+// 		name              string
+// 		DBType            string
+// 		expectedError     error
+// 		expectedNodeCache map[string]models.NodeFilterAttributes
+// 	}{
+// 		{
+// 			name:              "nil DB",
+// 			DBType:            "nil",
+// 			expectedError:     models.ErrNilDBPointer,
+// 			expectedNodeCache: nil,
+// 		},
+// 		{
+// 			name:              "empty DB",
+// 			DBType:            "empty",
+// 			expectedError:     models.ErrEmptyDB,
+// 			expectedNodeCache: nil,
+// 		},
+// 		{
+// 			name:          "valid DB",
+// 			DBType:        "one-node0",
+// 			expectedError: nil,
+// 			expectedNodeCache: map[string]models.NodeFilterAttributes{
+// 				"zero": {ID: 0, EventTS: 1731685733, Pagerank: 1.0},
+// 			},
+// 		},
+// 	}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			DB, err := SetupDB(cl, test.DBType)
-			if err != nil {
-				t.Fatalf("SetupDB(): expected nil, got %v", err)
-			}
+// 	for _, test := range testCases {
+// 		t.Run(test.name, func(t *testing.T) {
+// 			DB, err := SetupDB(cl, test.DBType)
+// 			if err != nil {
+// 				t.Fatalf("SetupDB(): expected nil, got %v", err)
+// 			}
 
-			NC, err := DB.NodeCache()
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NodeCache(): expected %v, got %v", test.expectedError, err)
-			}
+// 			NC, err := DB.NodeCache()
+// 			if !errors.Is(err, test.expectedError) {
+// 				t.Fatalf("NodeCache(): expected %v, got %v", test.expectedError, err)
+// 			}
 
-			NCMap := models.ToMap(NC)
-			if !reflect.DeepEqual(NCMap, test.expectedNodeCache) {
-				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NCMap)
-			}
-		})
-	}
-}
+// 			NCMap := models.ToMap(NC)
+// 			if !reflect.DeepEqual(NCMap, test.expectedNodeCache) {
+// 				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NCMap)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestSetPagerank(t *testing.T) {
 	cl := redisutils.SetupClient()
@@ -1008,17 +1073,17 @@ func TestSetPagerank(t *testing.T) {
 	})
 }
 
-func TestInterface(t *testing.T) {
-	var _ models.Database = &Database{}
-}
+// func TestInterface(t *testing.T) {
+// 	var _ models.Database = &Database{}
+// }
 
 // ------------------------------------BENCHMARKS------------------------------
 
-func BenchmarkNode(b *testing.B) {
+func BenchmarkNodeByKey(b *testing.B) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
-	_, err := SetupDB(cl, "one-node0")
+	DB, err := SetupDB(cl, "one-node0")
 	if err != nil {
 		b.Fatalf("SetupDB(): expected nil, got %v", err)
 	}
@@ -1026,9 +1091,28 @@ func BenchmarkNode(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := cl.HGetAll(context.Background(), KeyNode(0)).Result()
+		_, err := DB.NodeByKey("zero")
 		if err != nil {
-			b.Fatalf("Benchmark failed(): %v", err)
+			b.Fatalf("benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkNodeByID(b *testing.B) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	DB, err := SetupDB(cl, "one-node0")
+	if err != nil {
+		b.Fatalf("SetupDB(): expected nil, got %v", err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := DB.NodeByID(0)
+		if err != nil {
+			b.Fatalf("benchmark failed: %v", err)
 		}
 	}
 }

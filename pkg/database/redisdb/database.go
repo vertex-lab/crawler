@@ -78,33 +78,59 @@ func (DB *Database) Validate() error {
 	return nil
 }
 
-// NodeMetaWithID() retrieves a node by its pubkey.
-func (DB *Database) NodeMetaWithID(pubkey string) (models.NodeMetaWithID, error) {
+// NodeByID() retrieves a node by its nodeID.
+func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
 
 	if err := DB.validateFields(); err != nil {
-		return models.NodeMetaWithID{}, err
+		return &models.NodeMeta{}, err
 	}
 
-	luaScript := `
-		local KeyIndex = KEYS[1]
-		local KeyNodePrefix = KEYS[2]
-		local pubkey = ARGV[1]
+	cmd := DB.client.HGetAll(DB.ctx, KeyNode(nodeID))
+	if cmd.Err() != nil {
+		return &models.NodeMeta{}, cmd.Err()
+	}
 
-		local nodeID = redis.call('HGET', KeyIndex, pubkey)
-		if not nodeID then
-			return nil
-		end
+	// if an empty map is returned, it means the node was not found
+	if len(cmd.Val()) == 0 {
+		return &models.NodeMeta{}, redis.Nil
+	}
 
-		return {nodeID, redis.call('HGETALL', KeyNodePrefix .. nodeID)}
-	`
+	var node models.NodeMeta
+	if err := cmd.Scan(&node); err != nil {
+		return &models.NodeMeta{}, err
+	}
 
-	keys := []string{KeyKeyIndex, KeyNodePrefix}
-	res, err := DB.client.Eval(DB.ctx, luaScript, keys, pubkey).Result()
+	return &node, nil
+}
+
+// NodeByKey() retrieves a node by its pubkey.
+func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
+
+	if err := DB.validateFields(); err != nil {
+		return &models.NodeMeta{}, err
+	}
+
+	// get the nodeID associated with the pubkey
+	strNodeID, err := DB.client.HGet(DB.ctx, KeyKeyIndex, pubkey).Result()
 	if err != nil {
-		return models.NodeMetaWithID{}, err
+		return &models.NodeMeta{}, err
+	}
+	nodeID, err := redisutils.ParseID(strNodeID)
+	if err != nil {
+		return &models.NodeMeta{}, err
 	}
 
-	return redisutils.ParseNodeMetaWithID(res)
+	// get the node by the nodeID
+	cmd := DB.client.HGetAll(DB.ctx, KeyNode(nodeID))
+	if cmd.Err() != nil {
+		return &models.NodeMeta{}, cmd.Err()
+	}
+	var node models.NodeMeta
+	if err := cmd.Scan(&node); err != nil {
+		return &models.NodeMeta{}, err
+	}
+
+	return &node, nil
 }
 
 // AddNode() adds a node to the database and returns its assigned nodeID.
@@ -115,7 +141,7 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	}
 
 	// check if pubkey already exists in the DB
-	exist, err := DB.client.HExists(DB.ctx, KeyKeyIndex, node.Metadata.PubKey).Result()
+	exist, err := DB.client.HExists(DB.ctx, KeyKeyIndex, node.Metadata.Pubkey).Result()
 	if err != nil {
 		return math.MaxUint32, err
 	}
@@ -134,7 +160,7 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	pipe := DB.client.TxPipeline()
 
 	// add pubkey to the KeyIndex
-	pipe.HSetNX(DB.ctx, KeyKeyIndex, node.Metadata.PubKey, nodeID)
+	pipe.HSetNX(DB.ctx, KeyKeyIndex, node.Metadata.Pubkey, nodeID)
 
 	// add the node metadata in a node HASH
 	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata)
@@ -423,55 +449,55 @@ func (DB *Database) Size() int {
 	return int(size)
 }
 
-// NodeCache() returns a NodeCache struct.
-func (DB *Database) NodeCache() (models.NodeCache, error) {
+// // NodeCache() returns a NodeCache struct.
+// func (DB *Database) NodeCache() (models.NodeCache, error) {
 
-	if err := DB.validateFields(); err != nil {
-		return nil, err
-	}
+// 	if err := DB.validateFields(); err != nil {
+// 		return nil, err
+// 	}
 
-	size := DB.Size()
-	if size <= 0 {
-		return nil, models.ErrEmptyDB
-	}
+// 	size := DB.Size()
+// 	if size <= 0 {
+// 		return nil, models.ErrEmptyDB
+// 	}
 
-	luaScript := `
-		local KeyIndex = KEYS[1]
-		local KeyNodePrefix = KEYS[2]
-		local NodeCache = {}
+// 	luaScript := `
+// 		local KeyIndex = KEYS[1]
+// 		local KeyNodePrefix = KEYS[2]
+// 		local NodeCache = {}
 
-		local KeyIndexData = redis.call('HGETALL', KeyIndex)
+// 		local KeyIndexData = redis.call('HGETALL', KeyIndex)
 
-		-- iterate over the nodes and add the data to the NodeCache
-		for i = 1, #KeyIndexData, 2 do
-			local pubkey = KeyIndexData[i]
-			local nodeID = tonumber(KeyIndexData[i + 1])
+// 		-- iterate over the nodes and add the data to the NodeCache
+// 		for i = 1, #KeyIndexData, 2 do
+// 			local pubkey = KeyIndexData[i]
+// 			local nodeID = tonumber(KeyIndexData[i + 1])
 
-			local nodeAttributes = redis.call('HMGET', KeyNodePrefix .. nodeID, 'timestamp', 'pagerank')
+// 			local nodeAttributes = redis.call('HMGET', KeyNodePrefix .. nodeID, 'timestamp', 'pagerank')
 
-			NodeCache[pubkey] = {
-				ID = nodeID,
-				Timestamp = tonumber(nodeAttributes[1]),
-				Pagerank = tonumber(nodeAttributes[2]),
-			}
-		end
+// 			NodeCache[pubkey] = {
+// 				ID = nodeID,
+// 				EventTS = tonumber(nodeAttributes[1]),
+// 				Pagerank = tonumber(nodeAttributes[2]),
+// 			}
+// 		end
 
-		return cjson.encode(NodeCache)
-	`
+// 		return cjson.encode(NodeCache)
+// 	`
 
-	keys := []string{KeyKeyIndex, KeyNodePrefix}
-	res, err := DB.client.Eval(DB.ctx, luaScript, keys).Result()
-	if err != nil {
-		return nil, err
-	}
+// 	keys := []string{KeyKeyIndex, KeyNodePrefix}
+// 	res, err := DB.client.Eval(DB.ctx, luaScript, keys).Result()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	JSONNodeCache, ok := res.(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected result type, got %T", res)
-	}
+// 	JSONNodeCache, ok := res.(string)
+// 	if !ok {
+// 		return nil, fmt.Errorf("unexpected result type, got %T", res)
+// 	}
 
-	return models.FromJSON(JSONNodeCache)
-}
+// 	return models.FromJSON(JSONNodeCache)
+// }
 
 func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 
@@ -553,10 +579,10 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		// add node0  metadata
 		fields := models.NodeMeta{
-			PubKey:    "zero",
-			Timestamp: 1731685733,
-			Status:    "idk",
-			Pagerank:  1.0,
+			Pubkey:   "zero",
+			EventTS:  1731685733,
+			Status:   "idk",
+			Pagerank: 1.0,
 		}
 		if err = cl.HSet(DB.ctx, KeyNode(0), fields).Err(); err != nil {
 			return nil, err
@@ -586,10 +612,10 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		// add node0  metadata
 		fields := models.NodeMeta{
-			PubKey:    "zero",
-			Timestamp: 1731685733,
-			Status:    "idk",
-			Pagerank:  0.0,
+			Pubkey:   "zero",
+			EventTS:  1731685733,
+			Status:   "idk",
+			Pagerank: 0.0,
 		}
 		if err = cl.HSet(DB.ctx, KeyNode(0), fields).Err(); err != nil {
 			return nil, err
@@ -606,10 +632,10 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		node := models.Node{
 			Metadata: models.NodeMeta{
-				PubKey:    fiatjaf,
-				Timestamp: 0,
-				Status:    models.StatusActive,
-				Pagerank:  1.0,
+				Pubkey:   fiatjaf,
+				EventTS:  0,
+				Status:   models.StatusActive,
+				Pagerank: 1.0,
 			},
 			Successors:   []uint32{},
 			Predecessors: []uint32{},
@@ -630,10 +656,10 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		node := models.Node{
 			Metadata: models.NodeMeta{
-				PubKey:    pip,
-				Timestamp: 0,
-				Status:    models.StatusActive,
-				Pagerank:  1.0,
+				Pubkey:   pip,
+				EventTS:  0,
+				Status:   models.StatusActive,
+				Pagerank: 1.0,
 			},
 			Successors:   []uint32{},
 			Predecessors: []uint32{},

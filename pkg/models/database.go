@@ -21,16 +21,11 @@ const StatusInactive = "inactive"
 
 // NodeMeta contains the metadata about a node, meaning everything that is not a relationship
 type NodeMeta struct {
-	PubKey    string  `redis:"pubkey,omitempty"`
-	Timestamp int64   `redis:"timestamp,omitempty"`
-	Status    string  `redis:"status,omitempty"`
-	Pagerank  float64 `redis:"pagerank,omitempty"`
-}
-
-// NodeMetaWithID is like NodeMeta but has the extra field ID.
-type NodeMetaWithID struct {
-	ID uint32
-	*NodeMeta
+	ID       uint32  `redis:"id,omitempty"`
+	Pubkey   string  `redis:"pubkey,omitempty"`
+	EventTS  int64   `redis:"event_timestamp,omitempty"`
+	Status   string  `redis:"status,omitempty"`
+	Pagerank float64 `redis:"pagerank,omitempty"`
 }
 
 // Node represent the basic structure of a node in the graph
@@ -60,8 +55,11 @@ type Database interface {
 	// Validate() returns the appropriate error if the DB is nil or empty
 	Validate() error
 
-	// NodeMetaWith() retrieves a node by its pubkey.
-	NodeMetaWithID(pubkey string) (NodeMetaWithID, error)
+	// NodeByID() retrieves a node by its nodeID.
+	NodeByID(nodeID uint32) (*NodeMeta, error)
+
+	// NodeByKey() retrieves a node by its pubkey.
+	NodeByKey(pubkey string) (*NodeMeta, error)
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
 	AddNode(node *Node) (uint32, error)
@@ -94,7 +92,7 @@ type Database interface {
 
 	// NodeCache() returns a NodeCache struct, used in the main crawler for
 	// efficiently filtering events without calling the database
-	NodeCache() (NodeCache, error)
+	// NodeCache() (NodeCache, error)
 
 	// SetPagerank() set the pagerank in the database according to the pagerankMap
 	SetPagerank(PagerankMap) error

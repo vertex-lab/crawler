@@ -125,75 +125,75 @@ func ParseWalkMap(result interface{}) (map[uint32]models.RandomWalk, error) {
 
 // ----------------------------SHIT-TO-REFACTOR-----------------------------
 
-// ParseNodeMetaWithID() parses a NodeMetaWithID from the specified result
-// interface (typically the result of a lua script).
-func ParseNodeMetaWithID(res interface{}) (models.NodeMetaWithID, error) {
+// // ParseNodeMetaWithID() parses a NodeMetaWithID from the specified result
+// // interface (typically the result of a lua script).
+// func ParseNodeMetaWithID(res interface{}) (models.NodeMetaWithID, error) {
 
-	nodeMetaWithID := models.NodeMetaWithID{}
+// 	nodeMetaWithID := models.NodeMetaWithID{}
 
-	// the result should be a slice {nodeID, { key1, val1, key2, val2, ...}}
-	resSlice, ok := res.([]interface{})
-	if !ok {
-		return models.NodeMetaWithID{}, fmt.Errorf("unexpected result type: %T", res)
-	}
+// 	// the result should be a slice {nodeID, { key1, val1, key2, val2, ...}}
+// 	resSlice, ok := res.([]interface{})
+// 	if !ok {
+// 		return models.NodeMetaWithID{}, fmt.Errorf("unexpected result type: %T", res)
+// 	}
 
-	strNodeID, ok := resSlice[0].(string)
-	if !ok {
-		return models.NodeMetaWithID{}, fmt.Errorf("unexpected Redis result format: %v", res)
-	}
-	nodeID, err := ParseID(strNodeID)
-	if err != nil {
-		return models.NodeMetaWithID{}, fmt.Errorf("unexpected Redis result format!: %v", res)
-	}
-	nodeMetaWithID.ID = nodeID
+// 	strNodeID, ok := resSlice[0].(string)
+// 	if !ok {
+// 		return models.NodeMetaWithID{}, fmt.Errorf("unexpected Redis result format: %v", res)
+// 	}
+// 	nodeID, err := ParseID(strNodeID)
+// 	if err != nil {
+// 		return models.NodeMetaWithID{}, fmt.Errorf("unexpected Redis result format!: %v", res)
+// 	}
+// 	nodeMetaWithID.ID = nodeID
 
-	nodeMeta, err := ParseNodeMeta(resSlice[1])
-	if err != nil {
-		return models.NodeMetaWithID{}, err
-	}
+// 	nodeMeta, err := ParseNodeMeta(resSlice[1])
+// 	if err != nil {
+// 		return models.NodeMetaWithID{}, err
+// 	}
 
-	nodeMetaWithID.NodeMeta = &nodeMeta
-	return nodeMetaWithID, nil
-}
+// 	nodeMetaWithID.NodeMeta = &nodeMeta
+// 	return nodeMetaWithID, nil
+// }
 
-// ParseNodeMeta() parses a NodeMeta from the specified result
-// interface (typically the result of a lua script).
-func ParseNodeMeta(res interface{}) (models.NodeMeta, error) {
+// // ParseNodeMeta() parses a NodeMeta from the specified result
+// // interface (typically the result of a lua script).
+// func ParseNodeMeta(res interface{}) (models.NodeMeta, error) {
 
-	nodeMeta := models.NodeMeta{}
-	var err error
+// 	nodeMeta := models.NodeMeta{}
+// 	var err error
 
-	// the result should be a slice {key1, val1, key2, val2, ... }
-	resSlice, ok := res.([]interface{})
-	if !ok {
-		return models.NodeMeta{}, fmt.Errorf("unexpected result type: %T", res)
-	}
+// 	// the result should be a slice {key1, val1, key2, val2, ... }
+// 	resSlice, ok := res.([]interface{})
+// 	if !ok {
+// 		return models.NodeMeta{}, fmt.Errorf("unexpected result type: %T", res)
+// 	}
 
-	if len(resSlice)%2 != 0 {
-		return models.NodeMeta{}, fmt.Errorf("unexpected Redis result format!!: %v", res)
-	}
+// 	if len(resSlice)%2 != 0 {
+// 		return models.NodeMeta{}, fmt.Errorf("unexpected Redis result format!!: %v", res)
+// 	}
 
-	for i := 0; i < len(resSlice); i += 2 {
-		key := resSlice[i].(string)
-		strVal := resSlice[i+1].(string)
+// 	for i := 0; i < len(resSlice); i += 2 {
+// 		key := resSlice[i].(string)
+// 		strVal := resSlice[i+1].(string)
 
-		switch key {
-		case "pubkey":
-			nodeMeta.PubKey = strVal
-		case "status":
-			nodeMeta.Status = strVal
-		case "timestamp":
-			nodeMeta.Timestamp, err = ParseInt64(strVal)
-			if err != nil {
-				return models.NodeMeta{}, err
-			}
-		case "pagerank":
-			nodeMeta.Pagerank, err = ParseFloat64(strVal)
-			if err != nil {
-				return models.NodeMeta{}, err
-			}
-		}
-	}
+// 		switch key {
+// 		case "pubkey":
+// 			nodeMeta.Pubkey = strVal
+// 		case "status":
+// 			nodeMeta.Status = strVal
+// 		case "timestamp":
+// 			nodeMeta.EventTS, err = ParseInt64(strVal)
+// 			if err != nil {
+// 				return models.NodeMeta{}, err
+// 			}
+// 		case "pagerank":
+// 			nodeMeta.Pagerank, err = ParseFloat64(strVal)
+// 			if err != nil {
+// 				return models.NodeMeta{}, err
+// 			}
+// 		}
+// 	}
 
-	return nodeMeta, err
-}
+// 	return nodeMeta, err
+// }

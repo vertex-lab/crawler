@@ -54,14 +54,14 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 		return math.MaxUint32, models.ErrNilDBPointer
 	}
 
-	if _, exist := DB.KeyIndex[node.Metadata.PubKey]; exist {
+	if _, exist := DB.KeyIndex[node.Metadata.Pubkey]; exist {
 		return math.MaxUint32, models.ErrNodeAlreadyInDB
 	}
 
 	// add the node to the KeyIndex
 	nodeID := uint32(DB.LastNodeID + 1)
 	DB.LastNodeID++
-	DB.KeyIndex[node.Metadata.PubKey] = nodeID
+	DB.KeyIndex[node.Metadata.Pubkey] = nodeID
 
 	// add the node to the NodeIndex
 	DB.NodeIndex[nodeID] = node
@@ -88,12 +88,12 @@ func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 func (DB *Database) updateNodeMeta(nodeID uint32, nodeDiff *models.NodeDiff) {
 
 	// update the fields only if not empty
-	if nodeDiff.Metadata.PubKey != "" {
-		DB.NodeIndex[nodeID].Metadata.PubKey = nodeDiff.Metadata.PubKey
+	if nodeDiff.Metadata.Pubkey != "" {
+		DB.NodeIndex[nodeID].Metadata.Pubkey = nodeDiff.Metadata.Pubkey
 	}
 
-	if nodeDiff.Metadata.Timestamp > 0 {
-		DB.NodeIndex[nodeID].Metadata.Timestamp = nodeDiff.Metadata.Timestamp
+	if nodeDiff.Metadata.EventTS > 0 {
+		DB.NodeIndex[nodeID].Metadata.EventTS = nodeDiff.Metadata.EventTS
 	}
 
 	if nodeDiff.Metadata.Status != "" {
@@ -141,24 +141,34 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 	return exist
 }
 
-// NodeMetaWithID() retrieves a node by its pubkey.
-func (DB *Database) NodeMetaWithID(pubkey string) (models.NodeMetaWithID, error) {
+// NodeByKey() retrieves a node (NodeMeta) by its pubkey.
+func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
 
 	if err := DB.Validate(); err != nil {
-		return models.NodeMetaWithID{}, err
+		return &models.NodeMeta{}, err
 	}
 
 	nodeID, exists := DB.KeyIndex[pubkey]
 	if !exists {
-		return models.NodeMetaWithID{}, models.ErrNodeNotFoundDB
+		return &models.NodeMeta{}, models.ErrNodeNotFoundDB
 	}
 
-	node := models.NodeMetaWithID{
-		ID:       nodeID,
-		NodeMeta: &DB.NodeIndex[nodeID].Metadata,
+	return &DB.NodeIndex[nodeID].Metadata, nil
+}
+
+// NodeByID() retrieves a node (NodeMeta) by its nodeID.
+func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
+
+	if err := DB.Validate(); err != nil {
+		return &models.NodeMeta{}, err
 	}
 
-	return node, nil
+	node, exist := DB.NodeIndex[nodeID]
+	if !exist {
+		return &models.NodeMeta{}, models.ErrNodeNotFoundDB
+	}
+
+	return &node.Metadata, nil
 }
 
 // IsDandling returns whether a node has no successors (dandling).
@@ -230,7 +240,7 @@ func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 			continue
 		}
 
-		pubkeys = append(pubkeys, node.Metadata.PubKey)
+		pubkeys = append(pubkeys, node.Metadata.Pubkey)
 	}
 
 	return pubkeys, nil
@@ -284,25 +294,25 @@ func (DB *Database) Size() int {
 }
 
 // NodeCache() returns a NodeCache struct.
-func (DB *Database) NodeCache() (models.NodeCache, error) {
+// func (DB *Database) NodeCache() (models.NodeCache, error) {
 
-	if err := DB.Validate(); err != nil {
-		return nil, err
-	}
+// 	if err := DB.Validate(); err != nil {
+// 		return nil, err
+// 	}
 
-	NC := models.NewNodeCache()
-	for pubkey, nodeID := range DB.KeyIndex {
+// 	NC := models.NewNodeCache()
+// 	for pubkey, nodeID := range DB.KeyIndex {
 
-		nodeAttr := models.NodeFilterAttributes{
-			ID:        nodeID,
-			Timestamp: DB.NodeIndex[nodeID].Metadata.Timestamp,
-			Pagerank:  DB.NodeIndex[nodeID].Metadata.Pagerank,
-		}
-		NC.Store(pubkey, nodeAttr)
-	}
+// 		nodeAttr := models.NodeFilterAttributes{
+// 			ID:       nodeID,
+// 			EventTS:  DB.NodeIndex[nodeID].Metadata.EventTS,
+// 			Pagerank: DB.NodeIndex[nodeID].Metadata.Pagerank,
+// 		}
+// 		NC.Store(pubkey, nodeAttr)
+// 	}
 
-	return NC, nil
-}
+// 	return NC, nil
+// }
 
 // SetPagerank() set the pagerank in the database according to the pagerankMap
 func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
@@ -342,37 +352,37 @@ func SetupDB(DBType string) *Database {
 
 	case "dandling":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "one-node0":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{0}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{0}}
 		DB.LastNodeID = 0
 		return DB
 
 	case "one-node1":
 		DB := NewDatabase()
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
 		DB.LastNodeID = 1
 		return DB
 
 	case "triangle":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{0}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{0}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "simple":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Timestamp: 0}, Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -381,9 +391,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex["zero"] = 0
 		DB.KeyIndex["one"] = 1
 		DB.KeyIndex["two"] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: "zero", Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: "one", Timestamp: 0, Pagerank: 0.48}, Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: "two", Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: "zero", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Pubkey: "one", EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Pubkey: "two", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -392,16 +402,16 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: odell, Status: models.StatusActive, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{PubKey: calle, Status: models.StatusActive, Timestamp: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusActive, Timestamp: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: odell, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "pip":
 		DB := NewDatabase()
 		DB.KeyIndex[pip] = 0
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{PubKey: pip, Status: models.StatusActive, Timestamp: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 0
 		return DB
 
@@ -433,7 +443,7 @@ func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 		}
 
 		DB.NodeIndex[uint32(i)] = &models.Node{
-			Metadata:   models.NodeMeta{Timestamp: 0},
+			Metadata:   models.NodeMeta{EventTS: 0},
 			Successors: randomSuccessors}
 	}
 	return DB

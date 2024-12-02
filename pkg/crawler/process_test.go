@@ -203,7 +203,7 @@ func TestProcessNodeIDs(t *testing.T) {
 		name          string
 		DBType        string
 		RWMType       string
-		author        models.NodeMetaWithID
+		author        *models.NodeMeta
 		pubkeys       []string
 		expectedError error
 		expectedIDs   []uint32
@@ -214,10 +214,8 @@ func TestProcessNodeIDs(t *testing.T) {
 			DBType:  "simple-with-mock-pks",
 			RWMType: "one-node0",
 			pubkeys: nil,
-			author: models.NodeMetaWithID{
-				NodeMeta: &models.NodeMeta{
-					Pagerank: 1.0,
-				},
+			author: &models.NodeMeta{
+				Pagerank: 1.0,
 			},
 			expectedError: nil,
 			expectedIDs:   []uint32{},
@@ -227,10 +225,8 @@ func TestProcessNodeIDs(t *testing.T) {
 			name:    "empty pubkeys",
 			DBType:  "simple-with-mock-pks",
 			RWMType: "one-node0",
-			author: models.NodeMetaWithID{
-				NodeMeta: &models.NodeMeta{
-					Pagerank: 1.0,
-				},
+			author: &models.NodeMeta{
+				Pagerank: 1.0,
 			},
 			pubkeys:       []string{},
 			expectedError: nil,
@@ -241,10 +237,8 @@ func TestProcessNodeIDs(t *testing.T) {
 			name:    "existing pubkey",
 			DBType:  "simple-with-mock-pks",
 			RWMType: "one-node0",
-			author: models.NodeMetaWithID{
-				NodeMeta: &models.NodeMeta{
-					Pagerank: 1.0,
-				},
+			author: &models.NodeMeta{
+				Pagerank: 1.0,
 			},
 			pubkeys:       []string{"zero", "one"},
 			expectedError: nil,
@@ -255,10 +249,8 @@ func TestProcessNodeIDs(t *testing.T) {
 			name:    "existing and new pubkey",
 			DBType:  "simple-with-mock-pks",
 			RWMType: "one-node0",
-			author: models.NodeMetaWithID{
-				NodeMeta: &models.NodeMeta{
-					Pagerank: 1.0,
-				},
+			author: &models.NodeMeta{
+				Pagerank: 1.0,
 			},
 			pubkeys:       []string{"zero", "one", "three"},
 			expectedError: nil,

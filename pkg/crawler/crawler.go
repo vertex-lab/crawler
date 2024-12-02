@@ -82,13 +82,13 @@ func Firehose(
 		}
 
 		// query from the DB the node associated with the pubkey; If it's not found, skip (err != nil)
-		node, err := DB.NodeMetaWithID(event.PubKey)
+		node, err := DB.NodeByKey(event.PubKey)
 		if err != nil {
 			continue
 		}
 
 		// if this event is older than what we have, skip
-		if event.CreatedAt.Time().Unix() < node.Timestamp {
+		if event.CreatedAt.Time().Unix() < node.EventTS {
 			continue
 		}
 
