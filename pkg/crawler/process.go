@@ -3,7 +3,6 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"math"
 	"slices"
 	"time"
 
@@ -16,8 +15,8 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-// ProcessFollowListEvents() process one event at the time from the eventChannel.
-func ProcessFollowListEvents(
+// ProcessEvents() process one event at the time from the eventChannel.
+func ProcessEvents(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	eventChan chan nostr.RelayEvent,
@@ -44,24 +43,23 @@ func ProcessFollowListEvents(
 				continue
 			}
 
-			if event.Kind != nostr.KindFollowList {
-				logger.Warn("event kind is not %d", nostr.KindFollowList)
-				continue
-			}
-
 			eventCounter.Inc()
 			if eventCounter.Value()%1000 == 0 {
 				logger.Info("processed %d events", eventCounter.Value())
 			}
 
-			if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
-				logger.Error("Error processing the eventID %v: %v", event.ID, err)
+			// process event based on its kind
+			switch event.Kind {
+			case nostr.KindFollowList:
+				if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM, newPubkeyHandler); err != nil {
+					logger.Error("Error processing the eventID %v: %v", event.ID, err)
 
-				// re add event to the queue
-				select {
-				case eventChan <- event:
-				default:
-					logger.Warn("Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+					// re-add event to the queue
+					select {
+					case eventChan <- event:
+					default:
+						logger.Warn("Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+					}
 				}
 			}
 		}
@@ -79,18 +77,24 @@ func ProcessFollowListEvent(
 	RWM *walks.RandomWalkManager,
 	newPubkeyHandler func(pk string) error) error {
 
-	// Fetch node metadata and successors of the author
 	author, err := DB.NodeByKey(event.PubKey)
 	if err != nil {
 		return err
 	}
-	oldSucc, err := DB.Successors(author.ID)
+
+	// if the event is older than what we have, stop
+	if event.CreatedAt.Time().Unix() < author.EventTS {
+		return nil
+	}
+
+	// parse pubkeys and fetch/assign nodeIDs
+	followPubkeys := ParsePubkeys(event)
+	newSucc, err := AssignNodeIDs(ctx, DB, followPubkeys)
 	if err != nil {
 		return err
 	}
 
-	followPubkeys := ParsePubkeys(event)
-	newSucc, err := ProcessNodeIDs(ctx, DB, RWM, author, followPubkeys, newPubkeyHandler)
+	oldSucc, err := DB.Successors(author.ID)
 	if err != nil {
 		return err
 	}
@@ -105,7 +109,6 @@ func ProcessFollowListEvent(
 		AddedSucc:   addedSucc,
 		RemovedSucc: removedSucc,
 	}
-
 	if err := DB.UpdateNode(author.ID, &authorNodeDiff); err != nil {
 		return err
 	}
@@ -127,24 +130,16 @@ func ProcessFollowListEvent(
 	return nil
 }
 
-// ProcessNodeIDs() returns the nodeIDs of the specified pubkeys.
-// If a pubkey isn't found in the database:
-// - the corrisponding node is added to the DB
-// - the pubkey is sent to the newPubkeysQueue
-func ProcessNodeIDs(
+// AssignNodeIDs() returns the nodeIDs of the specified pubkeys.
+// If a pubkey isn't found in the database, it gets added.
+func AssignNodeIDs(
 	ctx context.Context,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
-	author *models.NodeMeta,
-	pubkeys []string,
-	newPubkeyHandler func(pk string) error) ([]uint32, error) {
-
-	// Each pubkey will inherit this pagerank from the event's author.
-	pr := InheritedPagerank(RWM.Store.Alpha(), author.Pagerank, len(pubkeys))
+	pubkeys []string) ([]uint32, error) {
 
 	IDs, err := DB.NodeIDs(pubkeys)
 	if err != nil {
-		return nil, err
+		return []uint32{}, err
 	}
 
 	nodeIDs := make([]uint32, len(IDs))
@@ -153,57 +148,25 @@ func ProcessNodeIDs(
 		nodeID, ok := ID.(uint32)
 		// if it's not uin32, it means the pubkey wasn't found in the database
 		if !ok {
-			nodeID, err = HandleMissingPubkey(ctx, DB, RWM, pubkeys[i], pr, newPubkeyHandler)
+
+			// add a new node to the database, and assign it an ID
+			node := models.Node{
+				Metadata: models.NodeMeta{
+					Pubkey:   pubkeys[i],
+					EventTS:  0,
+					Status:   models.StatusInactive,
+					Pagerank: 0.0,
+				},
+			}
+			nodeID, err = DB.AddNode(&node)
 			if err != nil {
-				return nil, err
+				return []uint32{}, err
 			}
 		}
 		nodeIDs[i] = nodeID
 	}
 
 	return nodeIDs, nil
-}
-
-// HandleMissingPubkey() adds a new node to the database,
-// If the expected pagerank is higher than the threshold:
-// - generates walks for it,
-// - sends the pubkey to the queue
-func HandleMissingPubkey(
-	ctx context.Context,
-	DB models.Database,
-	RWM *walks.RandomWalkManager,
-	pubkey string,
-	pagerank float64,
-	queueHandler func(pk string) error) (uint32, error) {
-
-	// add a new node to the database, and assign it an ID
-	node := models.Node{
-		Metadata: models.NodeMeta{
-			Pubkey:   pubkey,
-			EventTS:  0,
-			Status:   models.StatusInactive,
-			Pagerank: 0.0,
-		},
-	}
-
-	nodeID, err := DB.AddNode(&node)
-	if err != nil {
-		return math.MaxUint32, err
-	}
-
-	// if the iherited pagerank is higher than the threshold, generate walks and send to the queue.
-	if pagerank > pagerankThreshold(DB.Size()) {
-
-		if err := RWM.Generate(DB, nodeID); err != nil {
-			return math.MaxUint32, err
-		}
-
-		if err := queueHandler(pubkey); err != nil {
-			return math.MaxUint32, err
-		}
-	}
-
-	return nodeID, nil
 }
 
 // ParsePubKeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
@@ -217,7 +180,7 @@ func ParsePubkeys(event *nostr.Event) []string {
 		return []string{}
 	}
 
-	// if it's massively big, skip
+	// if it's very big, skip
 	if len(event.Tags) > 100000 {
 		return []string{}
 	}
@@ -251,12 +214,6 @@ func ParsePubkeys(event *nostr.Event) []string {
 	}
 
 	return pubkeys
-}
-
-// InheritedPagerank() returns the expected pagerank that flows from a node with
-// specified pagerank to its follows.
-func InheritedPagerank(alpha float32, pagerank float64, outDegree int) float64 {
-	return float64(alpha) * pagerank / float64(outDegree)
 }
 
 // NodeArbiter() scans through all the nodes in the database, and promotes or
@@ -293,7 +250,6 @@ func ScanNodes(ctx context.Context,
 	var cursor uint64 = 0
 
 	for {
-
 		select {
 		case <-ctx.Done():
 			return nil
@@ -302,7 +258,7 @@ func ScanNodes(ctx context.Context,
 
 		nodeIDs, cursor, err := DB.ScanNodes(cursor, 1000)
 		if err != nil {
-			continue
+			return fmt.Errorf("error scanning: %v", err)
 		}
 
 		// If the cursor returns to 0, the scan is complete
@@ -313,7 +269,7 @@ func ScanNodes(ctx context.Context,
 		for _, nodeID := range nodeIDs {
 			node, err := DB.NodeByID(nodeID)
 			if err != nil {
-				return fmt.Errorf("error fetching nodeID %d: %v", nodeID, err)
+				continue
 			}
 
 			// Active --> Inactive
@@ -339,7 +295,7 @@ func ScanNodes(ctx context.Context,
 	return nil
 }
 
-// PromoteNode() generates random walks for the specified node and sets it to "active".
+// PromoteNode() makes a node active, which means it generates random walks for it and updates the DB.
 func PromoteNode(
 	ctx context.Context,
 	DB models.Database,
@@ -371,6 +327,7 @@ func DemoteNode(
 	RWM *walks.RandomWalkManager,
 	nodeID uint32) error {
 
+	_ = RWM
 	// if err := RWM.Remove(DB, nodeID); err != nil {
 	// 	return err
 	// }

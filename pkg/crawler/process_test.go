@@ -3,7 +3,6 @@ package crawler
 import (
 	"context"
 	"errors"
-	"math"
 	"math/rand/v2"
 	"os"
 	"reflect"
@@ -112,165 +111,48 @@ func TestParsePubkeys(t *testing.T) {
 	}
 }
 
-func TestHandleMissingPubkey(t *testing.T) {
-	t.Run("simple errors", func(t *testing.T) {
-		testCases := []struct {
-			name           string
-			DBType         string
-			RWSType        string
-			pubkey         string
-			expectedError  error
-			expectedNodeID uint32
-		}{
-			{
-				name:           "nil DB",
-				DBType:         "nil",
-				RWSType:        "one-node0",
-				pubkey:         "zero",
-				expectedError:  models.ErrNilDBPointer,
-				expectedNodeID: math.MaxUint32,
-			},
-			{
-				name:           "nil RWM",
-				DBType:         "empty",
-				RWSType:        "nil",
-				pubkey:         "zero",
-				expectedError:  models.ErrNilRWSPointer,
-				expectedNodeID: math.MaxUint32,
-			},
-			{
-				name:           "node already in DB",
-				DBType:         "simple-with-mock-pks",
-				RWSType:        "simple",
-				pubkey:         "zero",
-				expectedError:  models.ErrNodeAlreadyInDB,
-				expectedNodeID: math.MaxUint32,
-			},
-		}
-
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				DB := mockdb.SetupDB(test.DBType)
-				RWM := walks.SetupRWM(test.RWSType)
-
-				queue := []string{}
-				nodeID, err := HandleMissingPubkey(context.Background(), DB, RWM, test.pubkey, 1.0, func(pk string) error {
-					queue = append(queue, pk)
-					return nil
-				})
-
-				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("HandleMissingPubkey: expected %v, got %v", test.expectedError, err)
-				}
-
-				if nodeID != test.expectedNodeID {
-					t.Errorf("HandleMissingPubkey: expected %v, got %v", test.expectedNodeID, nodeID)
-				}
-			})
-		}
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		DB := mockdb.SetupDB("pip")
-		RWS := mockstore.SetupRWS("one-node0")
-		RWM := &walks.RandomWalkManager{
-			Store: RWS,
-		}
-
-		queue := []string{}
-		nodeID, err := HandleMissingPubkey(context.Background(), DB, RWM, calle, 1.0, func(pk string) error {
-			queue = append(queue, pk)
-			return nil
-		})
-
-		if err != nil {
-			t.Fatalf("HandleMissingPubkey(): expected nil, got %v", err)
-		}
-
-		if nodeID != 1 {
-			t.Errorf("expected nodeID %v, got %v", 1, nodeID)
-		}
-
-		for walkID, walk := range RWS.WalkIndex {
-			expectedWalk := models.RandomWalk{walkID}
-			if !reflect.DeepEqual(walk, expectedWalk) {
-				t.Errorf("expected walk %v, got %v", expectedWalk, walk)
-			}
-		}
-	})
-}
-
-func TestProcessNodeIDs(t *testing.T) {
+func TestAssignNodeIDs(t *testing.T) {
 	testCases := []struct {
 		name          string
 		DBType        string
-		RWMType       string
-		author        *models.NodeMeta
 		pubkeys       []string
 		expectedError error
 		expectedIDs   []uint32
-		expectedQueue []string
 	}{
 		{
-			name:    "nil pubkeys",
-			DBType:  "simple-with-mock-pks",
-			RWMType: "one-node0",
-			pubkeys: nil,
-			author: &models.NodeMeta{
-				Pagerank: 1.0,
-			},
+			name:          "nil pubkeys",
+			DBType:        "simple-with-mock-pks",
+			pubkeys:       nil,
 			expectedError: nil,
 			expectedIDs:   []uint32{},
-			expectedQueue: []string{},
 		},
 		{
-			name:    "empty pubkeys",
-			DBType:  "simple-with-mock-pks",
-			RWMType: "one-node0",
-			author: &models.NodeMeta{
-				Pagerank: 1.0,
-			},
+			name:          "empty pubkeys",
+			DBType:        "simple-with-mock-pks",
 			pubkeys:       []string{},
 			expectedError: nil,
 			expectedIDs:   []uint32{},
-			expectedQueue: []string{},
 		},
 		{
-			name:    "existing pubkey",
-			DBType:  "simple-with-mock-pks",
-			RWMType: "one-node0",
-			author: &models.NodeMeta{
-				Pagerank: 1.0,
-			},
+			name:          "existing pubkey",
+			DBType:        "simple-with-mock-pks",
 			pubkeys:       []string{"zero", "one"},
 			expectedError: nil,
 			expectedIDs:   []uint32{0, 1},
-			expectedQueue: []string{},
 		},
 		{
-			name:    "existing and new pubkey",
-			DBType:  "simple-with-mock-pks",
-			RWMType: "one-node0",
-			author: &models.NodeMeta{
-				Pagerank: 1.0,
-			},
+			name:          "existing and new pubkey",
+			DBType:        "simple-with-mock-pks",
 			pubkeys:       []string{"zero", "one", "three"},
 			expectedError: nil,
 			expectedIDs:   []uint32{0, 1, 3},
-			expectedQueue: []string{"three"},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := mockdb.SetupDB(test.DBType)
-			RWM := walks.SetupRWM(test.RWMType)
-			queuePubkeys := []string{}
-
-			followIDs, err := ProcessNodeIDs(context.Background(), DB, RWM, test.author, test.pubkeys, func(pk string) error {
-				queuePubkeys = append(queuePubkeys, pk)
-				return nil
-			})
+			followIDs, err := AssignNodeIDs(context.Background(), DB, test.pubkeys)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
@@ -278,10 +160,6 @@ func TestProcessNodeIDs(t *testing.T) {
 
 			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
 				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
-			}
-
-			if !reflect.DeepEqual(queuePubkeys, test.expectedQueue) {
-				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedQueue, queuePubkeys)
 			}
 		})
 	}
@@ -430,7 +308,6 @@ func TestProcessFollowListEvent(t *testing.T) {
 }
 
 func TestNodeArbiter(t *testing.T) {
-
 	logger := logger.New(os.Stdout)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
