@@ -885,6 +885,84 @@ func TestAllNodes(t *testing.T) {
 	}
 }
 
+func TestScanNodes(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	type testCase struct {
+		name            string
+		DBType          string
+		limit           int
+		expectedError   error
+		expectedNodeIDs []uint32
+	}
+
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []testCase{
+			{
+				name:          "nil DB",
+				DBType:        "nil",
+				limit:         100,
+				expectedError: models.ErrNilDBPointer,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				DB, err := SetupDB(cl, test.DBType)
+				if err != nil {
+					t.Fatalf("SetupDB(): expected nil, got %v", err)
+				}
+
+				_, _, err = DB.ScanNodes(0, test.limit)
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("ScanNodes(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+
+		testCases := []testCase{
+			{
+				name:            "one batch",
+				DBType:          "one-node0",
+				limit:           100,
+				expectedNodeIDs: []uint32{0},
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				DB, err := SetupDB(cl, test.DBType)
+				if err != nil {
+					t.Fatalf("SetupDB(): expected nil, got %v", err)
+				}
+
+				var cursor uint64 = 0
+				nodeIDs := []uint32{}
+				for {
+
+					res, cursor, err := DB.ScanNodes(cursor, test.limit)
+					if err != nil {
+						t.Fatalf("ScanNodes(): expected nil, got %v", err)
+					}
+					nodeIDs = append(nodeIDs, res...)
+
+					if cursor == 0 {
+						break
+					}
+				}
+
+				if !reflect.DeepEqual(nodeIDs, test.expectedNodeIDs) {
+					t.Errorf("ScanNodes(): expected %v, got %v", test.expectedNodeIDs, nodeIDs)
+				}
+			})
+		}
+	})
+}
+
 func TestSize(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
@@ -1073,9 +1151,9 @@ func TestSetPagerank(t *testing.T) {
 	})
 }
 
-// func TestInterface(t *testing.T) {
-// 	var _ models.Database = &Database{}
-// }
+func TestInterface(t *testing.T) {
+	var _ models.Database = &Database{}
+}
 
 // ------------------------------------BENCHMARKS------------------------------
 

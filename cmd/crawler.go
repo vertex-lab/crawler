@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
-	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -21,72 +18,73 @@ import (
 const logFilePath = "crawler.log"
 
 func main() {
-	logger, logFile := logger.Init(logFilePath)
-	defer logFile.Close()
-	PrintTitle(logger)
+	// logger, logFile := logger.Init(logFilePath)
+	// defer logFile.Close()
+	// PrintTitle(logger)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
 	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
+	redisdb.SetupDB(cl, "one-node0")
+	// defer redisutils.CleanupRedis(cl)
 
-	DB, err := redisdb.SetupDB(cl, "pip")
-	if err != nil {
-		panic(err)
-	}
-	RWS, err := redistore.SetupRWS(cl, "one-node0")
-	if err != nil {
-		panic(err)
-	}
-	RWM := &walks.RandomWalkManager{Store: RWS}
+	// DB, err := redisdb.SetupDB(cl, "pip")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// RWS, err := redistore.SetupRWS(cl, "one-node0")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// RWM := &walks.RandomWalkManager{Store: RWS}
 
-	eventChan := make(chan nostr.RelayEvent, 100000)
-	pubkeyChan := make(chan string, 1000000)
-	eventCounter := xsync.NewCounter()
+	// eventChan := make(chan nostr.RelayEvent, 100000)
+	// pubkeyChan := make(chan string, 1000000)
+	// eventCounter := xsync.NewCounter()
 
-	go crawler.HandleSignals(cancel, logger)
-	go DisplayStats(ctx, logger, DB, RWM, eventCounter, eventChan, pubkeyChan)
+	// go crawler.HandleSignals(cancel, logger)
+	// go DisplayStats(ctx, logger, DB, RWM, eventCounter, eventChan, pubkeyChan)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
-			select {
-			case eventChan <- event:
-			default:
-				logger.Warn("Firehose: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
-			}
-			return nil
-		})
-	}()
+	// var wg sync.WaitGroup
+	// wg.Add(2)
+	// go func() {
+	// 	defer wg.Done()
+	// 	crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
+	// 		select {
+	// 		case eventChan <- event:
+	// 		default:
+	// 			logger.Warn("Firehose: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+	// 		}
+	// 		return nil
+	// 	})
+	// }()
 
-	go func() {
-		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
-			select {
-			case eventChan <- event:
-			default:
-				logger.Warn("QueryPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
-			}
-			return nil
-		})
-	}()
+	// go func() {
+	// 	defer wg.Done()
+	// 	crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
+	// 		select {
+	// 		case eventChan <- event:
+	// 		default:
+	// 			logger.Warn("QueryPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+	// 		}
+	// 		return nil
+	// 	})
+	// }()
 
-	crawler.ProcessFollowListEvents(ctx, logger, eventChan, DB, RWM, eventCounter, func(pubkey string) error {
-		select {
-		case pubkeyChan <- pubkey:
-		default:
-			logger.Warn("Process: Channel is full, dropping pubkey: %v", pubkey)
-		}
-		return nil
-	})
+	// crawler.ProcessFollowListEvents(ctx, logger, eventChan, DB, RWM, eventCounter, func(pubkey string) error {
+	// 	select {
+	// 	case pubkeyChan <- pubkey:
+	// 	default:
+	// 		logger.Warn("Process: Channel is full, dropping pubkey: %v", pubkey)
+	// 	}
+	// 	return nil
+	// })
 
-	wg.Wait()
-	fmt.Printf("\nExiting\n")
-	logger.Info("Exiting")
-	logger.Info("------------------------------------------------------")
+	// wg.Wait()
+	// fmt.Printf("\nExiting\n")
+	// logger.Info("Exiting")
+	// logger.Info("------------------------------------------------------")
 }
 
 func DisplayStats(

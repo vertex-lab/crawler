@@ -403,6 +403,35 @@ func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 	return pubkeys, nil
 }
 
+// ScanNodes() scans over the nodes and returns a batch of nodeIDs of size roughly equal to limit.
+// Limit controls how much "work" is invested in fetching the batch, hence it is not precise.
+func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error) {
+
+	if err := DB.validateFields(); err != nil {
+		return []uint32{}, 0, err
+	}
+	lenPrefix := len(KeyNodePrefix)
+	match := KeyNodePrefix + "*" // node:*
+
+	strNodeIDs, newCursor, err := DB.client.Scan(DB.ctx, cursor, match, int64(limit)).Result()
+	if err != nil {
+		return []uint32{11}, 0, err
+	}
+
+	nodeIDs := make([]uint32, 0, len(strNodeIDs))
+	for _, strNodeID := range strNodeIDs {
+
+		nodeID, err := redisutils.ParseID(strNodeID[lenPrefix:])
+		if err != nil {
+			return []uint32{22}, 0, err
+		}
+
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+
+	return nodeIDs, newCursor, nil
+}
+
 // AllNodes() returns a slice with the IDs of all nodes in the DB
 func (DB *Database) AllNodes() ([]uint32, error) {
 

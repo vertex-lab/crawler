@@ -63,7 +63,7 @@ func NodeArbiter(
 					break
 				}
 
-				if err := queueHandler(node.PubKey); err != nil {
+				if err := queueHandler(node.Pubkey); err != nil {
 					logger.Error("Error sending to queue: %v", err)
 				}
 			}

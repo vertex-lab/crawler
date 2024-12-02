@@ -806,6 +806,6 @@ func TestSetPagerank(t *testing.T) {
 	})
 }
 
-// func TestInterface(t *testing.T) {
-// 	var _ models.Database = &Database{}
-// }
+func TestInterface(t *testing.T) {
+	var _ models.Database = &Database{}
+}

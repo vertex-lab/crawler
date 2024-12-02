@@ -84,6 +84,10 @@ type Database interface {
 	// If a nodeID is not found, nil is returned
 	Pubkeys(nodeIDs []uint32) ([]interface{}, error)
 
+	// ScanNodes() scans over the nodes and returns a batch of nodeIDs of size roughly equal to limit.
+	// Limit controls how much "work" is invested in fetching the batch, hence it is not precise.
+	ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error)
+
 	// AllNodes() returns a slice with the IDs of all nodes in the DB
 	AllNodes() ([]uint32, error)
 

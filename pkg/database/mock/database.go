@@ -333,6 +333,16 @@ func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 	return nil
 }
 
+// ScanNodes() scans over the nodes and returns all of the nodeIDs, ignoring the limit.
+func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error) {
+
+	_ = limit
+
+	// Cursor simulation: returning 0 as the cursor for simplicity
+	nodeIDs, err := DB.AllNodes()
+	return nodeIDs, 0, err
+}
+
 // ------------------------------------HELPERS----------------------------------
 
 // function that returns a DB setup based on the DBType
