@@ -5,12 +5,14 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"os"
 	"reflect"
 	"slices"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/walks"
@@ -424,6 +426,20 @@ func TestProcessFollowListEvent(t *testing.T) {
 			// 	}
 			// }
 		}
+	})
+}
+
+func TestNodeArbiter(t *testing.T) {
+
+	logger := logger.New(os.Stdout)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go HandleSignals(cancel, logger)
+
+	DB := mockdb.SetupDB("one-node0")
+	RWM := walks.SetupRWM("one-node0")
+	NodeArbiter(ctx, logger, DB, RWM, func(pk string) error {
+		return nil
 	})
 }
 

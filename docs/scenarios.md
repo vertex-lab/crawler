@@ -27,6 +27,3 @@
 
 - [x] **Active node loses enough pagerank**
   Gets demoted by Node Arbiter.
-
-- [] **One week since the last check of an active node**
-  Node Arbiter --> Pubkey Channel --> Query Pubkeys --> Event Channel --> Process Events
