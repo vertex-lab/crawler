@@ -478,56 +478,6 @@ func (DB *Database) Size() int {
 	return int(size)
 }
 
-// // NodeCache() returns a NodeCache struct.
-// func (DB *Database) NodeCache() (models.NodeCache, error) {
-
-// 	if err := DB.validateFields(); err != nil {
-// 		return nil, err
-// 	}
-
-// 	size := DB.Size()
-// 	if size <= 0 {
-// 		return nil, models.ErrEmptyDB
-// 	}
-
-// 	luaScript := `
-// 		local KeyIndex = KEYS[1]
-// 		local KeyNodePrefix = KEYS[2]
-// 		local NodeCache = {}
-
-// 		local KeyIndexData = redis.call('HGETALL', KeyIndex)
-
-// 		-- iterate over the nodes and add the data to the NodeCache
-// 		for i = 1, #KeyIndexData, 2 do
-// 			local pubkey = KeyIndexData[i]
-// 			local nodeID = tonumber(KeyIndexData[i + 1])
-
-// 			local nodeAttributes = redis.call('HMGET', KeyNodePrefix .. nodeID, 'timestamp', 'pagerank')
-
-// 			NodeCache[pubkey] = {
-// 				ID = nodeID,
-// 				EventTS = tonumber(nodeAttributes[1]),
-// 				Pagerank = tonumber(nodeAttributes[2]),
-// 			}
-// 		end
-
-// 		return cjson.encode(NodeCache)
-// 	`
-
-// 	keys := []string{KeyKeyIndex, KeyNodePrefix}
-// 	res, err := DB.client.Eval(DB.ctx, luaScript, keys).Result()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	JSONNodeCache, ok := res.(string)
-// 	if !ok {
-// 		return nil, fmt.Errorf("unexpected result type, got %T", res)
-// 	}
-
-// 	return models.FromJSON(JSONNodeCache)
-// }
-
 func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 
 	if err := DB.validateFields(); err != nil {

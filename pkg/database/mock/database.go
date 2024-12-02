@@ -293,27 +293,6 @@ func (DB *Database) Size() int {
 	return len(DB.NodeIndex)
 }
 
-// NodeCache() returns a NodeCache struct.
-// func (DB *Database) NodeCache() (models.NodeCache, error) {
-
-// 	if err := DB.Validate(); err != nil {
-// 		return nil, err
-// 	}
-
-// 	NC := models.NewNodeCache()
-// 	for pubkey, nodeID := range DB.KeyIndex {
-
-// 		nodeAttr := models.NodeFilterAttributes{
-// 			ID:       nodeID,
-// 			EventTS:  DB.NodeIndex[nodeID].Metadata.EventTS,
-// 			Pagerank: DB.NodeIndex[nodeID].Metadata.Pagerank,
-// 		}
-// 		NC.Store(pubkey, nodeAttr)
-// 	}
-
-// 	return NC, nil
-// }
-
 // SetPagerank() set the pagerank in the database according to the pagerankMap
 func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 

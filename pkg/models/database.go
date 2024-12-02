@@ -94,10 +94,6 @@ type Database interface {
 	// Size() returns the number of nodes in the DB (ignores errors).
 	Size() int
 
-	// NodeCache() returns a NodeCache struct, used in the main crawler for
-	// efficiently filtering events without calling the database
-	// NodeCache() (NodeCache, error)
-
 	// SetPagerank() set the pagerank in the database according to the pagerankMap
 	SetPagerank(PagerankMap) error
 }

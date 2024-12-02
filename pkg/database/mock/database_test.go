@@ -681,56 +681,6 @@ func TestSize(t *testing.T) {
 	}
 }
 
-// func TestNodeCache(t *testing.T) {
-// 	testCases := []struct {
-// 		name              string
-// 		DBType            string
-// 		expectedError     error
-// 		expectedNodeCache map[string]models.NodeFilterAttributes
-// 	}{
-// 		{
-// 			name:              "nil DB",
-// 			DBType:            "nil",
-// 			expectedError:     models.ErrNilDBPointer,
-// 			expectedNodeCache: nil,
-// 		},
-// 		{
-// 			name:              "empty DB",
-// 			DBType:            "empty",
-// 			expectedError:     models.ErrEmptyDB,
-// 			expectedNodeCache: nil,
-// 		},
-// 		{
-// 			name:          "valid DB",
-// 			DBType:        "simple-with-mock-pks",
-// 			expectedError: nil,
-// 			expectedNodeCache: map[string]models.NodeFilterAttributes{
-// 				"zero": {ID: 0, EventTS: 0, Pagerank: 0.26},
-// 				"one":  {ID: 1, EventTS: 0, Pagerank: 0.48},
-// 				"two":  {ID: 2, EventTS: 0, Pagerank: 0.26},
-// 			},
-// 		},
-// 	}
-
-// 	for _, test := range testCases {
-// 		t.Run(test.name, func(t *testing.T) {
-// 			DB := SetupDB(test.DBType)
-// 			_ = DB
-
-// 			NC, err := DB.NodeCache()
-// 			if !errors.Is(err, test.expectedError) {
-// 				t.Fatalf("NodeCache(): expected %v, got %v", test.expectedError, err)
-// 			}
-
-// 			// Convert to regular map to compare
-// 			NCMap := models.ToMap(NC)
-// 			if !reflect.DeepEqual(NCMap, test.expectedNodeCache) {
-// 				t.Errorf("NodeCache(): expected %v, got %v", test.expectedNodeCache, NCMap)
-// 			}
-// 		})
-// 	}
-// }
-
 func TestSetPagerank(t *testing.T) {
 
 	type testCases struct {
