@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -64,7 +65,7 @@ func Firehose(
 	logger *logger.Aggregate,
 	relays []string,
 	DB models.Database,
-	timeLimit int64,
+	timeLimit int64, // use a small value here, or you will get rate-limited
 	queueHandler func(event nostr.RelayEvent) error) {
 
 	pool := nostr.NewSimplePool(ctx)
@@ -92,7 +93,7 @@ func Firehose(
 			continue
 		}
 
-		// if the author has not been crawled AND has low pagerank, skip.
+		// if the author has low pagerank, skip.
 		if node.Pagerank < pagerankThreshold(DB.Size()) {
 			continue
 		}
@@ -105,9 +106,9 @@ func Firehose(
 	}
 }
 
-// QueryNewPubkeys() extracts pubkeys from the pubkeyChan channel, and queries
+// QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries
 // for their events in batches of batchSize.
-func QueryNewPubkeys(
+func QueryPubkeys(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	relays []string,
@@ -117,7 +118,7 @@ func QueryNewPubkeys(
 
 	batch := make([]string, 0, batchSize)
 	pool := nostr.NewSimplePool(ctx)
-	defer close("QueryNewPubkeys", pool)
+	defer close("QueryPubkeys", pool)
 
 	for {
 		select {
@@ -203,11 +204,32 @@ func close(funcName string, pool *nostr.SimplePool) {
 	fmt.Printf("All closed!")
 }
 
-// pagerankThreshold returns the minimum pagerank a pubkey needs to have for its
-// events to be processed.
+/*
+pagerankThreshold returns the pagerank threshold used for deciding whether
+a node is active or inactive.
+It's based on the following exponential distribution of pagerank:
+
+	p_j ~ (1-b) / N^(1-b) * j^(-b)
+
+Where p_j is the j-th highest pagerank, b is the exponent, N is the size of the graph.
+The idea is to exclude the bottom 5% of the nodes, which means all nodes below
+
+	p_t = (1-b) / N^(1-b) * (0.95 * N)^(-b) = (1-b) * 0.95^(-b) / N
+
+# REFERENCES
+
+[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
+URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
+*/
 func pagerankThreshold(graphSize int) float64 {
-	_ = graphSize
-	return 0.0
+
+	// the exponent
+	const b float64 = 0.76
+
+	// cutting the bottom 5%
+	const percentageCut float64 = 0.95
+
+	return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
 }
 
 // PrintEvent is a simple function that prints the event ID, PubKey and Timestamp.
