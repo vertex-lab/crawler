@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	RWS, err := redistore.NewRWS(context.Background(), cl, 0.85, 10)
+	RWS, err := redistore.NewRWS(context.Background(), cl, 0.85, 1)
 	if err != nil {
 		panic(err)
 	}
@@ -44,8 +44,8 @@ func main() {
 		panic(err)
 	}
 
-	eventChan := make(chan nostr.RelayEvent, 1000)
-	pubkeyChan := make(chan string, 10000)
+	eventChan := make(chan nostr.RelayEvent, 10000)
+	pubkeyChan := make(chan string, 1000000)
 	eventCounter := xsync.NewCounter()
 
 	go crawler.HandleSignals(cancel, logger)
@@ -67,7 +67,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 50, func(event nostr.RelayEvent) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
 			select {
 			case eventChan <- event:
 			default:

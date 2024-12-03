@@ -60,6 +60,8 @@ func ProcessEvents(
 						logger.Warn("Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 					}
 				}
+			default:
+				logger.Warn("event of unwanted kind: %v", event.Kind)
 			}
 		}
 	}
@@ -240,7 +242,7 @@ func NodeArbiter(
 			}
 
 			counter++
-			logger.Info("completed scan: %d", counter)
+			logger.Info("NodeArbiter completed scan: %d", counter)
 		}
 	}
 }
@@ -255,6 +257,9 @@ func ArbiterScan(
 	queueHandler func(pk string) error) error {
 
 	var cursor uint64 = 0
+	var nodeIDs []uint32
+	var err error
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -262,7 +267,7 @@ func ArbiterScan(
 		default:
 		}
 
-		nodeIDs, cursor, err := DB.ScanNodes(cursor, 1000)
+		nodeIDs, cursor, err = DB.ScanNodes(cursor, 1000)
 		if err != nil {
 			return fmt.Errorf("error scanning: %w", err)
 		}
@@ -326,7 +331,7 @@ func PromoteNode(
 }
 
 // DemoteNode() sets a node to "inactive". In the future this function will also
-// remove the walks that starts from that node.
+// remove the walks that starts from that node, thus removing its influence on the pagerank.
 func DemoteNode(
 	ctx context.Context,
 	DB models.Database,
