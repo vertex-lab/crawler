@@ -35,11 +35,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	RWS, err := redistore.SetupRWS(cl, "one-node0")
+	RWS, err := redistore.NewRWS(context.Background(), cl, 0.85, 10)
 	if err != nil {
 		panic(err)
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
+	if err := RWM.GenerateAll(DB); err != nil {
+		panic(err)
+	}
 
 	eventChan := make(chan nostr.RelayEvent, 1000)
 	pubkeyChan := make(chan string, 10000)
@@ -64,7 +67,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 50, func(event nostr.RelayEvent) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -76,7 +79,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, 30, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:

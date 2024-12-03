@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -268,6 +269,126 @@ func TestProcessFollowListEvent(t *testing.T) {
 	})
 }
 
+func TestArbiterScan(t *testing.T) {
+	type testCases struct {
+		name          string
+		DBType        string
+		RWMType       string
+		expectedError error
+	}
+
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []testCases{
+			{
+				name:          "nil DB",
+				DBType:        "nil",
+				RWMType:       "one-node0",
+				expectedError: models.ErrNilDBPointer,
+			},
+			{
+				name:          "empty DB",
+				DBType:        "empty",
+				RWMType:       "one-node0",
+				expectedError: models.ErrEmptyDB,
+			},
+			{
+				name:          "valid",
+				DBType:        "one-node0",
+				RWMType:       "one-node0",
+				expectedError: nil,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				DB := mockdb.SetupDB(test.DBType)
+				RWM := walks.SetupRWM(test.RWMType)
+
+				err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
+					return nil
+				})
+
+				if !errors.Is(err, test.expectedError) {
+					t.Fatalf("ArbiterScan(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		t.Run("demotion", func(t *testing.T) {
+			// calle will be demoted to inactive, because the threshold is 1.0
+			DB := mockdb.SetupDB("promotion-demotion")
+			RWM := walks.SetupRWM("one-node1")
+
+			err := ArbiterScan(context.Background(), DB, RWM, 1.0, func(pk string) error {
+				return nil
+			})
+
+			if err != nil {
+				t.Fatalf("ArbiterScan(): expected nil, got %v", err)
+			}
+
+			// check that calle's the status changed
+			node, exists := DB.NodeIndex[1]
+			if !exists {
+				t.Fatalf("nodeID %d doesn't exists in the DB", 1)
+			}
+
+			if node.Metadata.Status != models.StatusInactive {
+				t.Errorf("expected status of nodeID %d %v, got %v", 1, models.StatusActive, node.Metadata.Status)
+			}
+		})
+		t.Run("promotion", func(t *testing.T) {
+			// pip and odell will be promoted from inactive to active
+			DB := mockdb.SetupDB("promotion-demotion")
+			RWM := walks.SetupRWM("one-node1")
+			queue := []string{}
+
+			err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
+				queue = append(queue, pk)
+				return nil
+			})
+
+			if err != nil {
+				t.Fatalf("ArbiterScan(): expected nil, got %v", err)
+			}
+
+			// compare queues when sorted in lexicographic order
+			expectedQueue := []string{odell, pip}
+			slices.Sort(queue)
+			if !reflect.DeepEqual(queue, expectedQueue) {
+				t.Errorf("ArbiterScan(): expected queue %v, got %v", expectedQueue, queue)
+			}
+
+			// check that the status changed
+			for nodeID := uint32(0); nodeID < 3; nodeID++ {
+				node, exists := DB.NodeIndex[nodeID]
+				if !exists {
+					t.Fatalf("nodeID %d doesn't exists in the DB", nodeID)
+				}
+
+				if node.Metadata.Status != models.StatusActive {
+					t.Errorf("expected status of nodeID %d %v, got %v", nodeID, models.StatusActive, node.Metadata.Status)
+				}
+			}
+
+			// check that walks for pip and odell have been generated.
+			for _, nodeID := range []uint32{0, 2} {
+				walkMap, err := RWM.Store.Walks(nodeID, -1)
+				if err != nil {
+					t.Fatalf("Walks(%d): expected nil, got %v", 0, err)
+				}
+
+				// check it contains exactly one walk (the one generated)
+				if len(walkMap) != 1 {
+					t.Errorf("walkMap: %v", walkMap)
+				}
+			}
+		})
+	})
+}
+
 func TestNodeArbiter(t *testing.T) {
 	logger := logger.New(os.Stdout)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -276,7 +397,7 @@ func TestNodeArbiter(t *testing.T) {
 
 	DB := mockdb.SetupDB("one-node0")
 	RWM := walks.SetupRWM("one-node0")
-	NodeArbiter(ctx, logger, DB, RWM, func(pk string) error {
+	NodeArbiter(ctx, logger, DB, RWM, 5, func(pk string) error {
 		return nil
 	})
 }

@@ -214,39 +214,47 @@ func ParsePubkeys(event *nostr.Event) []string {
 	return pubkeys
 }
 
-// NodeArbiter() scans through all the nodes in the database, and promotes or
-// demotes them based on their pagerank.
+// NodeArbiter() periodically scans through all the nodes in the database,
+// promoting or demoting them based on their pagerank.
 func NodeArbiter(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
+	sleepTime int,
 	queueHandler func(pk string) error) {
 
+	counter := 0
 	for {
 		select {
 		case <-ctx.Done():
 			fmt.Printf("\n  > Stopping the Node Arbiter... ")
 			return
 		default:
-			// 30s delay before the next complete scan
-			time.Sleep(time.Second * 30)
+			// delay before the next complete scan
+			time.Sleep(time.Duration(sleepTime) * time.Second)
 
-			if err := ScanNodes(ctx, DB, RWM, queueHandler); err != nil {
-				logger.Error("Error in NodeArbiter: %v", err)
+			threshold := pagerankThreshold(DB.Size())
+			if err := ArbiterScan(ctx, DB, RWM, threshold, queueHandler); err != nil {
+				logger.Error("NodeArbiter error: %v", err)
 			}
+
+			counter++
+			logger.Info("completed scan: %d", counter)
 		}
 	}
 }
 
-func ScanNodes(ctx context.Context,
+// ArbiterScan() performs one entire database scan, promoting or demoting nodes
+// based on their pagerank.
+func ArbiterScan(
+	ctx context.Context,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
+	threshold float64,
 	queueHandler func(pk string) error) error {
 
-	var threshold float64 = pagerankThreshold(DB.Size())
 	var cursor uint64 = 0
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -256,12 +264,7 @@ func ScanNodes(ctx context.Context,
 
 		nodeIDs, cursor, err := DB.ScanNodes(cursor, 1000)
 		if err != nil {
-			return fmt.Errorf("error scanning: %v", err)
-		}
-
-		// If the cursor returns to 0, the scan is complete
-		if cursor == 0 {
-			break
+			return fmt.Errorf("error scanning: %w", err)
 		}
 
 		for _, nodeID := range nodeIDs {
@@ -273,20 +276,25 @@ func ScanNodes(ctx context.Context,
 			// Active --> Inactive
 			if node.Status == models.StatusActive && node.Pagerank < threshold {
 				if err := DemoteNode(ctx, DB, RWM, nodeID); err != nil {
-					return fmt.Errorf("error demoting nodeID %d: %v", nodeID, err)
+					return fmt.Errorf("error demoting nodeID %d: %w", nodeID, err)
 				}
 			}
 
 			// Inactive --> Active
-			if node.Status == models.StatusInactive && node.Pagerank > threshold {
+			if node.Status == models.StatusInactive && node.Pagerank >= threshold {
 				if err := PromoteNode(ctx, DB, RWM, nodeID); err != nil {
-					return fmt.Errorf("error promoting nodeID %d: %v", nodeID, err)
+					return fmt.Errorf("error promoting nodeID %d: %w", nodeID, err)
 				}
 
 				if err := queueHandler(node.Pubkey); err != nil {
-					return fmt.Errorf("error sending pubkey %v to the queue: %v", node.Pubkey, err)
+					return fmt.Errorf("error sending pubkey %v to the queue: %w", node.Pubkey, err)
 				}
 			}
+		}
+
+		// If the cursor returns to 0, the scan is complete
+		if cursor == 0 {
+			break
 		}
 	}
 

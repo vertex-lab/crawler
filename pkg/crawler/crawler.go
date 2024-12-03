@@ -99,7 +99,7 @@ func Firehose(
 
 		// send the event to the queue
 		if err := queueHandler(event); err != nil {
-			logger.Error("Firehose queue Handler: %v", err)
+			logger.Error("Firehose queue handler: %v", err)
 			return
 		}
 	}
@@ -137,7 +137,7 @@ func QueryPubkeys(
 
 				err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler)
 				if err != nil {
-					logger.Error("error querying pubkeys: %v", err)
+					logger.Error("QueryPubkeys queue handler: %v", err)
 				} else {
 					// reset the batch only if successful, otherwise retry
 					batch = make([]string, 0, batchSize)
@@ -156,7 +156,7 @@ func QueryPubkeyBatch(
 	pubkeys []string,
 	queueHandler func(event nostr.RelayEvent) error) error {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
 	filters := nostr.Filters{{

@@ -381,9 +381,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex["zero"] = 0
 		DB.KeyIndex["one"] = 1
 		DB.KeyIndex["two"] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: "zero", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Pubkey: "one", EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Pubkey: "two", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: "zero", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: "one", EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: "two", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -392,9 +392,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: odell, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -403,6 +403,17 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[pip] = 0
 		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
 		DB.LastNodeID = 0
+		return DB
+
+	case "promotion-demotion":
+		DB := NewDatabase()
+		DB.KeyIndex[odell] = 0
+		DB.KeyIndex[calle] = 1
+		DB.KeyIndex[pip] = 2
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.LastNodeID = 2
 		return DB
 
 	default:
