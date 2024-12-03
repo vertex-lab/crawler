@@ -1,14 +1,18 @@
 package pagerank
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
 
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/store/redistore"
+	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
@@ -99,7 +103,7 @@ func TestPagerank(t *testing.T) {
 
 // ---------------------------------BENCHMARK----------------------------------
 
-func BenchmarkPagerank(b *testing.B) {
+func BenchmarkPagerankMock(b *testing.B) {
 	b.Run("FixedDB", func(b *testing.B) {
 
 		// initial setup
@@ -147,6 +151,45 @@ func BenchmarkPagerank(b *testing.B) {
 					}
 				}
 			})
+		}
+	})
+}
+
+func BenchmarkPagerankRedis(b *testing.B) {
+	b.Run("FixedWalksPerNode", func(b *testing.B) {
+		edgesPerNode := 100
+		rng := rand.New(rand.NewSource(69))
+
+		// Different DB sizes
+		for _, nodesSize := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
+				cl := redisutils.SetupClient()
+				defer redisutils.CleanupRedis(cl)
+
+				// Setup DB and RWS
+				DB, err := redisdb.GenerateDB(cl, nodesSize, edgesPerNode, rng)
+				if err != nil {
+					b.Fatalf("GenerateDB(): expected nil, got %v", err)
+				}
+				RWS, err := redistore.NewRWS(context.Background(), cl, 0.85, 10)
+				if err != nil {
+					b.Fatalf("NewRWS(): expected nil, got %v", err)
+				}
+				RWM := walks.RandomWalkManager{Store: RWS}
+				if err := RWM.GenerateAll(DB); err != nil {
+					b.Fatalf("GenerateAll(): expected nil, got %v", err)
+				}
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+
+					_, err := Pagerank(DB, RWM.Store)
+					if err != nil {
+						b.Fatalf("Benchmark failed: %v", err)
+					}
+				}
+			})
+
 		}
 	})
 }

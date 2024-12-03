@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
+	"slices"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -653,6 +655,45 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	default:
 		return nil, nil // default to nil
 	}
+}
+
+// generates a random mock database of a specified number of nodes and successors per node
+// the successor of a node won't include itself, and won't have repetitions
+func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Rand) (*Database, error) {
+
+	DB, err := NewDatabase(context.Background(), cl)
+	if err != nil {
+		return nil, err
+	}
+
+	if successorsPerNode > nodesNum {
+		return nil, fmt.Errorf("successorsPerNode must be lower than nodesNum!")
+	}
+
+	for i := 0; i < nodesNum; i++ {
+		// create random successors for each node
+		randomSuccessors := make([]uint32, 0, successorsPerNode)
+		for len(randomSuccessors) != successorsPerNode {
+
+			succ := uint32(rng.Intn(nodesNum))
+			if slices.Contains(randomSuccessors, succ) {
+				continue
+			}
+
+			randomSuccessors = append(randomSuccessors, succ)
+		}
+
+		node := &models.Node{
+			Metadata: models.NodeMeta{
+				Pubkey:  redisutils.FormatID(uint32(i)),
+				EventTS: 0},
+			Successors: randomSuccessors}
+
+		if _, err := DB.AddNode(node); err != nil {
+			return nil, err
+		}
+	}
+	return DB, nil
 }
 
 //----------------------------------REDIS-KEYS----------------------------------
