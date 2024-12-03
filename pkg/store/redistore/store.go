@@ -208,6 +208,54 @@ func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error
 	return visitMap, nil
 }
 
+// VisitCounts() returns a map that associates each nodeID with the number of
+// times it was visited by a walk.
+func (RWS *RandomWalkStore) VisitCountsLUA(nodeIDs []uint32) (map[uint32]int, error) {
+
+	if RWS == nil || RWS.client == nil {
+		return map[uint32]int{}, models.ErrNilRWSPointer
+	}
+
+	if len(nodeIDs) == 0 {
+		return map[uint32]int{}, nil
+	}
+
+	// Prepare keys for the Lua script
+	keys := make([]string, len(nodeIDs))
+	for i, nodeID := range nodeIDs {
+		keys[i] = KeyWalksVisiting(nodeID)
+	}
+
+	// Lua script for batching SCARD commands
+	luaScript := `
+		local results = {}
+		for i, key in ipairs(KEYS) do
+			results[i] = redis.call('SCARD', key)
+		end
+		return results
+	`
+
+	// execute the Lua script
+	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, KeyWalks).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
+	}
+
+	// Parse the results into the visitMap
+	visitMap := make(map[uint32]int, len(nodeIDs))
+	counts, ok := result.([]interface{})
+	if !ok {
+		return map[uint32]int{}, fmt.Errorf("unexpected result type: %T", result)
+	}
+
+	for i, count := range counts {
+		nodeID := nodeIDs[i]
+		visitMap[nodeID] = int(count.(int64)) // Redis results are returned as int64
+	}
+
+	return visitMap, nil
+}
+
 // Walks() returns a map of walks by walksID that visit nodeID.
 func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 

@@ -344,6 +344,73 @@ func TestVisitCounts(t *testing.T) {
 	}
 }
 
+func TestVisitCountsLUA(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name           string
+		RWSType        string
+		nodeIDs        []uint32
+		expectedVisits map[uint32]int
+		expectedError  error
+	}{
+		{
+			name:           "nil RWS",
+			RWSType:        "nil",
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{},
+			expectedError:  models.ErrNilRWSPointer,
+		},
+		{
+			name:           "empty RWS",
+			RWSType:        "empty",
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{0: 0},
+			expectedError:  nil,
+		},
+		{
+			name:           "empty nodeIDs",
+			RWSType:        "one-node0",
+			nodeIDs:        []uint32{},
+			expectedVisits: map[uint32]int{},
+			expectedError:  nil,
+		},
+		{
+			name:           "one node RWS",
+			RWSType:        "one-node0",
+			nodeIDs:        []uint32{0},
+			expectedVisits: map[uint32]int{0: 1},
+			expectedError:  nil,
+		},
+		{
+			name:           "triangle RWS",
+			RWSType:        "triangle",
+			nodeIDs:        []uint32{0, 1, 2, 99}, // 99 is not in the RWS
+			expectedVisits: map[uint32]int{0: 3, 1: 3, 2: 3, 99: 0},
+			expectedError:  nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			RWS, err := SetupRWS(cl, test.RWSType)
+			if err != nil {
+				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+			}
+
+			visits, err := RWS.VisitCountsLUA(test.nodeIDs)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(visits, test.expectedVisits) {
+				t.Errorf("VisitCount(0): expected %v, got %v", test.expectedVisits, visits)
+			}
+		})
+	}
+}
+
 func TestWalks(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
@@ -832,6 +899,47 @@ func BenchmarkVisitCounts(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					if _, err := RWS.VisitCounts(nodeIDs); err != nil {
+						b.Fatalf("benchmark failed: %v", err)
+					}
+				}
+			})
+		}
+	})
+}
+
+func BenchmarkVisitCountsLUA(b *testing.B) {
+	b.Run("FixedWalksPerNode", func(b *testing.B) {
+		edgesPerNode := 100
+		rng := rand.New(rand.NewSource(69))
+
+		// Different DB sizes
+		for _, nodesSize := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
+				cl := redisutils.SetupClient()
+				defer redisutils.CleanupRedis(cl)
+
+				nodeIDs := make([]uint32, 0, nodesSize)
+				for i := 0; i < nodesSize; i++ {
+					nodeIDs = append(nodeIDs, uint32(i))
+				}
+
+				// Setup DB and RWS
+				DB, err := redisdb.GenerateDB(cl, nodesSize, edgesPerNode, rng)
+				if err != nil {
+					b.Fatalf("GenerateDB(): expected nil, got %v", err)
+				}
+				RWS, err := NewRWS(context.Background(), cl, 0.85, 10)
+				if err != nil {
+					b.Fatalf("NewRWS(): expected nil, got %v", err)
+				}
+				RWM := walks.RandomWalkManager{Store: RWS}
+				if err := RWM.GenerateAll(DB); err != nil {
+					b.Fatalf("GenerateAll(): expected nil, got %v", err)
+				}
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := RWS.VisitCountsLUA(nodeIDs); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}

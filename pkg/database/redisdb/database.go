@@ -11,6 +11,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
@@ -525,6 +526,97 @@ func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 	return nil
 }
 
+func (DB *Database) SetPagerankPipe(pagerankMap models.PagerankMap) error {
+
+	if err := DB.validateFields(); err != nil {
+		return err
+	}
+
+	if len(pagerankMap) == 0 {
+		return nil
+	}
+
+	pipe := DB.client.Pipeline()
+	for nodeID, rank := range pagerankMap {
+		key := KeyNode(nodeID)
+		//pipe.Exists(DB.ctx, key)
+		pipe.HSet(DB.ctx, key, "pagerank", rank)
+	}
+
+	_, err := pipe.Exec(DB.ctx)
+	if err != nil {
+		return err
+	}
+
+	// for i := 0; i < len(pagerankMap); i++ {
+	// 	existsCmd := cmds[i*2] // every other command is an EXISTS
+	// 	if existsCmd.(*redis.IntCmd).Val() == 0 {
+	// 		return fmt.Errorf("%w: %v", models.ErrNodeNotFoundDB, KeyNode(i))
+	// 	}
+	// }
+	return nil
+}
+
+func (DB *Database) PagerankLUA() error {
+
+	if err := DB.validateFields(); err != nil {
+		return err
+	}
+
+	luaScript := `
+		local nodePrefix = KEYS[1]
+		local keyIndex = KEYS[2]
+		local walksVisiting = KEYS[3]
+
+		local nodeIDs = redis.call('HVALS', keyIndex)
+		local totalVisits = 0
+		local visitMap = {}
+
+		for i, nodeID in ipairs(nodeIDs) do
+			local visits = redis.call('SCARD', walksVisiting .. nodeID)
+			visitMap[nodeID] = visits
+			totalVisits = totalVisits + visits
+		end
+
+		-- If the total visits is zero, return an empty map to avoid division by zero
+		if totalVisits == 0 then
+			return 'NO VISITS'
+		end
+
+		-- Calculate Pagerank for each node and store it in a result map
+		for nodeID, visits in pairs(visitMap) do
+			redis.call('HSET', nodePrefix .. nodeID, 'pagerank', visits / totalVisits)
+		end
+
+		return 'OK'
+	`
+	_ = luaScript
+
+	keys := []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}
+	// sha1, err := DB.client.ScriptLoad(context.Background(), luaScript).Result()
+	// if err != nil {
+	// 	return err
+	// }
+	// return fmt.Errorf("sha1: %v", sha1)
+
+	// res, err := DB.client.Eval(DB.ctx, luaScript, []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}).Result()
+	// if err != nil {
+	// 	return err
+	// }
+	const scriptSHA = "22b8ddc9699ff7699d9fc68d5b158db136590d96"
+
+	res, err := DB.client.EvalSha(DB.ctx, scriptSHA, keys).Result()
+	if err != nil {
+		return err
+	}
+
+	if res == "NO VISITS" {
+		return models.ErrEmptyDB
+	}
+
+	return nil
+}
+
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	ctx := context.Background()
@@ -649,6 +741,41 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		if _, err := DB.AddNode(&node); err != nil {
 			return nil, err
+		}
+		return DB, nil
+
+	case "triangle":
+
+		DB, err := NewDatabase(context.Background(), cl)
+		if err != nil {
+			return nil, err
+		}
+
+		nodes := []*models.Node{
+			{
+				Metadata: models.NodeMeta{
+					Pubkey: "zero",
+				},
+				Successors: []uint32{1},
+			},
+			{
+				Metadata: models.NodeMeta{
+					Pubkey: "one",
+				},
+				Successors: []uint32{2},
+			},
+			{
+				Metadata: models.NodeMeta{
+					Pubkey: "two",
+				},
+				Successors: []uint32{0},
+			},
+		}
+
+		for _, node := range nodes {
+			if _, err := DB.AddNode(node); err != nil {
+				return nil, err
+			}
 		}
 		return DB, nil
 
