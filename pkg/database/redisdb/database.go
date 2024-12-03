@@ -667,7 +667,7 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 	}
 
 	if successorsPerNode > nodesNum {
-		return nil, fmt.Errorf("successorsPerNode must be lower than nodesNum!")
+		return nil, fmt.Errorf("successorsPerNode must be lower than nodesNum")
 	}
 
 	for i := 0; i < nodesNum; i++ {
