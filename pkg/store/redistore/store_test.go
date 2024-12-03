@@ -3,14 +3,17 @@ package redistore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
+	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestNewRWS(t *testing.T) {
@@ -797,39 +800,42 @@ func TestInterface(t *testing.T) {
 // ------------------------------------BENCHMARKS------------------------------
 
 func BenchmarkVisitCounts(b *testing.B) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
+	b.Run("FixedWalksPerNode", func(b *testing.B) {
+		edgesPerNode := 100
+		rng := rand.New(rand.NewSource(69))
 
-	const walksPerNode = 10
-	const alpha = 0.85
-	const nodeNum = 100
-	const walkLenght = 7
+		// Different DB sizes
+		for _, nodesSize := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
+				cl := redisutils.SetupClient()
+				defer redisutils.CleanupRedis(cl)
 
-	RWS, err := NewRWS(context.Background(), cl, alpha, walksPerNode)
-	if err != nil {
-		b.Fatalf("NewRWS: benchmark failed: %v", err)
-	}
+				nodeIDs := make([]uint32, 0, nodesSize)
+				for i := 0; i < nodesSize; i++ {
+					nodeIDs = append(nodeIDs, uint32(i))
+				}
 
-	// add some walks to the RWS
-	for i := 0; i < nodeNum*10; i++ {
+				// Setup DB and RWS
+				DB, err := redisdb.GenerateDB(cl, nodesSize, edgesPerNode, rng)
+				if err != nil {
+					b.Fatalf("GenerateDB(): expected nil, got %v", err)
+				}
+				RWS, err := NewRWS(context.Background(), cl, 0.85, 10)
+				if err != nil {
+					b.Fatalf("NewRWS(): expected nil, got %v", err)
+				}
+				RWM := walks.RandomWalkManager{Store: RWS}
+				if err := RWM.GenerateAll(DB); err != nil {
+					b.Fatalf("GenerateAll(): expected nil, got %v", err)
+				}
 
-		walk := make(models.RandomWalk, walkLenght)
-		for j := 0; j < walkLenght; j++ {
-			walk = append(walk, uint32(rand.Intn(nodeNum)))
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := RWS.VisitCounts(nodeIDs); err != nil {
+						b.Fatalf("benchmark failed: %v", err)
+					}
+				}
+			})
 		}
-		RWS.AddWalk(walk)
-	}
-
-	nodeIDs := make([]uint32, 0, nodeNum)
-	for i := uint32(0); i < nodeNum; i++ {
-		nodeIDs = append(nodeIDs, i)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := RWS.VisitCounts(nodeIDs)
-		if err != nil {
-			b.Fatalf("VisitCounts: benchmark failed: %v", err)
-		}
-	}
+	})
 }

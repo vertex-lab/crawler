@@ -1174,5 +1174,29 @@ func BenchmarkSetPagerank(b *testing.B) {
 			}
 		})
 	}
+}
 
+func BenchmarkAllNodes(b *testing.B) {
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+
+	// Different DB sizes
+	for _, nodesSize := range []int{100, 1000, 10000} {
+		b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
+			cl := redisutils.SetupClient()
+			defer redisutils.CleanupRedis(cl)
+
+			DB, err := GenerateDB(cl, nodesSize, edgesPerNode, rng)
+			if err != nil {
+				b.Fatalf("GenerateDB(): expected nil, got %v", err)
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := DB.AllNodes(); err != nil {
+					b.Fatalf("benchmark failed: %v", err)
+				}
+			}
+		})
+	}
 }
