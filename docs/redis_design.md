@@ -32,11 +32,12 @@ keyIndex = HASH { <pubkey>: <nodeID> }
 Each `node:<nodeID>` (e.g. `node:69`, `node:420`, ...) is a Redis hash, encapsulating relevant (one-dimentional) data about a node.
 
 ```
-node:<nodeID> = HASH {    pubkey: <pubkey>
-                          timestamp: <timestamp of last kind3>
+node:<nodeID> = HASH {    id: <nodeID>
+                          pubkey: <pubkey>
+                          event_timestamp: <timestamp of last kind3>
                           status: <we do random walks/ we don't>
                           pagerank: <pagerank>
-                      }
+                      } 
 ```
 
 ---
@@ -72,7 +73,8 @@ The `RWS` is a Redis hash that encapsulate relevant metadata about the RandomWal
 ```
 RWS = HASH {     alpha: <alpha>,
                  walksPerNode: <walksPerNode>,
-                 lastWalkID: <walkID> 
+                 lastWalkID: <walkID>
+                 totalVisits: <totalVisits>
             }
 ```
 
@@ -87,7 +89,7 @@ walks = HASH { <walkID>: <walk> }
 ```
 
 **Note**: we could have implemented this as a bunch Redis strings `walk:<walkID>`.
-For fetching a batch of walks, instead of using the built-in `HMGET` we should have do something like
+For fetching a batch of walks, instead of using the built-in `HMGET` we could have done something like
 
 ```lua
 -- Lua script to retrieve multiple keys

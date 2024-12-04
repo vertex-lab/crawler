@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,9 @@ import (
 	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
+
+const bottom = 0.95
+const top = 0.001
 
 var (
 	RelevantKinds = []int{
@@ -93,7 +97,7 @@ func Firehose(
 		}
 
 		// if the author has low pagerank, skip.
-		if node.Pagerank < pagerankThreshold(DB.Size()) {
+		if node.Pagerank < pagerankThreshold(DB.Size(), bottom) {
 			continue
 		}
 
@@ -206,31 +210,24 @@ func close(funcName string, pool *nostr.SimplePool) {
 /*
 pagerankThreshold returns the pagerank threshold used for deciding whether
 a node is active or inactive.
-It's based on the following exponential distribution of pagerank:
+It's based on the following approximated exponential distribution of pagerank:
 
 	p_j ~ (1-b) / N^(1-b) * j^(-b)
 
 Where p_j is the j-th highest pagerank, b is the exponent, N is the size of the graph.
-The idea is to exclude the bottom 5% of the nodes, which means all nodes below
+For example, to determine a threshold satisfied by 95% of all the nodes, we do:
 
-	p_t = (1-b) / N^(1-b) * (0.95 * N)^(-b) = (1-b) * 0.95^(-b) / N
+	p_(0.95 * N) = (1-b) / N^(1-b) * (0.95 * N)^(-b) = (1-b) * 0.95^(-b) / N
 
 # REFERENCES
 
 [1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
-func pagerankThreshold(graphSize int) float64 {
-
-	// // the exponent
-	// const b float64 = 0.76
-
-	// // cutting the bottom 5%
-	// const percentageCut float64 = 0.95
-
-	// return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
-	_ = graphSize
-	return 0.0
+func pagerankThreshold(graphSize int, percentageCut float64) float64 {
+	// the exponent
+	const b float64 = 0.76
+	return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
 }
 
 // PrintEvent is a simple function that prints the event ID, PubKey and Timestamp.

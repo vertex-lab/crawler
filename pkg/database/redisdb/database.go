@@ -11,7 +11,6 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
@@ -408,7 +407,8 @@ func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 }
 
 // ScanNodes() scans over the nodes and returns a batch of nodeIDs of size roughly equal to limit.
-// Limit controls how much "work" is invested in fetching the batch, hence it is not precise.
+// Limit controls how much "work" is invested in fetching the batch, hence it's not precise
+// in determining the number of nodes returned.
 func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error) {
 
 	if err := DB.validateFields(); err != nil {
@@ -419,7 +419,7 @@ func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error
 
 	strNodeIDs, newCursor, err := DB.client.Scan(DB.ctx, cursor, match, int64(limit)).Result()
 	if err != nil {
-		return []uint32{11}, 0, err
+		return []uint32{}, 0, err
 	}
 
 	nodeIDs := make([]uint32, 0, len(strNodeIDs))
@@ -427,7 +427,7 @@ func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error
 
 		nodeID, err := redisutils.ParseID(strNodeID[lenPrefix:])
 		if err != nil {
-			return []uint32{22}, 0, err
+			return []uint32{}, 0, err
 		}
 
 		nodeIDs = append(nodeIDs, nodeID)
@@ -482,7 +482,7 @@ func (DB *Database) Size() int {
 	return int(size)
 }
 
-func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
+func (DB *Database) SetPagerankLua(pagerankMap models.PagerankMap) error {
 
 	if err := DB.validateFields(); err != nil {
 		return err
@@ -526,7 +526,10 @@ func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 	return nil
 }
 
-func (DB *Database) SetPagerankPipe(pagerankMap models.PagerankMap) error {
+// SetPagerank() writes the pagerank values on the specified nodeIDs.
+// Before writing, it ensures that all keys exists. If that's not the case
+// no writes occur and an error is returned.
+func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 
 	if err := DB.validateFields(); err != nil {
 		return err
@@ -536,86 +539,101 @@ func (DB *Database) SetPagerankPipe(pagerankMap models.PagerankMap) error {
 		return nil
 	}
 
-	pipe := DB.client.Pipeline()
+	// prepare keys and values
+	keys := make([]string, 0, len(pagerankMap))
+	vals := make([]float64, 0, len(pagerankMap))
 	for nodeID, rank := range pagerankMap {
-		key := KeyNode(nodeID)
-		//pipe.Exists(DB.ctx, key)
-		pipe.HSet(DB.ctx, key, "pagerank", rank)
+		keys = append(keys, KeyNode(nodeID))
+		vals = append(vals, rank)
 	}
 
-	_, err := pipe.Exec(DB.ctx)
+	// validate the existence of all the keys before writing.
+	existsPipe := DB.client.Pipeline()
+	for _, key := range keys {
+		existsPipe.Exists(DB.ctx, key)
+	}
+	cmds, err := existsPipe.Exec(DB.ctx)
 	if err != nil {
 		return err
 	}
 
-	// for i := 0; i < len(pagerankMap); i++ {
-	// 	existsCmd := cmds[i*2] // every other command is an EXISTS
-	// 	if existsCmd.(*redis.IntCmd).Val() == 0 {
-	// 		return fmt.Errorf("%w: %v", models.ErrNodeNotFoundDB, KeyNode(i))
-	// 	}
-	// }
-	return nil
-}
-
-func (DB *Database) PagerankLUA() error {
-
-	if err := DB.validateFields(); err != nil {
-		return err
+	for i, cmd := range cmds {
+		if cmd.(*redis.IntCmd).Val() <= 0 { // Key does not exist
+			return fmt.Errorf("%w: %v", models.ErrNodeNotFoundDB, keys[i])
+		}
 	}
 
-	luaScript := `
-		local nodePrefix = KEYS[1]
-		local keyIndex = KEYS[2]
-		local walksVisiting = KEYS[3]
-
-		local nodeIDs = redis.call('HVALS', keyIndex)
-		local totalVisits = 0
-		local visitMap = {}
-
-		for i, nodeID in ipairs(nodeIDs) do
-			local visits = redis.call('SCARD', walksVisiting .. nodeID)
-			visitMap[nodeID] = visits
-			totalVisits = totalVisits + visits
-		end
-
-		-- If the total visits is zero, return an empty map to avoid division by zero
-		if totalVisits == 0 then
-			return 'NO VISITS'
-		end
-
-		-- Calculate Pagerank for each node and store it in a result map
-		for nodeID, visits in pairs(visitMap) do
-			redis.call('HSET', nodePrefix .. nodeID, 'pagerank', visits / totalVisits)
-		end
-
-		return 'OK'
-	`
-	_ = luaScript
-
-	keys := []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}
-	// sha1, err := DB.client.ScriptLoad(context.Background(), luaScript).Result()
-	// if err != nil {
-	// 	return err
-	// }
-	// return fmt.Errorf("sha1: %v", sha1)
-
-	// res, err := DB.client.Eval(DB.ctx, luaScript, []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}).Result()
-	// if err != nil {
-	// 	return err
-	// }
-	const scriptSHA = "22b8ddc9699ff7699d9fc68d5b158db136590d96"
-
-	res, err := DB.client.EvalSha(DB.ctx, scriptSHA, keys).Result()
-	if err != nil {
-		return err
+	// write the new pagerank scores
+	writePipe := DB.client.Pipeline()
+	for i, val := range vals {
+		writePipe.HSet(DB.ctx, keys[i], "pagerank", val)
 	}
-
-	if res == "NO VISITS" {
-		return models.ErrEmptyDB
+	if _, err := writePipe.Exec(DB.ctx); err != nil {
+		return err
 	}
 
 	return nil
 }
+
+// func (DB *Database) PagerankLUA() error {
+
+// 	if err := DB.validateFields(); err != nil {
+// 		return err
+// 	}
+
+// 	luaScript := `
+// 		local nodePrefix = KEYS[1]
+// 		local keyIndex = KEYS[2]
+// 		local walksVisiting = KEYS[3]
+
+// 		local nodeIDs = redis.call('HVALS', keyIndex)
+// 		local totalVisits = 0
+// 		local visitMap = {}
+
+// 		for i, nodeID in ipairs(nodeIDs) do
+// 			local visits = redis.call('SCARD', walksVisiting .. nodeID)
+// 			visitMap[nodeID] = visits
+// 			totalVisits = totalVisits + visits
+// 		end
+
+// 		-- If the total visits is zero, return an empty map to avoid division by zero
+// 		if totalVisits == 0 then
+// 			return 'NO VISITS'
+// 		end
+
+// 		-- Calculate Pagerank for each node and store it in a result map
+// 		for nodeID, visits in pairs(visitMap) do
+// 			redis.call('HSET', nodePrefix .. nodeID, 'pagerank', visits / totalVisits)
+// 		end
+
+// 		return 'OK'
+// 	`
+// 	_ = luaScript
+
+// 	keys := []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}
+// 	// sha1, err := DB.client.ScriptLoad(context.Background(), luaScript).Result()
+// 	// if err != nil {
+// 	// 	return err
+// 	// }
+// 	// return fmt.Errorf("sha1: %v", sha1)
+
+// 	// res, err := DB.client.Eval(DB.ctx, luaScript, []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}).Result()
+// 	// if err != nil {
+// 	// 	return err
+// 	// }
+// 	const scriptSHA = "22b8ddc9699ff7699d9fc68d5b158db136590d96"
+
+// 	res, err := DB.client.EvalSha(DB.ctx, scriptSHA, keys).Result()
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if res == "NO VISITS" {
+// 		return models.ErrEmptyDB
+// 	}
+
+// 	return nil
+// }
 
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {

@@ -25,6 +25,7 @@ type RWSFields struct {
 	Alpha        float32 `redis:"alpha"`
 	WalksPerNode uint16  `redis:"walksPerNode"`
 	LastWalkID   int     `redis:"lastWalkID"`
+	TotalVisits  int     `redis:"totalVisits"`
 }
 
 // NewRWS creates a new instance of RandomWalkStore using the provided Redis client,
@@ -42,6 +43,7 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 	fields := RWSFields{
 		Alpha:        alpha,
 		WalksPerNode: walksPerNode,
+		TotalVisits:  0,
 		LastWalkID:   -1, // the first ID will be 0, since we increment and return with HIncrBy
 	}
 
@@ -103,9 +105,43 @@ func (RWS *RandomWalkStore) Alpha() float32 {
 	return RWS.alpha
 }
 
-// WalkPerNode() returns the number of walks to be generated for each node in the DB
+// WalkPerNode() returns the number of walks to be generated for each node in the DB.
 func (RWS *RandomWalkStore) WalksPerNode() uint16 {
 	return RWS.walksPerNode
+}
+
+// TotalVisits() returns the total number of visits.
+// In case of any error, the default value 0 is returned.
+func (RWS *RandomWalkStore) TotalVisits() int {
+	if err := RWS.validateFields(); err != nil {
+		return 0
+	}
+
+	strVisits, err := RWS.client.HGet(RWS.ctx, KeyRWS, KeyTotalVisits).Result()
+	if err != nil {
+		return 0
+	}
+
+	visits, err := redisutils.ParseInt64(strVisits)
+	if err != nil {
+		return 0
+	}
+
+	return int(visits)
+}
+
+// SetTotalVisits() overwrites the total number of visits.
+func (RWS *RandomWalkStore) SetTotalVisits(totalVisits int) error {
+
+	if err := RWS.validateFields(); err != nil {
+		return err
+	}
+
+	if totalVisits < 0 {
+		return models.ErrInvalidTotalVisits
+	}
+
+	return RWS.client.HSet(RWS.ctx, KeyRWS, KeyTotalVisits, totalVisits).Err()
 }
 
 // IsEmpty() returns false if the size of the hash key "walks" is > 0, otherwise true.
@@ -538,6 +574,10 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 			return nil, err
 		}
 
+		if err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, 1).Err(); err != nil {
+			return nil, err
+		}
+
 		return RWS, nil
 
 	case "one-walk0":
@@ -622,6 +662,7 @@ const KeyRWS string = "RWS"
 const KeyAlpha string = "alpha"
 const KeyWalksPerNode string = "walksPerNode"
 const KeyLastWalkID string = "lastWalkID"
+const KeyTotalVisits string = "totalVisits"
 const KeyWalks string = "walks"
 const KeyWalksVisitingPrefix string = "walksVisiting:"
 

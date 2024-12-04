@@ -18,11 +18,12 @@ import (
 
 func TestPagerank(t *testing.T) {
 	testCases := []struct {
-		name             string
-		DBType           string
-		RWSType          string
-		expectedPagerank models.PagerankMap
-		expectedError    error
+		name                string
+		DBType              string
+		RWSType             string
+		expectedPagerank    models.PagerankMap
+		expectedTotalVisits int
+		expectedError       error
 	}{
 		{
 			name:          "nil DB",
@@ -49,19 +50,21 @@ func TestPagerank(t *testing.T) {
 			expectedError: models.ErrEmptyRWS,
 		},
 		{
-			name:          "just one node",
-			DBType:        "one-node0",
-			RWSType:       "one-node0",
-			expectedError: nil,
+			name:                "just one node",
+			DBType:              "one-node0",
+			RWSType:             "one-node0",
+			expectedError:       nil,
+			expectedTotalVisits: 1,
 			expectedPagerank: models.PagerankMap{
 				0: 1.0,
 			},
 		},
 		{
-			name:          "simple RWS",
-			DBType:        "simple",
-			RWSType:       "simple",
-			expectedError: nil,
+			name:                "simple RWS",
+			DBType:              "simple",
+			RWSType:             "simple",
+			expectedError:       nil,
+			expectedTotalVisits: 2,
 			expectedPagerank: models.PagerankMap{
 				0: 0.5,
 				1: 0.5,
@@ -69,10 +72,11 @@ func TestPagerank(t *testing.T) {
 			},
 		},
 		{
-			name:          "triangle RWS",
-			DBType:        "triangle",
-			RWSType:       "triangle",
-			expectedError: nil,
+			name:                "triangle RWS",
+			DBType:              "triangle",
+			RWSType:             "triangle",
+			expectedError:       nil,
+			expectedTotalVisits: 9,
 			expectedPagerank: models.PagerankMap{
 				0: 1.0 / 3.0,
 				1: 1.0 / 3.0,
@@ -86,6 +90,101 @@ func TestPagerank(t *testing.T) {
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
 			pagerank, err := Pagerank(DB, RWS)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
+			}
+
+			// in case of no errors, check the pagerank and the totalVisits.
+			if err == nil {
+				if models.Distance(pagerank, test.expectedPagerank) > 1e-10 {
+					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
+				}
+
+				visits := RWS.TotalVisits()
+				if visits != test.expectedTotalVisits {
+					t.Errorf("Pagerank(): expected visits %v, got %v", test.expectedTotalVisits, visits)
+				}
+			}
+		})
+	}
+}
+
+func TestLazyPagerank(t *testing.T) {
+	testCases := []struct {
+		name             string
+		DBType           string
+		RWSType          string
+		nodeIDs          []uint32
+		expectedPagerank models.PagerankMap
+		expectedError    error
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			RWSType:       "one-node0",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			RWSType:       "one-node0",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrEmptyDB,
+		},
+		{
+			name:          "nil RWS",
+			DBType:        "one-node0",
+			RWSType:       "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilRWSPointer,
+		},
+		{
+			name:          "empty RWS",
+			DBType:        "one-node0",
+			RWSType:       "empty",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrEmptyRWS,
+		},
+		{
+			name:          "just one node",
+			DBType:        "one-node0",
+			RWSType:       "one-node0",
+			expectedError: nil,
+			nodeIDs:       []uint32{0},
+			expectedPagerank: models.PagerankMap{
+				0: 1.0,
+			},
+		},
+		{
+			name:          "simple RWS",
+			DBType:        "simple",
+			RWSType:       "simple",
+			expectedError: nil,
+			nodeIDs:       []uint32{0},
+			expectedPagerank: models.PagerankMap{
+				0: 0.5,
+			},
+		},
+		{
+			name:          "triangle RWS",
+			DBType:        "triangle",
+			RWSType:       "triangle",
+			expectedError: nil,
+			nodeIDs:       []uint32{0, 1},
+			expectedPagerank: models.PagerankMap{
+				0: 1.0 / 3.0,
+				1: 1.0 / 3.0,
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := mockdb.SetupDB(test.DBType)
+			RWS := mockstore.SetupRWS(test.RWSType)
+			pagerank, err := LazyPagerank(DB, RWS, test.nodeIDs)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)

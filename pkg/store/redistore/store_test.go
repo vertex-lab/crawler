@@ -120,6 +120,101 @@ func TestLoadRWS(t *testing.T) {
 	}
 }
 
+func TestTotalVisits(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name                string
+		RWSType             string
+		expectedTotalVisits int
+	}{
+		{
+			name:                "nil RWS",
+			RWSType:             "nil",
+			expectedTotalVisits: 0,
+		},
+		{
+			name:                "empty RWS",
+			RWSType:             "empty",
+			expectedTotalVisits: 0,
+		},
+		{
+			name:                "non-empty RWS",
+			RWSType:             "one-node0",
+			expectedTotalVisits: 1,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			RWS, err := SetupRWS(cl, test.RWSType)
+			if err != nil {
+				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+			}
+
+			visits := RWS.TotalVisits()
+			if visits != test.expectedTotalVisits {
+				t.Errorf("TotalVisits(): expected %v, got %v", test.expectedTotalVisits, visits)
+			}
+		})
+	}
+}
+
+func TestSetTotalVisits(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name          string
+		RWSType       string
+		totalVisits   int
+		expectedError error
+	}{
+		{
+			name:          "nil RWS",
+			RWSType:       "nil",
+			expectedError: models.ErrNilRWSPointer,
+		},
+		{
+			name:          "incorrect totalVisits value",
+			RWSType:       "empty",
+			totalVisits:   -10,
+			expectedError: models.ErrInvalidTotalVisits,
+		},
+		{
+			name:          "non-empty RWS",
+			RWSType:       "one-node0",
+			totalVisits:   69,
+			expectedError: nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			RWS, err := SetupRWS(cl, test.RWSType)
+			if err != nil {
+				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+			}
+
+			err = RWS.SetTotalVisits(test.totalVisits)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("SetTotalVisits(): expected %v, got %v", test.expectedError, err)
+			}
+
+			// check that the new value has been written
+			if err == nil {
+				visits := RWS.TotalVisits()
+				if visits != test.totalVisits {
+					t.Errorf("SetTotalVisits(): expected %v, got %v", test.totalVisits, visits)
+				}
+			}
+		})
+	}
+}
+
 func TestIsEmpty(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)

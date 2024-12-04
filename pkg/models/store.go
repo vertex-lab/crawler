@@ -34,6 +34,10 @@ type RandomWalkStore interface {
 	// WalkPerNode() returns the number of walks to be generated for each node in the DB
 	WalksPerNode() uint16
 
+	// TotalVisits() returns the total number of visits.
+	// In case of any error, the default value 0 is returned.
+	TotalVisits() int
+
 	// IsEmpty() returns whether RWS is empty (ignores errors).
 	IsEmpty() bool
 
@@ -62,6 +66,9 @@ type RandomWalkStore interface {
 
 	// ----------------------------------WRITE----------------------------------
 
+	// SetTotalVisits() overwrites the total number of visits.
+	SetTotalVisits(totalVisits int) error
+
 	// AddWalk() adds a walk to the RandomWalkStore.
 	AddWalk(walk RandomWalk) error
 
@@ -83,6 +90,7 @@ var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the
 // RWS errors
 var ErrInvalidAlpha = errors.New("alpha should be a number between 0 and 1 (excluded)")
 var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zero")
+var ErrInvalidTotalVisits = errors.New("totalVisits should be greater than zero")
 var ErrNilRWSPointer = errors.New("nil RWS pointer")
 var ErrEmptyRWS = errors.New("RWS is empty")
 var ErrNonEmptyRWS = errors.New("the RWS is NOT empty")

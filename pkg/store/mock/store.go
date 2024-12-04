@@ -23,6 +23,10 @@ type RandomWalkStore struct {
 
 	// The number of random walks to be performed for each node. Default is 10
 	walksPerNode uint16
+
+	// The total number of visits, meaning the sum of how many times each node
+	// was visited by a walk
+	totalVisits int
 }
 
 // Creates a new RandomWalkStore.
@@ -41,6 +45,7 @@ func NewRWS(alpha float32, walksPerNode uint16) (*RandomWalkStore, error) {
 		NodeWalkIDSet: make(map[uint32]models.WalkIDSet),
 		alpha:         alpha,
 		walksPerNode:  walksPerNode,
+		totalVisits:   0,
 	}
 	return RWS, nil
 }
@@ -53,6 +58,22 @@ func (RWS *RandomWalkStore) Alpha() float32 {
 // WalkPerNode() returns the number of walks to be generated for each node in the DB
 func (RWS *RandomWalkStore) WalksPerNode() uint16 {
 	return RWS.walksPerNode
+}
+
+// TotalVisits() returns the total number of visits.
+func (RWS *RandomWalkStore) TotalVisits() int {
+
+	visits := 0
+	for _, walkSet := range RWS.NodeWalkIDSet {
+		visits += walkSet.Cardinality()
+	}
+
+	return visits
+}
+
+// SetTotalVisits() overwrites the field totalVisits.
+func (RWS *RandomWalkStore) SetTotalVisits(totalVisits int) error {
+	return nil
 }
 
 // IsEmpty() returns whether RWS is empty (ignores errors).

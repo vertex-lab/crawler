@@ -15,7 +15,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-// ProcessEvents() process one event at the time from the eventChannel.
+// ProcessEvents() process one event at the time from the eventChannel, based on their kind.
 func ProcessEvents(
 	ctx context.Context,
 	logger *logger.Aggregate,
@@ -50,6 +50,7 @@ func ProcessEvents(
 			// process event based on its kind
 			switch event.Kind {
 			case nostr.KindFollowList:
+
 				if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM); err != nil {
 					logger.Error("Error processing the eventID %v: %v", event.ID, err)
 
@@ -66,6 +67,9 @@ func ProcessEvents(
 		}
 	}
 }
+
+// The accumulated pagerank mass since the last full recomputation of pagerank
+var mass float64
 
 /*
 ProcessFollowListEvent() adds the author and its follows to the database.
@@ -118,12 +122,27 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	// recompute pagerank and update the DB
-	pagerank, err := pagerank.Pagerank(DB, RWM.Store)
-	if err != nil {
-		return err
+	var pagerankMap models.PagerankMap
+	mass += author.Pagerank
+
+	if mass > pagerankThreshold(DB.Size(), top) {
+		// full recomputation of pagerank
+		pagerankMap, err = pagerank.Pagerank(DB, RWM.Store)
+		if err != nil {
+			return err
+		}
+		mass = 0
+	} else {
+		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
+		impactedNodes := append(addedSucc, removedSucc...)
+		pagerankMap, err = pagerank.LazyPagerank(DB, RWM.Store, impactedNodes)
+		if err != nil {
+			return err
+		}
 	}
-	if err := DB.SetPagerank(pagerank); err != nil {
+
+	// set the pagerank
+	if err := DB.SetPagerank(pagerankMap); err != nil {
 		return err
 	}
 
@@ -236,7 +255,7 @@ func NodeArbiter(
 			// delay before the next complete scan
 			time.Sleep(time.Duration(sleepTime) * time.Second)
 
-			threshold := pagerankThreshold(DB.Size())
+			threshold := pagerankThreshold(DB.Size(), bottom)
 			if err := ArbiterScan(ctx, DB, RWM, threshold, queueHandler); err != nil {
 				logger.Error("NodeArbiter error: %v", err)
 			}
