@@ -125,13 +125,14 @@ func ProcessFollowListEvent(
 	var pagerankMap models.PagerankMap
 	mass += author.Pagerank
 
-	if mass > pagerankThreshold(DB.Size(), top) {
+	if mass > 0.001 {
 		// full recomputation of pagerank
 		pagerankMap, err = pagerank.Pagerank(DB, RWM.Store)
 		if err != nil {
 			return err
 		}
 		mass = 0
+
 	} else {
 		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
 		impactedNodes := append(addedSucc, removedSucc...)
@@ -255,7 +256,8 @@ func NodeArbiter(
 			// delay before the next complete scan
 			time.Sleep(time.Duration(sleepTime) * time.Second)
 
-			threshold := pagerankThreshold(DB.Size(), bottom)
+			//threshold := pagerankThreshold(DB.Size(), bottom)
+			threshold := 0.0
 			if err := ArbiterScan(ctx, DB, RWM, threshold, queueHandler); err != nil {
 				logger.Error("NodeArbiter error: %v", err)
 			}

@@ -29,7 +29,7 @@ func main() {
 	defer cancel()
 
 	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
+	//defer redisutils.CleanupRedis(cl)
 
 	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
