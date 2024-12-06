@@ -765,6 +765,82 @@ func TestAddWalk(t *testing.T) {
 	})
 }
 
+func TestRemoveWalk(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			RWSType       string
+			expectedError error
+		}{
+			{
+				name:          "nil RWS",
+				RWSType:       "nil",
+				expectedError: models.ErrNilRWSPointer,
+			},
+			{
+				name:          "walk not found",
+				RWSType:       "one-node0",
+				expectedError: redis.Nil,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				RWS, err := SetupRWS(cl, test.RWSType)
+				if err != nil {
+					t.Fatalf("SetupRWS(): expected nil, got %v", err)
+				}
+
+				err = RWS.RemoveWalk(69)
+				if !errors.Is(err, test.expectedError) {
+					t.Errorf("RemoveWalk(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		RWS, err := SetupRWS(cl, "triangle")
+		if err != nil {
+			t.Fatalf("SetupRWS(): expected nil, got %v", err)
+		}
+
+		walkID := uint32(0)
+		removedWalk := []uint32{0, 1, 2}
+		expectedTotalVisits := 6
+
+		if err := RWS.RemoveWalk(walkID); err != nil {
+			t.Fatalf("RemoveWalk(%d): expected nil, got %v", walkID, err)
+		}
+
+		// check the walk has been removed from the WalkIndex
+		if walk, err := cl.HGet(RWS.ctx, KeyWalks, redisutils.FormatID(walkID)).Result(); !errors.Is(err, redis.Nil) {
+			t.Fatalf("RemoveWalk(%d): expected walk %v to be removed: %v", walkID, walk, err)
+		}
+
+		// check the walkID has been removed from each node
+		for _, nodeID := range removedWalk {
+			exists, err := cl.SIsMember(RWS.ctx, KeyWalksVisiting(nodeID), walkID).Result()
+			if err != nil {
+				t.Errorf("SIsMember(): expected nil, got %v", err)
+			}
+
+			if exists {
+				t.Errorf("RemoveWalk(%d): walk should have been removed from walksVisiting:%d", walkID, nodeID)
+			}
+		}
+
+		// check that the total visits have been decreased by len(walk)
+		visits := RWS.TotalVisits()
+		if visits != expectedTotalVisits {
+			t.Errorf("RemoveWalk(): expected totalVisits = %v, got %v", expectedTotalVisits, visits)
+		}
+	})
+}
+
 func TestPruneGraftWalk(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)

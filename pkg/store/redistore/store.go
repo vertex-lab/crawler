@@ -478,6 +478,40 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 	return nil
 }
 
+// RemoveWalk() removes a walk from the RWS
+func (RWS *RandomWalkStore) RemoveWalk(walkID uint32) error {
+
+	if err := RWS.validateFields(); err != nil {
+		return err
+	}
+
+	strWalkID := redisutils.FormatID(walkID)
+	strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, strWalkID).Result()
+	if err != nil {
+		return err
+	}
+	walk, err := redisutils.ParseWalk(strWalk)
+	if err != nil {
+		return err
+	}
+
+	// remove the walk and decrease the total visits
+	pipe := RWS.client.TxPipeline()
+	pipe.HDel(RWS.ctx, KeyWalks, strWalkID)
+	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, -int64(len(walk)))
+
+	// remove the walkID from each node
+	for _, nodeID := range walk {
+		pipe.SRem(RWS.ctx, KeyWalksVisiting(nodeID), strWalkID)
+	}
+
+	if _, err := pipe.Exec(RWS.ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // PruneGraftWalk() encapsulates the functions of Pruning and
 // Grafting ( = appending to) a walk.
 // These functions need to be coupled together to leverage the atomicity of

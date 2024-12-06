@@ -246,9 +246,7 @@ func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
 	return walkMap, nil
 }
 
-// AddWalk() adds the walk to the WalkIndex. It also adds the walkID to the
-// WalkIDSet of each node the walk visited. This means that for each node
-// visited by the walk, the walk ID will be added to its WalkSet.
+// AddWalk() adds the walk to the RWS.
 func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 
 	if RWS == nil {
@@ -259,11 +257,8 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 		return err
 	}
 
-	// add the walk to the WalkIndex
 	newWalkID := uint32(len(RWS.WalkIndex))
 	RWS.WalkIndex[newWalkID] = walk
-
-	// increase the total visits
 	RWS.totalVisits += len(walk)
 
 	// add the walkID to each node
@@ -279,9 +274,28 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 	return nil
 }
 
-// PruneWalk() removes the walkID from each node in the walk after cutIndex.
-// This means that for each prunedNode in walk[cutIndex:], the walk ID will
-// be removed from its WalkSet.
+// RemoveWalk() removes the specified walk
+func (RWS *RandomWalkStore) RemoveWalk(walkID uint32) error {
+
+	if err := RWS.Validate(false); err != nil {
+		return err
+	}
+
+	walk, exists := RWS.WalkIndex[walkID]
+	if !exists {
+		return models.ErrWalkNotFound
+	}
+
+	delete(RWS.WalkIndex, walkID)
+	RWS.totalVisits -= len(walk)
+	for _, nodeID := range walk {
+		RWS.WalksVisiting[nodeID].Remove(walkID)
+	}
+
+	return nil
+}
+
+// PruneWalk() prunes the specified walk, cutting at cutIndex (walk[:cutIndex])
 func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 
 	if err := RWS.Validate(false); err != nil {

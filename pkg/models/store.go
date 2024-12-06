@@ -27,8 +27,7 @@ type RandomWalkStore interface {
 	// WalkPerNode() returns the number of walks to be generated for each node in the DB
 	WalksPerNode() uint16
 
-	// TotalVisits() returns the total number of visits.
-	// In case of any error, the default value 0 is returned.
+	// TotalVisits() returns the total number of visits. In case of any error, the default value 0 is returned.
 	TotalVisits() int
 
 	// IsEmpty() returns whether RWS is empty (ignores errors).
@@ -57,12 +56,14 @@ type RandomWalkStore interface {
 	// AddWalk() adds a walk to the RandomWalkStore.
 	AddWalk(walk RandomWalk) error
 
-	// RemoveWalks() removes all the walks associated with the specified walkIDs
+	// RemoveWalk() removes the walk associated with the walkID
+	RemoveWalk(walkID uint32) error
 
-	// PruneGraftWalk() encapsulates the functions of Pruning and
-	// Grafting ( = appending to) a walk.
-	// These functions need to be coupled together to leverage the atomicity of
-	// Redis transactions.
+	// PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
+	// These functions need to be coupled together to leverage the atomicity of Redis transactions.
+	// example:
+	// 1. Pruning: walk = {0,1,2,3} gets pruned with cutIndex = 1, becoming walk[:cutIndex] = {0,1}
+	// 2. Grafting: walkSegment = {4,5} is added to the walk, resulting in walk = {0,1,4,5}
 	PruneGraftWalk(walkID uint32, cutIndex int, walkSegment RandomWalk) error
 }
 

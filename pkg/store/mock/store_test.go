@@ -649,6 +649,69 @@ func TestAddWalk(t *testing.T) {
 	})
 }
 
+func TestRemoveWalk(t *testing.T) {
+	t.Run("simple errors", func(t *testing.T) {
+		testCases := []struct {
+			name          string
+			RWSType       string
+			expectedError error
+		}{
+			{
+				name:          "nil RWS",
+				RWSType:       "nil",
+				expectedError: models.ErrNilRWSPointer,
+			},
+			{
+				name:          "walk node found",
+				RWSType:       "simple",
+				expectedError: models.ErrWalkNotFound,
+			},
+		}
+
+		for _, test := range testCases {
+			t.Run(test.name, func(t *testing.T) {
+				RWS := SetupRWS(test.RWSType)
+
+				err := RWS.RemoveWalk(69)
+				if !errors.Is(err, test.expectedError) {
+					t.Errorf("RemoveWalk(): expected %v, got %v", test.expectedError, err)
+				}
+			})
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		RWS := SetupRWS("triangle")
+		walkID := uint32(0)
+		removedWalk := []uint32{0, 1, 2}
+		expectedTotalVisits := 6
+
+		if err := RWS.RemoveWalk(walkID); err != nil {
+			t.Fatalf("RemoveWalk(%d): expected nil, got %v", walkID, err)
+		}
+
+		// check the walk has been removed from the WalkIndex
+		if _, exists := RWS.WalkIndex[walkID]; exists {
+			t.Fatalf("RemoveWalk(%d): the walk %v should have been removed", walkID, RWS.WalkIndex[walkID])
+		}
+
+		// check the walkID has been removed from each node
+		expectedWalkSet := mapset.NewSet[uint32](1, 2)
+		for _, nodeID := range removedWalk {
+			walkSet := RWS.WalksVisiting[nodeID]
+
+			if !walkSet.Equal(expectedWalkSet) {
+				t.Errorf("Expected walkset %v, got %v", expectedWalkSet, walkSet)
+			}
+		}
+
+		// check that the total visits have been decreased by len(walk)
+		if RWS.totalVisits != expectedTotalVisits {
+			t.Errorf("RemoveWalk(): expected totalVisits = %v, got %v", expectedTotalVisits, RWS.totalVisits)
+		}
+	})
+}
+
 func TestPruneWalk(t *testing.T) {
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
