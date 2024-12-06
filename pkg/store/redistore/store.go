@@ -154,23 +154,6 @@ func (RWS *RandomWalkStore) IsEmpty() bool {
 	return err != nil || len == 0
 }
 
-// ContainsNode() returns whether RWS contains a given nodeID, meaning if
-// nodeWalkIDs:nodeID exist in Redis. It ignores errors intentionally,
-// returning false in case of any Redis or context issues.
-func (RWS *RandomWalkStore) ContainsNode(nodeID uint32) bool {
-
-	if RWS == nil || RWS.client == nil {
-		return false
-	}
-
-	exist, err := RWS.client.Exists(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
-	if err != nil {
-		return false
-	}
-
-	return exist > 0
-}
-
 // Validate() checks the fields alpha, walksPerNode and whether the RWS is nil, empty or
 // non-empty and returns an appropriate error based on the requirement.
 func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {

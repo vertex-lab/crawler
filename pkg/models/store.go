@@ -41,9 +41,6 @@ type RandomWalkStore interface {
 	// IsEmpty() returns whether RWS is empty (ignores errors).
 	IsEmpty() bool
 
-	// ContainsNode() returns whether RWS contains a given nodeID (ignores errors)
-	ContainsNode(nodeID uint32) bool
-
 	// Validate() checks whether the RWS is nil, empty or non-empty and returns
 	// an appropriate error based on the requirement.
 	Validate(expectEmptyRWS bool) error

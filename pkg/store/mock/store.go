@@ -103,26 +103,6 @@ func (RWS *RandomWalkStore) AllNodes() []uint32 {
 	return nodeIDs
 }
 
-// ContainsWalk() returns whether RWS contains a walkID in the WalkIndex.
-func (RWS *RandomWalkStore) ContainsWalk(walkID uint32) bool {
-	if RWS.IsEmpty() {
-		return false
-	}
-
-	_, exist := RWS.WalkIndex[walkID]
-	return exist
-}
-
-// ContainsNode() returns whether RWS contains a nodeID in the NodeWalkIDSet.
-func (RWS *RandomWalkStore) ContainsNode(nodeID uint32) bool {
-	if RWS.IsEmpty() {
-		return false
-	}
-
-	_, exist := RWS.NodeWalkIDSet[nodeID]
-	return exist
-}
-
 // Validate() checks the fields alpha, walksPerNode and whether the RWS is nil, empty or
 // non-empty and returns an appropriate error based on the requirement.
 func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
@@ -301,11 +281,11 @@ func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 		return err
 	}
 
-	if !RWS.ContainsWalk(walkID) {
+	oldWalk, exists := RWS.WalkIndex[walkID]
+	if !exists {
 		return models.ErrWalkNotFound
 	}
 
-	oldWalk := RWS.WalkIndex[walkID]
 	if cutIndex < 0 || cutIndex > len(oldWalk) {
 		return models.ErrInvalidWalkIndex
 	}
@@ -334,7 +314,7 @@ func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error
 		return err
 	}
 
-	if !RWS.ContainsWalk(walkID) {
+	if _, exists := RWS.WalkIndex[walkID]; !exists {
 		return models.ErrWalkNotFound
 	}
 

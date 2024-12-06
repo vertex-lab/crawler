@@ -321,57 +321,6 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestContainsNode(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
-
-	testCases := []struct {
-		name             string
-		RWSType          string
-		nodeID           uint32
-		expectedContains bool
-	}{
-		{
-			name:             "nil RWS",
-			RWSType:          "nil",
-			nodeID:           0,
-			expectedContains: false,
-		},
-		{
-			name:             "empty RWS",
-			RWSType:          "empty",
-			nodeID:           0,
-			expectedContains: false,
-		},
-		{
-			name:             "nodeID not in RWS",
-			RWSType:          "one-walk0",
-			nodeID:           5,
-			expectedContains: false,
-		},
-		{
-			name:             "nodeID in RWS",
-			RWSType:          "one-walk0",
-			nodeID:           0,
-			expectedContains: true,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			RWS, err := SetupRWS(cl, test.RWSType)
-			if err != nil {
-				t.Fatalf("SetupRWS(): expected nil, got %v", err)
-			}
-
-			contains := RWS.ContainsNode(test.nodeID)
-			if contains != test.expectedContains {
-				t.Errorf("IsEmpty(): expected %v, got %v", test.expectedContains, contains)
-			}
-		})
-	}
-}
-
 func TestVisitCounts(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)

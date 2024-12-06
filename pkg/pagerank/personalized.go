@@ -248,10 +248,6 @@ func checkInputs(DB models.Database, RWS models.RandomWalkStore,
 		return models.ErrNodeNotFoundDB
 	}
 
-	if !RWS.ContainsNode(nodeID) {
-		return models.ErrNodeNotFoundRWS
-	}
-
 	if topK <= 0 {
 		return ErrInvalidTopN
 	}

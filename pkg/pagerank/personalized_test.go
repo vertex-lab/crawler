@@ -64,14 +64,14 @@ func TestCheckInputs(t *testing.T) {
 			topK:          5,
 			expectedError: models.ErrNodeNotFoundDB,
 		},
-		{
-			name:          "node not in RWS",
-			DBType:        "one-node1",
-			RWSType:       "one-node0",
-			nodeID:        1,
-			topK:          5,
-			expectedError: models.ErrNodeNotFoundRWS,
-		},
+		// {
+		// 	name:          "node not in RWS",
+		// 	DBType:        "one-node1",
+		// 	RWSType:       "one-node0",
+		// 	nodeID:        1,
+		// 	topK:          5,
+		// 	expectedError: models.ErrNodeNotFoundRWS,
+		// },
 		{
 			name:          "invalid topK",
 			DBType:        "one-node0",
