@@ -107,3 +107,5 @@ var ErrNilDBPointer = errors.New("database pointer is nil")
 var ErrEmptyDB = errors.New("database is empty")
 var ErrNodeNotFoundDB = errors.New("node not found in the database")
 var ErrNodeAlreadyInDB = errors.New("node already in the database")
+
+var ErrNilClientPointer = errors.New("nil client pointer")

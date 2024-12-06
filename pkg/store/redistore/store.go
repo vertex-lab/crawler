@@ -4,7 +4,6 @@ package redistore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
@@ -12,7 +11,22 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
-// RandomWalkStore fulfills the RandomWalkStore interface defined in models
+const (
+	KeyRWS                 string = "RWS"
+	KeyAlpha               string = "alpha"
+	KeyWalksPerNode        string = "walksPerNode"
+	KeyLastWalkID          string = "lastWalkID"
+	KeyTotalVisits         string = "totalVisits"
+	KeyWalks               string = "walks"
+	KeyWalksVisitingPrefix string = "walksVisiting:"
+)
+
+// KeyWalksVisiting() returns the Redis key for the nodeWalkIDs with specified nodeID
+func KeyWalksVisiting(nodeID uint32) string {
+	return fmt.Sprintf("%v%d", KeyWalksVisitingPrefix, nodeID)
+}
+
+// RandomWalkStore implements the omonimus interface defined in models.
 type RandomWalkStore struct {
 	client       *redis.Client
 	ctx          context.Context
@@ -638,27 +652,3 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		return nil, nil
 	}
 }
-
-//----------------------------------REDIS-KEYS----------------------------------
-
-const KeyRWS string = "RWS"
-const KeyAlpha string = "alpha"
-const KeyWalksPerNode string = "walksPerNode"
-const KeyLastWalkID string = "lastWalkID"
-const KeyTotalVisits string = "totalVisits"
-const KeyWalks string = "walks"
-const KeyWalksVisitingPrefix string = "walksVisiting:"
-
-// // KeyWalk() returns the Redis key for the walk with specified walkID
-// func KeyWalk(walkID uint32) string {
-// 	return fmt.Sprintf("%v%d", KeyWalks, walkID)
-// }
-
-// KeyWalksVisiting() returns the Redis key for the nodeWalkIDs with specified nodeID
-func KeyWalksVisiting(nodeID uint32) string {
-	return fmt.Sprintf("%v%d", KeyWalksVisitingPrefix, nodeID)
-}
-
-//---------------------------------ERROR-CODES---------------------------------
-
-var ErrNilClientPointer = errors.New("nil redis client pointer")
