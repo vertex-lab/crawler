@@ -2,8 +2,6 @@ package models
 
 import (
 	"errors"
-
-	mapset "github.com/deckarep/golang-set/v2"
 )
 
 // RandomWalk represent the slice of nodeIDs visited during the walk (e.g. {1,2,77,5})
@@ -20,13 +18,8 @@ func Validate(walk RandomWalk) error {
 	return nil
 }
 
-// WalkIDSet is a set of IDs of RandomWalks. Each node in the RandomWalkStore
-// is associated with the set of IDs of walks that visit that node.
-type WalkIDSet mapset.Set[uint32]
-
 // RandomWalkStore handles atomic operations to create, update, and remove RandomWalks.
 type RandomWalkStore interface {
-	// ----------------------------------READ----------------------------------
 
 	// Alpha() returns the dampening factor used for the RandomWalks
 	Alpha() float32
@@ -60,8 +53,6 @@ type RandomWalkStore interface {
 	// CommonWalks() returns a map of walks by walkID that contain both nodeID
 	// and at least one of the removedNode in removedNodes.
 	CommonWalks(nodeID uint32, removedNodes []uint32) (map[uint32]RandomWalk, error)
-
-	// ----------------------------------WRITE----------------------------------
 
 	// SetTotalVisits() overwrites the total number of visits.
 	SetTotalVisits(totalVisits int) error

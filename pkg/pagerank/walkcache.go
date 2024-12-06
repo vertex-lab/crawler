@@ -27,10 +27,14 @@ have been used in the personalized walk.
 	should not be reused in the personalized walk, we won't fetch walks that
 	have already been fetched (even if not yet used).
 */
+
+// WalkSet is a set of IDs of RandomWalks.
+type WalkSet mapset.Set[uint32]
+
 type WalkCache struct {
 	NodeWalks     map[uint32][]models.RandomWalk
 	NodeWalkIndex map[uint32]int
-	LoadedWalkIDs models.WalkIDSet
+	LoadedWalkIDs WalkSet
 }
 
 // initializes an empty WC
