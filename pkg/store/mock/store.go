@@ -20,7 +20,7 @@ type RandomWalkStore struct {
 	WalkIndex map[uint32]models.RandomWalk
 
 	// Associates a nodeID to the set of walkIDs that visited that node.
-	WalksVisitingByNode map[uint32]WalkSet
+	WalksVisiting map[uint32]WalkSet
 
 	// The dampening factor, which is the probability of stopping at each step of the random walk. Default is 0.85
 	alpha float32
@@ -45,11 +45,11 @@ func NewRWS(alpha float32, walksPerNode uint16) (*RandomWalkStore, error) {
 	}
 
 	RWS := &RandomWalkStore{
-		WalkIndex:           make(map[uint32]models.RandomWalk),
-		WalksVisitingByNode: make(map[uint32]WalkSet),
-		alpha:               alpha,
-		walksPerNode:        walksPerNode,
-		totalVisits:         0,
+		WalkIndex:     make(map[uint32]models.RandomWalk),
+		WalksVisiting: make(map[uint32]WalkSet),
+		alpha:         alpha,
+		walksPerNode:  walksPerNode,
+		totalVisits:   0,
 	}
 	return RWS, nil
 }
@@ -68,7 +68,7 @@ func (RWS *RandomWalkStore) WalksPerNode() uint16 {
 func (RWS *RandomWalkStore) TotalVisits() int {
 
 	visits := 0
-	for _, walkSet := range RWS.WalksVisitingByNode {
+	for _, walkSet := range RWS.WalksVisiting {
 		visits += walkSet.Cardinality()
 	}
 
@@ -90,7 +90,7 @@ func (RWS *RandomWalkStore) NodeCount() int {
 	if RWS.IsEmpty() {
 		return 0
 	}
-	return len(RWS.WalksVisitingByNode)
+	return len(RWS.WalksVisiting)
 }
 
 // DEPRECATED AllNodes() returns a slice with all the nodeIDs in the RWS.
@@ -100,7 +100,7 @@ func (RWS *RandomWalkStore) AllNodes() []uint32 {
 	}
 
 	nodeIDs := make([]uint32, 0, RWS.NodeCount())
-	for nodeID := range RWS.WalksVisitingByNode {
+	for nodeID := range RWS.WalksVisiting {
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
@@ -138,7 +138,7 @@ func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
 // VisitCounts() returns a map that associates each nodeID with the number of
 // times it was visited by a walk.
 func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error) {
-	if RWS == nil || RWS.WalksVisitingByNode == nil {
+	if RWS == nil || RWS.WalksVisiting == nil {
 		return map[uint32]int{}, models.ErrNilRWSPointer
 	}
 
@@ -149,7 +149,7 @@ func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error
 	visitMap := make(map[uint32]int, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
 
-		walkSet, exists := RWS.WalksVisitingByNode[nodeID]
+		walkSet, exists := RWS.WalksVisiting[nodeID]
 		if !exists {
 			visitMap[nodeID] = 0
 			continue
@@ -168,7 +168,7 @@ func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (WalkSet, error) {
 		return nil, err
 	}
 
-	walkIDs, exist := RWS.WalksVisitingByNode[nodeID]
+	walkIDs, exist := RWS.WalksVisiting[nodeID]
 	if !exist {
 		return nil, models.ErrNodeNotFoundRWS
 	}
@@ -263,14 +263,17 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 	newWalkID := uint32(len(RWS.WalkIndex))
 	RWS.WalkIndex[newWalkID] = walk
 
+	// increase the total visits
+	RWS.totalVisits += len(walk)
+
 	// add the walkID to each node
 	for _, nodeID := range walk {
 		// Initialize the WalkIDSet for nodeID if it doesn't exist
-		if _, exists := RWS.WalksVisitingByNode[nodeID]; !exists {
-			RWS.WalksVisitingByNode[nodeID] = mapset.NewSet[uint32]()
+		if _, exists := RWS.WalksVisiting[nodeID]; !exists {
+			RWS.WalksVisiting[nodeID] = mapset.NewSet[uint32]()
 		}
 
-		RWS.WalksVisitingByNode[nodeID].Add(newWalkID)
+		RWS.WalksVisiting[nodeID].Add(newWalkID)
 	}
 
 	return nil
@@ -297,9 +300,12 @@ func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 	// change the WalkIndex
 	RWS.WalkIndex[walkID] = oldWalk[:cutIndex]
 
+	// decrease the total visits
+	RWS.totalVisits -= len(oldWalk) - cutIndex
+
 	// remove the walkID from each pruned node
 	for _, prunedNodeID := range oldWalk[cutIndex:] {
-		RWS.WalksVisitingByNode[prunedNodeID].Remove(walkID)
+		RWS.WalksVisiting[prunedNodeID].Remove(walkID)
 	}
 
 	return nil
@@ -325,14 +331,17 @@ func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error
 	// graft the walk
 	RWS.WalkIndex[walkID] = append(RWS.WalkIndex[walkID], walkSegment...)
 
+	// increase the total visits
+	RWS.totalVisits += len(walkSegment)
+
 	// add the walkID to each grafted node
 	for _, nodeID := range walkSegment {
 		// Initialize the WalkIDSet for nodeID if it doesn't exist
-		if _, exists := RWS.WalksVisitingByNode[nodeID]; !exists {
-			RWS.WalksVisitingByNode[nodeID] = mapset.NewSet[uint32]()
+		if _, exists := RWS.WalksVisiting[nodeID]; !exists {
+			RWS.WalksVisiting[nodeID] = mapset.NewSet[uint32]()
 		}
 
-		RWS.WalksVisitingByNode[nodeID].Add(walkID)
+		RWS.WalksVisiting[nodeID].Add(walkID)
 	}
 
 	return nil
@@ -413,20 +422,23 @@ func SetupRWS(RWSType string) *RandomWalkStore {
 	case "one-node0":
 		RWS, _ := NewRWS(0.85, 1)
 		RWS.WalkIndex[0] = models.RandomWalk{0}
-		RWS.WalksVisitingByNode[0] = mapset.NewSet[uint32](0)
+		RWS.WalksVisiting[0] = mapset.NewSet[uint32](0)
+		RWS.totalVisits = 1
 		return RWS
 
 	case "one-node1":
 		RWS, _ := NewRWS(0.85, 1)
 		RWS.WalkIndex[0] = models.RandomWalk{1}
-		RWS.WalksVisitingByNode[1] = mapset.NewSet[uint32](0)
+		RWS.WalksVisiting[1] = mapset.NewSet[uint32](0)
+		RWS.totalVisits = 1
 		return RWS
 
 	case "simple":
 		RWS, _ := NewRWS(0.85, 1)
 		RWS.WalkIndex[0] = models.RandomWalk{0, 1}
-		RWS.WalksVisitingByNode[0] = mapset.NewSet[uint32](0)
-		RWS.WalksVisitingByNode[1] = mapset.NewSet[uint32](0)
+		RWS.WalksVisiting[0] = mapset.NewSet[uint32](0)
+		RWS.WalksVisiting[1] = mapset.NewSet[uint32](0)
+		RWS.totalVisits = 2
 		return RWS
 
 	case "triangle":
@@ -435,9 +447,10 @@ func SetupRWS(RWSType string) *RandomWalkStore {
 		RWS.WalkIndex[0] = models.RandomWalk{0, 1, 2}
 		RWS.WalkIndex[1] = models.RandomWalk{1, 2, 0}
 		RWS.WalkIndex[2] = models.RandomWalk{2, 0, 1}
-		RWS.WalksVisitingByNode[0] = mapset.NewSet[uint32](0, 1, 2)
-		RWS.WalksVisitingByNode[1] = mapset.NewSet[uint32](0, 1, 2)
-		RWS.WalksVisitingByNode[2] = mapset.NewSet[uint32](0, 1, 2)
+		RWS.WalksVisiting[0] = mapset.NewSet[uint32](0, 1, 2)
+		RWS.WalksVisiting[1] = mapset.NewSet[uint32](0, 1, 2)
+		RWS.WalksVisiting[2] = mapset.NewSet[uint32](0, 1, 2)
+		RWS.totalVisits = 9
 		return RWS
 
 	case "complex":
@@ -447,10 +460,11 @@ func SetupRWS(RWSType string) *RandomWalkStore {
 		RWS.WalkIndex[0] = models.RandomWalk{0, 1, 2}
 		RWS.WalkIndex[1] = models.RandomWalk{0, 3}
 		RWS.WalkIndex[2] = models.RandomWalk{1, 2}
-		RWS.WalksVisitingByNode[0] = mapset.NewSet[uint32](0, 1)
-		RWS.WalksVisitingByNode[1] = mapset.NewSet[uint32](0, 2)
-		RWS.WalksVisitingByNode[2] = mapset.NewSet[uint32](0, 2)
-		RWS.WalksVisitingByNode[3] = mapset.NewSet[uint32](1)
+		RWS.WalksVisiting[0] = mapset.NewSet[uint32](0, 1)
+		RWS.WalksVisiting[1] = mapset.NewSet[uint32](0, 2)
+		RWS.WalksVisiting[2] = mapset.NewSet[uint32](0, 2)
+		RWS.WalksVisiting[3] = mapset.NewSet[uint32](1)
+		RWS.totalVisits = 7
 		return RWS
 
 	default:

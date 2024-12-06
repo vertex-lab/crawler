@@ -691,12 +691,15 @@ func TestAddWalk(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
+		walk := models.RandomWalk{1, 2, 3}
+		expectedLastWalkID := uint32(0)
+		expectedTotalVisits := len(walk)
+
 		RWS, err := SetupRWS(cl, "empty")
 		if err != nil {
 			t.Fatalf("SetupRWS(): expected nil, got %v", err)
 		}
 
-		walk := models.RandomWalk{1, 2, 3}
 		if err := RWS.AddWalk(walk); err != nil {
 			t.Fatalf("AddWalk(): expected nil, got %v", err)
 		}
@@ -706,52 +709,59 @@ func TestAddWalk(t *testing.T) {
 		if err != nil {
 			t.Fatalf("HGet(): expected nil, got %v", err)
 		}
-
 		lastWalkID, err := redisutils.ParseID(strLastWalkID)
 		if err != nil {
 			t.Fatalf("ParseID(): expected nil, got %v", err)
 		}
-
-		if lastWalkID != 0 {
-			t.Errorf("AddWalk(): expected walkID = 1, got %v", lastWalkID)
+		if lastWalkID != expectedLastWalkID {
+			t.Errorf("AddWalk(): expected walkID = %v, got %v", expectedLastWalkID, lastWalkID)
 		}
 
-		// Load the walk from Redis
+		// check if the two loaded walk matches the original
 		strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, "0").Result()
 		if err != nil {
 			t.Fatalf("Get(): expected nil, got %v", err)
 		}
-
 		loadedWalk, err := redisutils.ParseWalk(strWalk)
 		if err != nil {
 			t.Fatalf("ParseWalk(): expected nil, got %v", err)
 		}
-
-		// check if the two walks match
 		if !reflect.DeepEqual(walk, loadedWalk) {
 			t.Errorf("AddWalk(): expected %v, got %v", walk, loadedWalk)
 		}
 
-		// check that each node is associated with the walkID = 0
+		// check that each node is associated with the walkID
 		for _, nodeID := range walk {
-
 			// Get the only walkID associated with nodeID
 			strWalkID, err := RWS.client.SRandMember(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
 			if err != nil {
 				t.Fatalf("SRandMember(): expected nil, got %v", err)
 			}
-
-			// Parse it to a walkID
 			loadedWalkID, err := redisutils.ParseID(strWalkID)
 			if err != nil {
 				t.Fatalf("ParseID(): expected nil, got %v", err)
 			}
 
 			// check it matches the intended walkID
-			if loadedWalkID != 0 {
+			if loadedWalkID != expectedLastWalkID {
 				t.Errorf("AddWalk(): expected %v, got %v", 0, loadedWalkID)
 			}
 		}
+
+		// check the total visits
+		strVisits, err := cl.HGet(RWS.ctx, KeyRWS, KeyTotalVisits).Result()
+		if err != nil {
+			t.Errorf("TotalVisits(): expected nil, got %v", err)
+		}
+		visits, err := redisutils.ParseInt64(strVisits)
+		if err != nil {
+			t.Errorf("unexpected result type: %v", strVisits)
+		}
+
+		if visits != int64(expectedTotalVisits) {
+			t.Errorf("AddWalk(): expected total visits %v, got %v", expectedTotalVisits, visits)
+		}
+
 	})
 }
 
@@ -811,46 +821,49 @@ func TestPruneGraftWalk(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		testCases := []struct {
-			name           string
-			RWSType        string
-			walkID         uint32
-			cutIndex       int
-			oldWalk        models.RandomWalk
-			newWalkSegment models.RandomWalk
-			expectedWalk   models.RandomWalk
+			name                string
+			RWSType             string
+			walkID              uint32
+			cutIndex            int
+			oldWalk             models.RandomWalk
+			newWalkSegment      models.RandomWalk
+			expectedWalk        models.RandomWalk
+			expectedTotalVisits int
 		}{
 			{
-				name:           "pruning only",
-				RWSType:        "one-walk0",
-				walkID:         0,
-				cutIndex:       2,
-				oldWalk:        models.RandomWalk{0, 1, 2, 3},
-				newWalkSegment: models.RandomWalk{},
-				expectedWalk:   models.RandomWalk{0, 1},
+				name:                "pruning only",
+				RWSType:             "one-walk0",
+				walkID:              0,
+				cutIndex:            2,
+				oldWalk:             models.RandomWalk{0, 1, 2, 3},
+				newWalkSegment:      models.RandomWalk{},
+				expectedWalk:        models.RandomWalk{0, 1},
+				expectedTotalVisits: 2,
 			},
 			{
-				name:           "grafting only",
-				RWSType:        "one-walk0",
-				walkID:         0,
-				cutIndex:       4, //  the lenght of the walk
-				oldWalk:        models.RandomWalk{0, 1, 2, 3},
-				newWalkSegment: models.RandomWalk{4, 5},
-				expectedWalk:   models.RandomWalk{0, 1, 2, 3, 4, 5},
+				name:                "grafting only",
+				RWSType:             "one-walk0",
+				walkID:              0,
+				cutIndex:            4, //  the lenght of the walk
+				oldWalk:             models.RandomWalk{0, 1, 2, 3},
+				newWalkSegment:      models.RandomWalk{4, 5},
+				expectedWalk:        models.RandomWalk{0, 1, 2, 3, 4, 5},
+				expectedTotalVisits: 6,
 			},
 			{
-				name:           "pruning and grafting",
-				RWSType:        "one-walk0",
-				walkID:         0,
-				cutIndex:       1, //  the lenght of the walk
-				oldWalk:        models.RandomWalk{0, 1, 2, 3},
-				newWalkSegment: models.RandomWalk{4, 5},
-				expectedWalk:   models.RandomWalk{0, 4, 5},
+				name:                "pruning and grafting",
+				RWSType:             "one-walk0",
+				walkID:              0,
+				cutIndex:            1,
+				oldWalk:             models.RandomWalk{0, 1, 2, 3},
+				newWalkSegment:      models.RandomWalk{4, 5},
+				expectedWalk:        models.RandomWalk{0, 4, 5},
+				expectedTotalVisits: 3,
 			},
 		}
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-
 				RWS, err := SetupRWS(cl, test.RWSType)
 				if err != nil {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
@@ -897,6 +910,21 @@ func TestPruneGraftWalk(t *testing.T) {
 					if size != 0 {
 						t.Errorf("PruneGraftWalk(%d): expected empty set, got carinality = %v", nodeID, size)
 					}
+				}
+
+				// check the total visits
+				strVisits, err := cl.HGet(RWS.ctx, KeyRWS, KeyTotalVisits).Result()
+				if err != nil {
+					t.Errorf("TotalVisits(): expected nil, got %v", err)
+				}
+
+				visits, err := redisutils.ParseInt64(strVisits)
+				if err != nil {
+					t.Errorf("unexpected result type: %v", strVisits)
+				}
+
+				if visits != int64(test.expectedTotalVisits) {
+					t.Errorf("TotalVisits(): expected %v, got %v", test.expectedTotalVisits, visits)
 				}
 
 			})

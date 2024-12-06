@@ -78,7 +78,7 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 
 	if cl == nil {
-		return nil, ErrNilClientPointer
+		return nil, models.ErrNilClientPointer
 	}
 
 	cmdReturn := cl.HMGet(ctx, KeyRWS, KeyAlpha, KeyWalksPerNode)
@@ -196,7 +196,7 @@ func (RWS *RandomWalkStore) validateFields() error {
 	}
 
 	if RWS.client == nil {
-		return ErrNilClientPointer
+		return models.ErrNilClientPointer
 	}
 
 	if RWS.alpha <= 0.0 || RWS.alpha >= 1.0 {
@@ -460,18 +460,17 @@ func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
 		return err
 	}
 
-	// begin the transaction
 	pipe := RWS.client.TxPipeline()
 
-	// add the walk to the walks HASH
+	// add the walk to the walks HASH, and increase the total walks
 	pipe.HSet(RWS.ctx, KeyWalks, redisutils.FormatID(uint32(walkID)), redisutils.FormatWalk(walk))
+	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, int64(len(walk)))
 
 	// add the walkID to each node
 	for _, nodeID := range walk {
 		pipe.SAdd(RWS.ctx, KeyWalksVisiting(nodeID), walkID)
 	}
 
-	// execute the transaction
 	if _, err = pipe.Exec(RWS.ctx); err != nil {
 		return fmt.Errorf("AddWalk(%v) failed to execute: %v", walk, err)
 	}
@@ -509,10 +508,8 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 		return models.ErrInvalidWalkIndex
 	}
 
-	// Begins the transaction
-	pipe := RWS.client.TxPipeline()
-
 	// remove the walkID form each pruned node
+	pipe := RWS.client.TxPipeline()
 	for _, prunedNodeID := range walk[cutIndex:] {
 		pipe.SRem(RWS.ctx, KeyWalksVisiting(prunedNodeID), walkID)
 	}
@@ -522,11 +519,14 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 		pipe.SAdd(RWS.ctx, KeyWalksVisiting(graftedNodeID), walkID)
 	}
 
+	// update the totalVisits
+	diff := len(walkSegment) - (len(walk) - cutIndex)
+	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, int64(diff))
+
 	// prune and graft operation on the walk
 	newWalk := append(walk[:cutIndex], walkSegment...)
 	pipe.HSet(RWS.ctx, KeyWalks, walkIDKey, redisutils.FormatWalk(newWalk))
 
-	// Execute the transaction
 	if _, err = pipe.Exec(RWS.ctx); err != nil {
 		return fmt.Errorf("PruneGraftWalk(%v) failed to execute: %v", walk, err)
 	}
@@ -537,7 +537,7 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 // SetupRWS returns a RandomWalkStore ready to be used in tests
 func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 	if cl == nil {
-		return nil, ErrNilClientPointer
+		return nil, models.ErrNilClientPointer
 	}
 
 	switch RWSType {
@@ -596,6 +596,10 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		if err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyLastWalkID, 1).Err(); err != nil {
+			return nil, err
+		}
+
+		if err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, int64(len(walk))).Err(); err != nil {
 			return nil, err
 		}
 

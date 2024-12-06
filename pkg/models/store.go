@@ -54,9 +54,6 @@ type RandomWalkStore interface {
 	// and at least one of the removedNode in removedNodes.
 	CommonWalks(nodeID uint32, removedNodes []uint32) (map[uint32]RandomWalk, error)
 
-	// SetTotalVisits() overwrites the total number of visits.
-	SetTotalVisits(totalVisits int) error
-
 	// AddWalk() adds a walk to the RandomWalkStore.
 	AddWalk(walk RandomWalk) error
 

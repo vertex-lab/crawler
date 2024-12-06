@@ -42,11 +42,6 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMa
 		totalVisits += float64(visits)
 	}
 
-	// update the value of totalVisits
-	if err := RWS.SetTotalVisits(int(totalVisits)); err != nil {
-		return nil, err
-	}
-
 	// compute the pagerank as the frequency of visits
 	pagerank := make(models.PagerankMap, len(nodeIDs))
 	for nodeID, visits := range visitMap {

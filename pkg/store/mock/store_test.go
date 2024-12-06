@@ -583,7 +583,6 @@ func TestWalksRand(t *testing.T) {
 }
 
 func TestAddWalk(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -623,7 +622,6 @@ func TestAddWalk(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-
 		RWS := SetupRWS("empty")
 		walk := models.RandomWalk{1, 2, 3}
 
@@ -638,14 +636,15 @@ func TestAddWalk(t *testing.T) {
 
 		// check that each node is associated with the walkID = 0
 		for _, nodeID := range walk {
-			walkSet, err := RWS.WalkIDs(nodeID)
-			if err != nil {
-				t.Fatalf("WalkIDs(%d): expected nil, got %v", nodeID, err)
-			}
-
+			walkSet := RWS.WalksVisiting[nodeID]
 			if !walkSet.Equal(mapset.NewSet[uint32](0)) {
 				t.Errorf("AddWalk(): nodeID = %d; expected {0}, got %v", nodeID, walkSet)
 			}
+		}
+
+		// check that the total visits have been increased by len(walk)
+		if RWS.totalVisits != len(walk) {
+			t.Errorf("AddWalk(): expected totalVisits = %v, got %v", len(walk), RWS.totalVisits)
 		}
 	})
 }
@@ -701,6 +700,8 @@ func TestPruneWalk(t *testing.T) {
 		RWS := SetupRWS("simple")
 		walkID := uint32(0)
 		expectedPrunedWalk := models.RandomWalk{0}
+		expectedTotalVisits := 1
+
 		if err := RWS.PruneWalk(walkID, 1); err != nil {
 			t.Fatalf("PruneWalk(): expected nil, got %v", err)
 		}
@@ -711,23 +712,20 @@ func TestPruneWalk(t *testing.T) {
 		}
 
 		// check the walk remains
-		walkSet0, err := RWS.WalkIDs(0)
-		if err != nil {
-			t.Fatalf("WalkIDs(0): expected nil, got %v", err)
-		}
-
+		walkSet0 := RWS.WalksVisiting[0]
 		if !walkSet0.Equal(mapset.NewSet[uint32](0)) {
-			t.Errorf("PruneWalk(): expected {{1}}, got %v", walkSet0)
+			t.Errorf("PruneWalk(): expected {{0}}, got %v", walkSet0)
 		}
 
 		// check the walks was removed
-		walkSet2, err := RWS.WalkIDs(1)
-		if err != nil {
-			t.Fatalf("WalkIDs(1): expected nil, got %v", err)
+		walkSet1 := RWS.WalksVisiting[1]
+		if !walkSet1.IsEmpty() {
+			t.Errorf("PruneWalk(): expected empty set, got %v", walkSet1)
 		}
 
-		if !walkSet2.IsEmpty() {
-			t.Errorf("PruneWalk(): expected empty set, got %v", walkSet2)
+		// check the totalVisits
+		if RWS.totalVisits != expectedTotalVisits {
+			t.Errorf("PruneWalk(): expected total visits %v, got %v", expectedTotalVisits, RWS.totalVisits)
 		}
 	})
 }
@@ -775,13 +773,14 @@ func TestGraftWalk(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-
 		RWS := SetupRWS("simple")
+		walkID := uint32(0)
 		walkSegment := []uint32{2, 3, 4}
 		expectedGraftedWalk := models.RandomWalk{0, 1, 2, 3, 4}
+		expectedTotalVisits := len(expectedGraftedWalk)
 		expectedWalkSet := mapset.NewSet[uint32](0)
 
-		if err := RWS.GraftWalk(0, walkSegment); err != nil {
+		if err := RWS.GraftWalk(walkID, walkSegment); err != nil {
 			t.Fatalf("GraftWalk(): expected nil, got %v", err)
 		}
 
@@ -793,14 +792,15 @@ func TestGraftWalk(t *testing.T) {
 		// check if the walk is present in all walkSets
 		for _, nodeID := range expectedGraftedWalk {
 
-			walkSet, err := RWS.WalkIDs(nodeID)
-			if err != nil {
-				t.Fatalf("WalkIDs(): expected nil, got %v", err)
-			}
-
+			walkSet := RWS.WalksVisiting[nodeID]
 			if !walkSet.Equal(expectedWalkSet) {
 				t.Errorf("GraftWalk(): nodeID = %d; expected %v, got %v", nodeID, expectedWalkSet, walkSet)
 			}
+		}
+
+		// check the total visits
+		if RWS.totalVisits != expectedTotalVisits {
+			t.Errorf("GraftWalk(): expected total visits %v, got %v", expectedTotalVisits, RWS.totalVisits)
 		}
 	})
 }
