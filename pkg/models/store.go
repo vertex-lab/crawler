@@ -72,6 +72,8 @@ type RandomWalkStore interface {
 	// AddWalk() adds a walk to the RandomWalkStore.
 	AddWalk(walk RandomWalk) error
 
+	// RemoveWalks() removes all the walks associated with the specified walkIDs
+
 	// PruneGraftWalk() encapsulates the functions of Pruning and
 	// Grafting ( = appending to) a walk.
 	// These functions need to be coupled together to leverage the atomicity of

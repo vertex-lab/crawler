@@ -97,7 +97,7 @@ func TestPagerank(t *testing.T) {
 
 			// in case of no errors, check the pagerank and the totalVisits.
 			if err == nil {
-				if models.Distance(pagerank, test.expectedPagerank) > 1e-10 {
+				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
 					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
 				}
 
@@ -192,7 +192,7 @@ func TestLazyPagerank(t *testing.T) {
 
 			// if provided, check the pagerank is equal to the expected
 			if test.expectedPagerank != nil {
-				if models.Distance(pagerank, test.expectedPagerank) > 1e-10 {
+				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
 					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
 				}
 			}

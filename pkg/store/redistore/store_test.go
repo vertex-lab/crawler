@@ -1042,3 +1042,76 @@ func BenchmarkVisitCountsLUA(b *testing.B) {
 		}
 	})
 }
+
+// WAY TOO SLOW. BETTER TO HAVE THIS FILTERING DONE CLIENT SIDE, WHICH MEANS ONE
+// LESS METHOD OF THE INTERFACE!
+func BenchmarkCommonWalks(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	RWS, err := LoadRWS(ctx, cl)
+	if err != nil {
+		b.Fatalf("LoadRWS(): expected nil, got %v", err)
+	}
+
+	removedNodes := []uint32{0, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	for i := 0; i < b.N; i++ {
+		if _, err := RWS.CommonWalks(1, removedNodes); err != nil {
+			b.Fatalf("benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkWalksRand(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	RWS, err := LoadRWS(ctx, cl)
+	if err != nil {
+		b.Fatalf("LoadRWS(): expected nil, got %v", err)
+	}
+
+	var probabilityOfSelection float32 = 0.03
+	for i := 0; i < b.N; i++ {
+		if _, err := RWS.WalksRand(1, probabilityOfSelection); err != nil {
+			b.Fatalf("benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkWalks(b *testing.B) {
+	b.Run("FixedDB", func(b *testing.B) {
+		nodesSize := 1000
+		edgesPerNode := 100
+		rng := rand.New(rand.NewSource(69))
+
+		// Different DB sizes
+		for _, walkPerNode := range []int{1, 10, 100} {
+			b.Run(fmt.Sprintf("walksPerNode=%d", walkPerNode), func(b *testing.B) {
+				cl := redisutils.SetupClient()
+				defer redisutils.CleanupRedis(cl)
+
+				// Setup DB and RWS
+				DB, err := redisdb.GenerateDB(cl, nodesSize, edgesPerNode, rng)
+				if err != nil {
+					b.Fatalf("GenerateDB(): expected nil, got %v", err)
+				}
+				RWS, err := NewRWS(context.Background(), cl, 0.85, uint16(walkPerNode))
+				if err != nil {
+					b.Fatalf("NewRWS(): expected nil, got %v", err)
+				}
+				RWM := walks.RandomWalkManager{Store: RWS}
+				if err := RWM.GenerateAll(DB); err != nil {
+					b.Fatalf("GenerateAll(): expected nil, got %v", err)
+				}
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := RWS.Walks(0, -1); err != nil {
+						b.Fatalf("benchmark failed: %v", err)
+					}
+				}
+			})
+		}
+	})
+}

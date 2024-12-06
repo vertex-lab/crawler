@@ -127,7 +127,7 @@ func TestCountAndNormalize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			pp := countAndNormalize(test.longWalk)
-			if models.Distance(test.expectedPP, pp) > 1e-10 {
+			if Distance(test.expectedPP, pp) > 1e-10 {
 				t.Fatalf("countAndNormalize(): expected %v, got %v", test.expectedPP, pp)
 			}
 		})

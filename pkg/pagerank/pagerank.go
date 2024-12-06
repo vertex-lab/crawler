@@ -2,8 +2,18 @@
 package pagerank
 
 import (
+	"math"
+
 	"github.com/vertex-lab/crawler/pkg/models"
 )
+
+func Distance(map1, map2 models.PagerankMap) float64 {
+	distance := 0.0
+	for key := range map1 {
+		distance += math.Abs(map1[key] - map2[key])
+	}
+	return distance
+}
 
 // Pagerank() computes the pagerank score for each node in the database.
 func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMap, error) {

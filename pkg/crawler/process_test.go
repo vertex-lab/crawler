@@ -13,6 +13,7 @@ import (
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/logger"
 	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/pagerank"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -255,15 +256,15 @@ func TestProcessFollowListEvent(t *testing.T) {
 				t.Fatalf("ProcessFollowListEvent(event%d): expected nil, got %v", i, err)
 			}
 
-			pagerank := models.PagerankMap{}
+			pagerankMap := models.PagerankMap{}
 			for nodeID, node := range DB.NodeIndex {
-				pagerank[nodeID] = node.Metadata.Pagerank
+				pagerankMap[nodeID] = node.Metadata.Pagerank
 			}
 
-			distance := models.Distance(pagerank, expectedPagerank[i])
+			distance := pagerank.Distance(pagerankMap, expectedPagerank[i])
 			if distance > maxDist {
 				t.Errorf("Expected distance %v, got %v", maxDist, distance)
-				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], pagerank)
+				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], pagerankMap)
 			}
 		}
 	})

@@ -31,7 +31,7 @@ func main() {
 	cl := redisutils.SetupClient()
 	//defer redisutils.CleanupRedis(cl)
 
-	DB, err := redisdb.SetupDB(cl, "pip")
+	DB, err := redisdb.SetupDB(cl, "fran-pip")
 	if err != nil {
 		panic(err)
 	}

@@ -762,6 +762,37 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 		}
 		return DB, nil
 
+	case "fran-pip":
+		const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
+		const fran = "726a1e261cc6474674e8285e3951b3bb139be9a773d1acf49dc868db861a1c11"
+		pks := []string{fran, pip}
+
+		DB, err := NewDatabase(ctx, cl)
+		if err != nil {
+			return nil, err
+		}
+
+		initialPagerank := 1.0 / float64(len(pks))
+		for _, pk := range pks {
+
+			node := models.Node{
+				Metadata: models.NodeMeta{
+					Pubkey:   pk,
+					EventTS:  0,
+					Status:   models.StatusInactive,
+					Pagerank: initialPagerank,
+				},
+				Successors:   []uint32{},
+				Predecessors: []uint32{},
+			}
+
+			if _, err := DB.AddNode(&node); err != nil {
+				return nil, err
+			}
+		}
+
+		return DB, nil
+
 	case "triangle":
 
 		DB, err := NewDatabase(context.Background(), cl)

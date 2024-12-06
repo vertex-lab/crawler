@@ -98,6 +98,9 @@ type Database interface {
 	SetPagerank(PagerankMap) error
 }
 
+// a map that associates each nodeID with its corrisponding pagerank value
+type PagerankMap map[uint32]float64
+
 //--------------------------ERROR-CODES--------------------------
 
 var ErrNilDBPointer = errors.New("database pointer is nil")
