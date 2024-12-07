@@ -246,50 +246,66 @@ func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
 	return walkMap, nil
 }
 
-// AddWalk() adds the walk to the RWS.
-func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
+// AddWalks() adds all the specified walks to the RWS. If at least one of the walks
+// is invalid, no one gets added.
+func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 
 	if RWS == nil {
 		return models.ErrNilRWSPointer
 	}
 
-	if err := models.Validate(walk); err != nil {
-		return err
+	if len(walks) == 0 {
+		return nil
 	}
 
-	newWalkID := uint32(len(RWS.WalkIndex))
-	RWS.WalkIndex[newWalkID] = walk
-	RWS.totalVisits += len(walk)
-
-	// add the walkID to each node
-	for _, nodeID := range walk {
-		// Initialize the WalkIDSet for nodeID if it doesn't exist
-		if _, exists := RWS.WalksVisiting[nodeID]; !exists {
-			RWS.WalksVisiting[nodeID] = mapset.NewSet[uint32]()
+	for _, walk := range walks {
+		if err := models.Validate(walk); err != nil {
+			return err
 		}
+	}
 
-		RWS.WalksVisiting[nodeID].Add(newWalkID)
+	for _, walk := range walks {
+		walkID := uint32(len(RWS.WalkIndex))
+		RWS.WalkIndex[walkID] = walk
+		RWS.totalVisits += len(walk)
+
+		// add the walkID to each node
+		for _, nodeID := range walk {
+			// Initialize the WalkIDSet for nodeID if it doesn't exist
+			if _, exists := RWS.WalksVisiting[nodeID]; !exists {
+				RWS.WalksVisiting[nodeID] = mapset.NewSet[uint32]()
+			}
+
+			RWS.WalksVisiting[nodeID].Add(walkID)
+		}
 	}
 
 	return nil
 }
 
-// RemoveWalk() removes the specified walk
-func (RWS *RandomWalkStore) RemoveWalk(walkID uint32) error {
+// RemoveWalks() removes the all the specified walks from the RWS. If one walkID
+// is not found, no walk gets removed.
+func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 
 	if err := RWS.Validate(false); err != nil {
 		return err
 	}
 
-	walk, exists := RWS.WalkIndex[walkID]
-	if !exists {
-		return models.ErrWalkNotFound
+	for _, walkID := range walkIDs {
+		_, exists := RWS.WalkIndex[walkID]
+		if !exists {
+			return models.ErrWalkNotFound
+		}
 	}
 
-	delete(RWS.WalkIndex, walkID)
-	RWS.totalVisits -= len(walk)
-	for _, nodeID := range walk {
-		RWS.WalksVisiting[nodeID].Remove(walkID)
+	for _, walkID := range walkIDs {
+		walk := RWS.WalkIndex[walkID]
+		delete(RWS.WalkIndex, walkID)
+		RWS.totalVisits -= len(walk)
+
+		for _, nodeID := range walk {
+			RWS.WalksVisiting[nodeID].Remove(walkID)
+		}
 	}
 
 	return nil

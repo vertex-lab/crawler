@@ -39,15 +39,47 @@ func ParseWalk(strWalk string) (models.RandomWalk, error) {
 	return walk, nil
 }
 
-// FormatID() formats a nodeID or walkID (uint32) into a string
+// FormatID() formats an ID into a string
 func FormatID(ID uint32) string {
 	return strconv.FormatUint(uint64(ID), 10)
 }
 
 // ParseID() parses a nodeID or walkID (uint32) from the specified string
-func ParseID(strVal string) (uint32, error) {
-	parsedVal, err := strconv.ParseUint(strVal, 10, 32)
-	return uint32(parsedVal), err
+func ParseID(strID string) (uint32, error) {
+	ID, err := strconv.ParseUint(strID, 10, 32)
+	return uint32(ID), err
+}
+
+// FormatIDs() formats a slice of IDs into a slice of string.
+func FormatIDs(IDs []uint32) []string {
+	if len(IDs) == 0 {
+		return []string{}
+	}
+
+	strIDs := make([]string, 0, len(IDs))
+	for _, ID := range IDs {
+		strIDs = append(strIDs, FormatID(ID))
+	}
+
+	return strIDs
+}
+
+// ParseIDs() parses a slice of IDs from the specified slice of string.
+func ParseIDs(strIDs []string) ([]uint32, error) {
+	if len(strIDs) == 0 {
+		return []uint32{}, nil
+	}
+
+	IDs := make([]uint32, 0, len(strIDs))
+	for _, strID := range strIDs {
+		ID, err := ParseID(strID)
+		if err != nil {
+			return []uint32{}, nil
+		}
+
+		IDs = append(IDs, ID)
+	}
+	return IDs, nil
 }
 
 // ParseInt64() parses an int from the specified string

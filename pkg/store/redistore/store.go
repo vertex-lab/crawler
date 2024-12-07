@@ -440,70 +440,100 @@ func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
 	return redisutils.ParseWalkMap(result)
 }
 
-// AddWalk() adds the walk to the WalkIndex. It also adds the walkID to the
-// WalkIDSet of each node the walk visited. This means that for each node
-// visited by the walk, the walkID will be added to its WalkSet.
-func (RWS *RandomWalkStore) AddWalk(walk models.RandomWalk) error {
+// AddWalks() adds all the specified walks to the RWS. If at least one of the walks
+// is invalid, no one gets added.
+func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 
 	if err := RWS.validateFields(); err != nil {
 		return err
 	}
 
-	if err := models.Validate(walk); err != nil {
-		return err
+	if len(walks) == 0 {
+		return nil
 	}
 
-	// assign a new walkID to this walk. It's not possible to do it inside the tx,
+	for _, walk := range walks {
+		if err := models.Validate(walk); err != nil {
+			return err
+		}
+	}
+
+	// assign a new walkID to the last walk. It's not possible to do it inside the tx,
 	// which means there might be "holes" in the walkIndex, meaning walkIDs NOT associated to any walk.
-	walkID, err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyLastWalkID, 1).Result()
+	lastID, err := RWS.client.HIncrBy(RWS.ctx, KeyRWS, KeyLastWalkID, int64(len(walks))).Result()
 	if err != nil {
 		return err
 	}
 
 	pipe := RWS.client.TxPipeline()
+	var newVisits int64 = 0
+	for i, walk := range walks {
+		walkID := uint32(int(lastID) - len(walks) + i + 1) // assigning IDs in the same order
 
-	// add the walk to the walks HASH, and increase the total walks
-	pipe.HSet(RWS.ctx, KeyWalks, redisutils.FormatID(uint32(walkID)), redisutils.FormatWalk(walk))
-	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, int64(len(walk)))
+		pipe.HSet(RWS.ctx, KeyWalks, redisutils.FormatID(walkID), redisutils.FormatWalk(walk))
 
-	// add the walkID to each node
-	for _, nodeID := range walk {
-		pipe.SAdd(RWS.ctx, KeyWalksVisiting(nodeID), walkID)
+		// add the walkID to each node
+		for _, nodeID := range walk {
+			pipe.SAdd(RWS.ctx, KeyWalksVisiting(nodeID), walkID)
+		}
+
+		newVisits += int64(len(walk))
 	}
+	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, newVisits)
 
 	if _, err = pipe.Exec(RWS.ctx); err != nil {
-		return fmt.Errorf("AddWalk(%v) failed to execute: %v", walk, err)
+		return fmt.Errorf("AddWalk(%v) failed to execute: %v", walks, err)
 	}
 
 	return nil
 }
 
-// RemoveWalk() removes a walk from the RWS
-func (RWS *RandomWalkStore) RemoveWalk(walkID uint32) error {
+// RemoveWalks() removes the all the specified walks from the RWS. If one walkID
+// is not found, no walk gets removed.
+func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 
 	if err := RWS.validateFields(); err != nil {
 		return err
 	}
 
-	strWalkID := redisutils.FormatID(walkID)
-	strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, strWalkID).Result()
-	if err != nil {
-		return err
+	if len(walkIDs) == 0 {
+		return nil
 	}
-	walk, err := redisutils.ParseWalk(strWalk)
+
+	strIDs := redisutils.FormatIDs(walkIDs)
+	res, err := RWS.client.HMGet(RWS.ctx, KeyWalks, strIDs...).Result()
 	if err != nil {
 		return err
 	}
 
-	// remove the walk and decrease the total visits
+	walks := make([]models.RandomWalk, 0, len(walkIDs))
+	for _, r := range res {
+		strWalk, ok := r.(string)
+		if !ok {
+			return fmt.Errorf("%w: unexpected return type: %v", models.ErrWalkNotFound, res)
+		}
+
+		walk, err := redisutils.ParseWalk(strWalk)
+		if err != nil {
+			return fmt.Errorf("unexpected return type: %v", strWalk)
+		}
+
+		walks = append(walks, walk)
+	}
+
+	var removedVisits int64 = 0.0
 	pipe := RWS.client.TxPipeline()
-	pipe.HDel(RWS.ctx, KeyWalks, strWalkID)
-	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, -int64(len(walk)))
 
-	// remove the walkID from each node
-	for _, nodeID := range walk {
-		pipe.SRem(RWS.ctx, KeyWalksVisiting(nodeID), strWalkID)
+	for i, strID := range strIDs {
+		pipe.HDel(RWS.ctx, KeyWalks, strID)
+
+		for _, nodeID := range walks[i] {
+			pipe.SRem(RWS.ctx, KeyWalksVisiting(nodeID), strID)
+		}
+
+		removedVisits += int64(len(walks[i]))
 	}
+	pipe.HIncrBy(RWS.ctx, KeyRWS, KeyTotalVisits, -removedVisits)
 
 	if _, err := pipe.Exec(RWS.ctx); err != nil {
 		return err
@@ -648,12 +678,9 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walks := []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
-		for _, walk := range walks {
-			if err := RWS.AddWalk(walk); err != nil {
-				return nil, err
-			}
+		if err := RWS.AddWalks(walks); err != nil {
+			return nil, err
 		}
-
 		return RWS, nil
 
 	case "complex":
@@ -666,11 +693,10 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walks := []models.RandomWalk{{0, 1, 2}, {0, 3}, {1, 2}}
-		for _, walk := range walks {
-			if err := RWS.AddWalk(walk); err != nil {
-				return nil, err
-			}
+		if err := RWS.AddWalks(walks); err != nil {
+			return nil, err
 		}
+
 		return RWS, nil
 
 	case "pip":
@@ -680,8 +706,8 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 			return nil, err
 		}
 
-		walk := models.RandomWalk{0}
-		if err := RWS.AddWalk(walk); err != nil {
+		walk := []models.RandomWalk{{0}}
+		if err := RWS.AddWalks(walk); err != nil {
 			return nil, err
 		}
 		return RWS, nil

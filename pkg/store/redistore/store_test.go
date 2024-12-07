@@ -14,6 +14,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
+	"golang.org/x/exp/slices"
 )
 
 func TestNewRWS(t *testing.T) {
@@ -645,15 +646,12 @@ func TestWalksRand(t *testing.T) {
 	}
 }
 
-func TestAddWalk(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
-
+func TestAddWalks(t *testing.T) {
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
 			RWSType       string
-			walk          models.RandomWalk
+			walks         []models.RandomWalk
 			expectedError error
 		}{
 			{
@@ -662,27 +660,42 @@ func TestAddWalk(t *testing.T) {
 				expectedError: models.ErrNilRWSPointer,
 			},
 			{
-				name:          "nil walk",
+				name:          "nil walks",
 				RWSType:       "empty",
-				walk:          nil,
+				walks:         nil,
+				expectedError: nil,
+			},
+			{
+				name:          "empty walks",
+				RWSType:       "empty",
+				walks:         []models.RandomWalk{},
+				expectedError: nil,
+			},
+			{
+				name:          "one nil walk",
+				RWSType:       "triangle",
+				walks:         []models.RandomWalk{{0}, nil},
 				expectedError: models.ErrNilWalkPointer,
 			},
 			{
-				name:          "empty walk",
-				RWSType:       "empty",
-				walk:          models.RandomWalk{},
+				name:          "one empty walk",
+				RWSType:       "triangle",
+				walks:         []models.RandomWalk{{0}, {}},
 				expectedError: models.ErrEmptyWalk,
 			},
 		}
 
 		for _, test := range testCases {
+			cl := redisutils.SetupClient()
+			defer redisutils.CleanupRedis(cl)
+
 			t.Run(test.name, func(t *testing.T) {
 				RWS, err := SetupRWS(cl, test.RWSType)
 				if err != nil {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.AddWalk(test.walk)
+				err = RWS.AddWalks(test.walks)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("AddWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -691,20 +704,29 @@ func TestAddWalk(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-		walk := models.RandomWalk{1, 2, 3}
-		expectedLastWalkID := uint32(0)
-		expectedTotalVisits := len(walk)
+		cl := redisutils.SetupClient()
+		defer redisutils.CleanupRedis(cl)
 
 		RWS, err := SetupRWS(cl, "empty")
 		if err != nil {
 			t.Fatalf("SetupRWS(): expected nil, got %v", err)
 		}
 
-		if err := RWS.AddWalk(walk); err != nil {
-			t.Fatalf("AddWalk(): expected nil, got %v", err)
+		walks := []models.RandomWalk{{1, 2, 3}, {1, 5}}
+		expectedLastWalkID := uint32(1)
+		expectedTotalVisits := len(walks[0]) + len(walks[1])
+		expectedWalksVisiting := map[uint32][]uint32{
+			1: {0, 1},
+			2: {0},
+			3: {0},
+			5: {1},
 		}
 
-		// check the walkID has been incremented
+		if err := RWS.AddWalks(walks); err != nil {
+			t.Fatalf("AddWalks(): expected nil, got %v", err)
+		}
+
+		// check the last walkID has been incremented
 		strLastWalkID, err := cl.HGet(RWS.ctx, KeyRWS, KeyLastWalkID).Result()
 		if err != nil {
 			t.Fatalf("HGet(): expected nil, got %v", err)
@@ -714,37 +736,45 @@ func TestAddWalk(t *testing.T) {
 			t.Fatalf("ParseID(): expected nil, got %v", err)
 		}
 		if lastWalkID != expectedLastWalkID {
-			t.Errorf("AddWalk(): expected walkID = %v, got %v", expectedLastWalkID, lastWalkID)
+			t.Errorf("AddWalks(): expected walkID = %v, got %v", expectedLastWalkID, lastWalkID)
 		}
 
-		// check if the two loaded walk matches the original
-		strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, "0").Result()
-		if err != nil {
-			t.Fatalf("Get(): expected nil, got %v", err)
-		}
-		loadedWalk, err := redisutils.ParseWalk(strWalk)
-		if err != nil {
-			t.Fatalf("ParseWalk(): expected nil, got %v", err)
-		}
-		if !reflect.DeepEqual(walk, loadedWalk) {
-			t.Errorf("AddWalk(): expected %v, got %v", walk, loadedWalk)
-		}
-
-		// check that each node is associated with the walkID
-		for _, nodeID := range walk {
-			// Get the only walkID associated with nodeID
-			strWalkID, err := RWS.client.SRandMember(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
+		// check if the loaded walks match the originals
+		for i, walk := range walks {
+			walkID := redisutils.FormatID(uint32(i))
+			strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, walkID).Result()
 			if err != nil {
-				t.Fatalf("SRandMember(): expected nil, got %v", err)
+				t.Fatalf("Get(): expected nil, got %v", err)
 			}
-			loadedWalkID, err := redisutils.ParseID(strWalkID)
+			loadedWalk, err := redisutils.ParseWalk(strWalk)
 			if err != nil {
-				t.Fatalf("ParseID(): expected nil, got %v", err)
+				t.Fatalf("ParseWalk(): expected nil, got %v", err)
+			}
+			if !reflect.DeepEqual(walk, loadedWalk) {
+				t.Errorf("AddWalks(): expected %v, got %v", walk, loadedWalk)
+			}
+		}
+
+		// check that each node is associated with the expected walkIDs
+		for _, nodeID := range []uint32{1, 2, 3, 5} {
+			strIDs, err := RWS.client.SMembers(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
+			if err != nil {
+				t.Fatalf("SMembers(): expected nil, got %v", err)
 			}
 
-			// check it matches the intended walkID
-			if loadedWalkID != expectedLastWalkID {
-				t.Errorf("AddWalk(): expected %v, got %v", 0, loadedWalkID)
+			walkIDs := []uint32{}
+			for _, strID := range strIDs {
+				walkID, err := redisutils.ParseID(strID)
+				if err != nil {
+					t.Fatalf("ParseID(): expected nil, got %v", err)
+				}
+
+				walkIDs = append(walkIDs, walkID)
+			}
+			slices.Sort(walkIDs)
+
+			if !reflect.DeepEqual(walkIDs, expectedWalksVisiting[nodeID]) {
+				t.Errorf("AddWalks(): nodeID %d expected %v, got %v", nodeID, expectedWalksVisiting[nodeID], walkIDs)
 			}
 		}
 
@@ -761,11 +791,10 @@ func TestAddWalk(t *testing.T) {
 		if visits != int64(expectedTotalVisits) {
 			t.Errorf("AddWalk(): expected total visits %v, got %v", expectedTotalVisits, visits)
 		}
-
 	})
 }
 
-func TestRemoveWalk(t *testing.T) {
+func TestRemoveWalks(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -783,7 +812,7 @@ func TestRemoveWalk(t *testing.T) {
 			{
 				name:          "walk not found",
 				RWSType:       "one-node0",
-				expectedError: redis.Nil,
+				expectedError: models.ErrWalkNotFound,
 			},
 		}
 
@@ -794,9 +823,9 @@ func TestRemoveWalk(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.RemoveWalk(69)
+				err = RWS.RemoveWalks([]uint32{0, 69})
 				if !errors.Is(err, test.expectedError) {
-					t.Errorf("RemoveWalk(): expected %v, got %v", test.expectedError, err)
+					t.Errorf("RemoveWalks(): expected %v, got %v", test.expectedError, err)
 				}
 			})
 		}
@@ -808,28 +837,30 @@ func TestRemoveWalk(t *testing.T) {
 			t.Fatalf("SetupRWS(): expected nil, got %v", err)
 		}
 
-		walkID := uint32(0)
-		removedWalk := []uint32{0, 1, 2}
-		expectedTotalVisits := 6
+		nodeIDs := []uint32{0, 1, 2}
+		walkIDs := []uint32{0, 1}
+		expectedTotalVisits := 3
 
-		if err := RWS.RemoveWalk(walkID); err != nil {
-			t.Fatalf("RemoveWalk(%d): expected nil, got %v", walkID, err)
+		if err := RWS.RemoveWalks(walkIDs); err != nil {
+			t.Fatalf("RemoveWalks(%d): expected nil, got %v", walkIDs, err)
 		}
 
-		// check the walk has been removed from the WalkIndex
-		if walk, err := cl.HGet(RWS.ctx, KeyWalks, redisutils.FormatID(walkID)).Result(); !errors.Is(err, redis.Nil) {
-			t.Fatalf("RemoveWalk(%d): expected walk %v to be removed: %v", walkID, walk, err)
+		// check the walks have been removed from the WalkIndex
+		for _, walkID := range walkIDs {
+			if walk, err := cl.HGet(RWS.ctx, KeyWalks, redisutils.FormatID(walkID)).Result(); !errors.Is(err, redis.Nil) {
+				t.Fatalf("RemoveWalk(%d): expected walk %v to be removed: %v", walkID, walk, err)
+			}
 		}
 
 		// check the walkID has been removed from each node
-		for _, nodeID := range removedWalk {
-			exists, err := cl.SIsMember(RWS.ctx, KeyWalksVisiting(nodeID), walkID).Result()
+		for _, nodeID := range nodeIDs {
+			strIDs, err := cl.SMembers(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
 			if err != nil {
 				t.Errorf("SIsMember(): expected nil, got %v", err)
 			}
 
-			if exists {
-				t.Errorf("RemoveWalk(%d): walk should have been removed from walksVisiting:%d", walkID, nodeID)
+			if !reflect.DeepEqual(strIDs, []string{"2"}) {
+				t.Errorf("RemoveWalk(): nodeID %d, expected %v, got %v", nodeID, []string{"2"}, strIDs)
 			}
 		}
 

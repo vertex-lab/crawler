@@ -54,10 +54,10 @@ type RandomWalkStore interface {
 	CommonWalks(nodeID uint32, removedNodes []uint32) (map[uint32]RandomWalk, error)
 
 	// AddWalk() adds a walk to the RandomWalkStore.
-	AddWalk(walk RandomWalk) error
+	AddWalks(walks []RandomWalk) error
 
 	// RemoveWalk() removes the walk associated with the walkID
-	RemoveWalk(walkID uint32) error
+	RemoveWalks(walkIDs []uint32) error
 
 	// PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
 	// These functions need to be coupled together to leverage the atomicity of Redis transactions.

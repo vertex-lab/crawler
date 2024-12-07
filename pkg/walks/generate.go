@@ -68,19 +68,21 @@ func (RWM *RandomWalkManager) generateWalks(DB models.Database,
 	alpha := RWM.Store.Alpha()
 	walksPerNode := RWM.Store.WalksPerNode()
 
-	// for each node, perform `walksPerNode` random walks
+	// for each node, perform `walksPerNode` random walks and add them to the RWS
 	for _, nodeID := range nodeIDs {
-		for i := uint16(0); i < walksPerNode; i++ {
 
+		walks := make([]models.RandomWalk, 0, walksPerNode)
+		for i := uint16(0); i < walksPerNode; i++ {
 			walk, err := generateWalk(DB, nodeID, alpha, rng)
 			if err != nil {
 				return err
 			}
 
-			// add the RandomWalk to the RWS
-			if err := RWM.Store.AddWalk(walk); err != nil {
-				return err
-			}
+			walks = append(walks, walk)
+		}
+
+		if err := RWM.Store.AddWalks(walks); err != nil {
+			return err
 		}
 	}
 
