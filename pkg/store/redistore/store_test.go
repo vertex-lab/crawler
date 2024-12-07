@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
-	"golang.org/x/exp/slices"
 )
 
 func TestNewRWS(t *testing.T) {
