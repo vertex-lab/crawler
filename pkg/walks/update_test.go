@@ -435,7 +435,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 
 run this benchmark with:
 
-> -benchtime=nodesSizex
+> -benchtime=<nodesSize>x
 
 each node should only be updated once. Each subsequent update will be
 much cheaper because no walk will need an update, thus compromizing the measurement

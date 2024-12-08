@@ -65,7 +65,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 		return nil
 	}
 
-	walkMap, err := RWM.Store.CommonWalks(nodeID, removedSucc)
+	walkMap, err := RWM.Store.Walks(nodeID, -1)
 	if err != nil {
 		return err
 	}
@@ -204,10 +204,4 @@ func estimateWalksToUpdate(RWM *RandomWalkManager, nodeID uint32, addedSize int,
 	p := float32(addedSize) / float32(currentSize)
 
 	return int(p * walksNum), nil
-}
-
-// probabilityOfSelection() returns the probability of a walk to be updated by
-// the method RWM.updateAddedNodes().
-func probabilityOfSelection(addedSuccSize int, currentSuccSize int) float32 {
-	return float32(addedSuccSize) / float32(currentSuccSize)
 }
