@@ -39,6 +39,25 @@ func ParseWalk(strWalk string) (models.RandomWalk, error) {
 	return walk, nil
 }
 
+// ParseWalks() parses a slice of strings to a slice of random walks
+func ParseWalks(strWalks []string) ([]models.RandomWalk, error) {
+	if len(strWalks) == 0 {
+		return []models.RandomWalk{}, nil
+	}
+
+	walks := make([]models.RandomWalk, 0, len(strWalks))
+	for _, strWalk := range strWalks {
+		walk, err := ParseWalk(strWalk)
+		if err != nil {
+			return []models.RandomWalk{}, err
+		}
+
+		walks = append(walks, walk)
+	}
+
+	return walks, nil
+}
+
 // FormatID() formats an ID into a string
 func FormatID(ID uint32) string {
 	return strconv.FormatUint(uint64(ID), 10)

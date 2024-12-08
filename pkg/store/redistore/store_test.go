@@ -163,59 +163,6 @@ func TestTotalVisits(t *testing.T) {
 	}
 }
 
-func TestSetTotalVisits(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
-
-	testCases := []struct {
-		name          string
-		RWSType       string
-		totalVisits   int
-		expectedError error
-	}{
-		{
-			name:          "nil RWS",
-			RWSType:       "nil",
-			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "incorrect totalVisits value",
-			RWSType:       "empty",
-			totalVisits:   -10,
-			expectedError: models.ErrInvalidTotalVisits,
-		},
-		{
-			name:          "non-empty RWS",
-			RWSType:       "one-node0",
-			totalVisits:   69,
-			expectedError: nil,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			RWS, err := SetupRWS(cl, test.RWSType)
-			if err != nil {
-				t.Fatalf("SetupRWS(): expected nil, got %v", err)
-			}
-
-			err = RWS.SetTotalVisits(test.totalVisits)
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("SetTotalVisits(): expected %v, got %v", test.expectedError, err)
-			}
-
-			// check that the new value has been written
-			if err == nil {
-				visits := RWS.TotalVisits()
-				if visits != test.totalVisits {
-					t.Errorf("SetTotalVisits(): expected %v, got %v", test.totalVisits, visits)
-				}
-			}
-		})
-	}
-}
-
 func TestIsEmpty(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
@@ -474,17 +421,18 @@ func TestWalks(t *testing.T) {
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
-			name:          "empty RWS",
-			RWSType:       "empty",
-			nodeID:        0,
-			expectedError: models.ErrEmptyRWS,
+			name:            "empty RWS",
+			RWSType:         "empty",
+			nodeID:          0,
+			expectedWalkMap: map[uint32]models.RandomWalk{},
+			expectedError:   models.ErrNodeNotFoundRWS,
 		},
 		{
 			name:            "node not found in RWS",
 			RWSType:         "one-node0",
 			nodeID:          1,
 			expectedWalkMap: map[uint32]models.RandomWalk{},
-			expectedError:   nil,
+			expectedError:   models.ErrNodeNotFoundRWS,
 		},
 		{
 			name:    "normal",
@@ -1165,8 +1113,8 @@ func BenchmarkWalksRand(b *testing.B) {
 
 func BenchmarkWalks(b *testing.B) {
 	b.Run("FixedDB", func(b *testing.B) {
-		nodesSize := 1000
-		edgesPerNode := 100
+		nodesSize := 100
+		edgesPerNode := 10
 		rng := rand.New(rand.NewSource(69))
 
 		// Different DB sizes

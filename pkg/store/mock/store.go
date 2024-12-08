@@ -66,18 +66,12 @@ func (RWS *RandomWalkStore) WalksPerNode() uint16 {
 
 // TotalVisits() returns the total number of visits.
 func (RWS *RandomWalkStore) TotalVisits() int {
-
 	visits := 0
 	for _, walkSet := range RWS.WalksVisiting {
 		visits += walkSet.Cardinality()
 	}
 
 	return visits
-}
-
-// SetTotalVisits() overwrites the field totalVisits.
-func (RWS *RandomWalkStore) SetTotalVisits(totalVisits int) error {
-	return nil
 }
 
 // IsEmpty() returns whether RWS is empty (ignores errors).

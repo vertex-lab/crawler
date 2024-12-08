@@ -78,7 +78,6 @@ var ErrInvalidWalkIndex = errors.New("the index is bigger than the lenght of the
 // RWS errors
 var ErrInvalidAlpha = errors.New("alpha should be a number between 0 and 1 (excluded)")
 var ErrInvalidWalksPerNode = errors.New("walksPerNode should be greater than zero")
-var ErrInvalidTotalVisits = errors.New("totalVisits should be greater than zero")
 var ErrNilRWSPointer = errors.New("nil RWS pointer")
 var ErrEmptyRWS = errors.New("RWS is empty")
 var ErrNonEmptyRWS = errors.New("the RWS is NOT empty")

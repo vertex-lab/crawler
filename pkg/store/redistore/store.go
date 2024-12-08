@@ -144,20 +144,6 @@ func (RWS *RandomWalkStore) TotalVisits() int {
 	return int(visits)
 }
 
-// SetTotalVisits() overwrites the total number of visits.
-func (RWS *RandomWalkStore) SetTotalVisits(totalVisits int) error {
-
-	if err := RWS.validateFields(); err != nil {
-		return err
-	}
-
-	if totalVisits < 0 {
-		return models.ErrInvalidTotalVisits
-	}
-
-	return RWS.client.HSet(RWS.ctx, KeyRWS, KeyTotalVisits, totalVisits).Err()
-}
-
 // IsEmpty() returns false if the size of the hash key "walks" is > 0, otherwise true.
 func (RWS *RandomWalkStore) IsEmpty() bool {
 	if RWS == nil {
@@ -292,7 +278,7 @@ func (RWS *RandomWalkStore) VisitCountsLUA(nodeIDs []uint32) (map[uint32]int, er
 // Walks() returns a map of walks by walksID that visit nodeID.
 func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.validateFields(); err != nil {
 		return nil, err
 	}
 
@@ -300,32 +286,45 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 		limit = 1000000000 // a very large number, such that SRANDMEMBER returns everything
 	}
 
-	luaScript := `
-        local nodeID = KEYS[1]
-		local limit = ARGV[1]
-        local KeyWalks = ARGV[2]
-
-        -- Get some walkIDs from the walks visiting nodeID
-        local walkIDs = redis.call("SRANDMEMBER", nodeID, limit)
-        
-		if not walkIDs or #walkIDs == 0 then
-			return {{}, {}}
-		end
-		
-		-- Get the walks associated with the walkIDs
-		local walks = redis.call("HMGET", KeyWalks, unpack(walkIDs))
-
-        -- Return both walkIDs and walks as two parallel arrays
-        return {walkIDs, walks}
-    `
-	// execute the Lua script
-	keys := []string{KeyWalksVisiting(nodeID)}
-	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, limit, KeyWalks).Result()
+	strIDs, err := RWS.client.SRandMemberN(RWS.ctx, KeyWalksVisiting(nodeID), int64(limit)).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
+		return map[uint32]models.RandomWalk{}, err
+	}
+	if len(strIDs) == 0 {
+		return map[uint32]models.RandomWalk{}, models.ErrNodeNotFoundRWS
 	}
 
-	return redisutils.ParseWalkMap(result)
+	walkIDs, err := redisutils.ParseIDs(strIDs)
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	res, err := RWS.client.HMGet(RWS.ctx, KeyWalks, strIDs...).Result()
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	strWalks := make([]string, 0, len(res))
+	for _, r := range res {
+		strWalk, ok := r.(string)
+		if !ok {
+			return map[uint32]models.RandomWalk{}, fmt.Errorf("unexpected type: %v", res)
+		}
+
+		strWalks = append(strWalks, strWalk)
+	}
+
+	walks, err := redisutils.ParseWalks(strWalks)
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	walkMap := make(map[uint32]models.RandomWalk, len(walkIDs))
+	for i, walkID := range walkIDs {
+		walkMap[walkID] = walks[i]
+	}
+
+	return walkMap, nil
 }
 
 /*
