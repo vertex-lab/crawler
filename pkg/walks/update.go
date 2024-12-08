@@ -38,13 +38,13 @@ func (RWM *RandomWalkManager) Update(DB models.Database, nodeID uint32,
 func (RWM *RandomWalkManager) update(DB models.Database, nodeID uint32,
 	oldSucc []uint32, currentSucc []uint32, rng *rand.Rand) error {
 
-	removedSucc, commonSucc, addesSucc := sliceutils.Partition(oldSucc, currentSucc)
+	removedSucc, commonSucc, addedSucc := sliceutils.Partition(oldSucc, currentSucc)
 
 	if err := RWM.updateRemovedNodes(DB, nodeID, removedSucc, commonSucc, rng); err != nil {
 		return err
 	}
 
-	if err := RWM.updateAddedNodes(DB, nodeID, addesSucc, len(currentSucc), rng); err != nil {
+	if err := RWM.updateAddedNodes(DB, nodeID, addedSucc, len(currentSucc), rng); err != nil {
 		return err
 	}
 
@@ -53,7 +53,7 @@ func (RWM *RandomWalkManager) update(DB models.Database, nodeID uint32,
 
 /*
 updateRemovedNodes() updates the RWM by "pruning" and "grafting" all the walks that
-contain the hop `nodeID` --> `removedID` in `removedSucc`.
+contain the invalid step `nodeID` --> `removedID` in `removedSucc`.
 
 After the execution of this method, the state of the walks of nodeID is as if nodeID
 only successors are the common successors `commonSucc`.
@@ -72,7 +72,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 
 	for walkID, walk := range walkMap {
 
-		cutIndex, err := NeedsUpdate(walk, nodeID, removedSucc)
+		cutIndex, err := containsInvalidStep(walk, nodeID, removedSucc)
 		if err != nil {
 			return err
 		}
@@ -102,15 +102,18 @@ a method that updates the RWM by "pruning" some randomly selected walks of nodeI
 and by "grafting" them using the newly added nodes
 */
 func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32,
-	addesSucc []uint32, currentSuccSize int, rng *rand.Rand) error {
+	addedSucc []uint32, currentSuccSize int, rng *rand.Rand) error {
 
-	if len(addesSucc) == 0 {
+	if len(addedSucc) == 0 {
 		return nil
 	}
 
-	// fetch the walks that will be updated
-	probability := probabilityOfSelection(len(addesSucc), currentSuccSize)
-	walkMap, err := RWM.Store.WalksRand(nodeID, probability)
+	limit, err := estimateWalksToUpdate(RWM, nodeID, len(addedSucc), currentSuccSize)
+	if err != nil {
+		return err
+	}
+
+	walkMap, err := RWM.Store.Walks(nodeID, limit)
 	if err != nil {
 		return err
 	}
@@ -124,7 +127,7 @@ func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32
 		var newWalkSegment models.RandomWalk
 		if rng.Float32() < RWM.Store.Alpha() {
 
-			newWalkSegment, err = generateWalkSegment(DB, addesSucc, walk[:cutIndex], RWM.Store.Alpha(), rng)
+			newWalkSegment, err = generateWalkSegment(DB, addedSucc, walk[:cutIndex], RWM.Store.Alpha(), rng)
 			if err != nil {
 				return err
 			}
@@ -164,14 +167,14 @@ func generateWalkSegment(DB models.Database, candidateNodes []uint32, currentWal
 }
 
 /*
-NeedsUpdate returns the index or position where the RandomWalk needs to be
+containsInvalidStep() returns the index or position where the RandomWalk needs to be
 Pruned and Grafted.
 
 This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes.
 
-cutIndex = -1 signals to don't update
+cutIndex = -1 signals no need to update.
 */
-func NeedsUpdate(walk models.RandomWalk, nodeID uint32,
+func containsInvalidStep(walk models.RandomWalk, nodeID uint32,
 	removedNodes []uint32) (int, error) {
 
 	if err := models.Validate(walk); err != nil {
@@ -187,6 +190,20 @@ func NeedsUpdate(walk models.RandomWalk, nodeID uint32,
 		}
 	}
 	return -1, nil
+}
+
+// estimateWalksToUpdate() returns the number of walks that needs to be updated in updateAddedNodes().
+// This number is (addedSize / currentSize) * numberOfWalks.
+func estimateWalksToUpdate(RWM *RandomWalkManager, nodeID uint32, addedSize int, currentSize int) (int, error) {
+	walkMap, err := RWM.Store.VisitCounts([]uint32{nodeID})
+	if err != nil {
+		return 1, err
+	}
+
+	walksNum := float32(walkMap[nodeID])
+	p := float32(addedSize) / float32(currentSize)
+
+	return int(p * walksNum), nil
 }
 
 // probabilityOfSelection() returns the probability of a walk to be updated by

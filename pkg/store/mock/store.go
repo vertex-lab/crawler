@@ -22,6 +22,8 @@ type RandomWalkStore struct {
 	// Associates a nodeID to the set of walkIDs that visited that node.
 	WalksVisiting map[uint32]WalkSet
 
+	//mu sync.RWMutex
+
 	// The dampening factor, which is the probability of stopping at each step of the random walk. Default is 0.85
 	alpha float32
 
@@ -47,9 +49,10 @@ func NewRWS(alpha float32, walksPerNode uint16) (*RandomWalkStore, error) {
 	RWS := &RandomWalkStore{
 		WalkIndex:     make(map[uint32]models.RandomWalk),
 		WalksVisiting: make(map[uint32]WalkSet),
-		alpha:         alpha,
-		walksPerNode:  walksPerNode,
-		totalVisits:   0,
+		//mu:            sync.RWMutex{},
+		alpha:        alpha,
+		walksPerNode: walksPerNode,
+		totalVisits:  0,
 	}
 	return RWS, nil
 }
@@ -179,13 +182,13 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 		return nil, err
 	}
 
-	if limit <= 0 {
+	if limit <= 0 || limit > walkIDs.Cardinality() {
 		limit = walkIDs.Cardinality()
 	}
 
 	// extract into the map format
-	walkMap := make(map[uint32]models.RandomWalk, walkIDs.Cardinality())
-	for walkID := range walkIDs.Iter() {
+	walkMap := make(map[uint32]models.RandomWalk, limit)
+	for _, walkID := range walkIDs.ToSlice() { // we use ToSlice instead of Iter() to avoid potential for deadlocks
 		if len(walkMap) >= limit {
 			break
 		}
@@ -402,11 +405,6 @@ a specified probability of selection.
 func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
 	probabilityOfSelection float32) (map[uint32]models.RandomWalk, error) {
 
-	if err := RWS.Validate(false); err != nil {
-		return nil, err
-	}
-
-	// get the IDs of the walks that visit nodeID
 	walkIDs, err := RWS.WalkIDs(nodeID)
 	if err != nil {
 		return nil, err
