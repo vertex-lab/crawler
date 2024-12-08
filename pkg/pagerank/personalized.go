@@ -240,7 +240,7 @@ func checkInputs(DB models.Database, RWS models.RandomWalkStore,
 		return err
 	}
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return err
 	}
 

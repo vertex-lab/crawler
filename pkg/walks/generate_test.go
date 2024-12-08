@@ -106,22 +106,24 @@ func TestGenerateWalk(t *testing.T) {
 }
 
 func TestGenerateWalks(t *testing.T) {
-
 	testCases := []struct {
 		name          string
 		DBType        string
+		nodeIDs       []uint32
 		expectedWalks map[uint32]map[uint32]models.RandomWalk
 		expectedError error
 	}{
 		{
 			name:          "node not found",
 			DBType:        "one-node1",
+			nodeIDs:       []uint32{0, 1},
 			expectedWalks: nil,
 			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:          "valid, triangle",
 			DBType:        "triangle",
+			nodeIDs:       []uint32{0, 1, 2},
 			expectedError: nil,
 			expectedWalks: map[uint32]map[uint32]models.RandomWalk{
 				0: {
@@ -152,32 +154,28 @@ func TestGenerateWalks(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-
 		t.Run(test.name, func(t *testing.T) {
-
 			DB := mock.SetupDB(test.DBType)
-			nodeIDs := []uint32{0, 1, 2}
 			RWM, _ := NewRWM("mock", 0.85, 2)
 			rng := rand.New(rand.NewSource(69))
 
-			if err := RWM.generateWalks(DB, nodeIDs, rng); !errors.Is(err, test.expectedError) {
+			err := RWM.generateWalks(DB, test.nodeIDs, rng)
+			if !errors.Is(err, test.expectedError) {
 				t.Errorf("generateWalks(): expected %v, got %v", test.expectedError, err)
 			}
 
 			// check if the walk was added to each node
-			for _, nodeID := range nodeIDs {
-				if RWM.Store.IsEmpty() {
-					break
-				}
+			if err == nil {
+				for _, nodeID := range test.nodeIDs {
+					walkMap, err := RWM.Store.Walks(nodeID, -1)
+					if err != nil {
+						t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
+					}
 
-				walkMap, err := RWM.Store.Walks(nodeID, -1)
-				if err != nil {
-					t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
-				}
-
-				// check if the walk is as expected
-				if !reflect.DeepEqual(walkMap, test.expectedWalks[nodeID]) {
-					t.Errorf("generateWalks(): nodeID = %d; expected %v, got %v", nodeID, test.expectedWalks[nodeID], walkMap)
+					// check if the walk is as expected
+					if !reflect.DeepEqual(walkMap, test.expectedWalks[nodeID]) {
+						t.Errorf("generateWalks(): nodeID = %d; expected %v, got %v", nodeID, test.expectedWalks[nodeID], walkMap)
+					}
 				}
 			}
 		})
@@ -185,7 +183,6 @@ func TestGenerateWalks(t *testing.T) {
 }
 
 func TestGenerate(t *testing.T) {
-
 	testCases := []struct {
 		name          string
 		DBType        string
@@ -216,12 +213,6 @@ func TestGenerate(t *testing.T) {
 			DBType:        "one-node0",
 			RWMType:       "nil",
 			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "empty RWM",
-			DBType:        "one-node0",
-			RWMType:       "empty",
-			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "valid",
@@ -256,9 +247,7 @@ func TestGenerate(t *testing.T) {
 }
 
 func TestGenerateAll(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
-
 		testCases := []struct {
 			name          string
 			DBType        string
@@ -282,12 +271,6 @@ func TestGenerateAll(t *testing.T) {
 				DBType:        "one-node0",
 				RWMType:       "nil",
 				expectedError: models.ErrNilRWSPointer,
-			},
-			{
-				name:          "non-empty RWM",
-				DBType:        "one-node0",
-				RWMType:       "one-node0",
-				expectedError: models.ErrNonEmptyRWS,
 			},
 		}
 

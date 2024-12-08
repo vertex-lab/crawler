@@ -30,12 +30,8 @@ type RandomWalkStore interface {
 	// TotalVisits() returns the total number of visits. In case of any error, the default value 0 is returned.
 	TotalVisits() int
 
-	// IsEmpty() returns whether RWS is empty (ignores errors).
-	IsEmpty() bool
-
-	// Validate() checks whether the RWS is nil, empty or non-empty and returns
-	// an appropriate error based on the requirement.
-	Validate(expectEmptyRWS bool) error
+	// Validate() checks whether RWS is nil, and it's fields.
+	Validate() error
 
 	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
 	VisitCounts(nodeIDs []uint32) (map[uint32]int, error)

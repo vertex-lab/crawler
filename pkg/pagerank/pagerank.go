@@ -22,7 +22,7 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMa
 		return nil, err
 	}
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +63,7 @@ func LazyPagerank(DB models.Database, RWS models.RandomWalkStore, nodeIDs []uint
 		return nil, err
 	}
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 

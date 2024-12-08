@@ -80,7 +80,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 				DBType:        "one-node0",
 				RWMType:       "empty",
 				removedSucc:   []uint32{0},
-				expectedError: models.ErrEmptyRWS,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "node not found in the RWM",
@@ -183,7 +183,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:       "empty",
 				addedSucc:     []uint32{3},
 				newOutDegree:  1,
-				expectedError: models.ErrEmptyRWS,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "node not found in the RWM",
@@ -209,9 +209,9 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWM := SetupRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-				err := RWM.updateRemovedNodes(DB, 0, test.addedSucc, []uint32{2}, rng)
+				err := RWM.updateAddedNodes(DB, 0, test.addedSucc, test.newOutDegree, rng)
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("updateAddedNodes(): expected %v, got %v", test.expectedError, err)
+					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
 				}
 			})
 		}
@@ -256,7 +256,6 @@ func TestUpdateAddedNodes(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
 
 		testCases := []struct {
@@ -273,6 +272,8 @@ func TestUpdate(t *testing.T) {
 				DBType:        "nil",
 				RWMType:       "triangle",
 				nodeID:        0,
+				oldSucc:       []uint32{0},
+				currentSucc:   []uint32{1},
 				expectedError: models.ErrNilDBPointer,
 			},
 			{
@@ -280,6 +281,8 @@ func TestUpdate(t *testing.T) {
 				DBType:        "empty",
 				RWMType:       "triangle",
 				nodeID:        0,
+				oldSucc:       []uint32{0},
+				currentSucc:   []uint32{1},
 				expectedError: models.ErrEmptyDB,
 			},
 			{
@@ -287,6 +290,8 @@ func TestUpdate(t *testing.T) {
 				DBType:        "one-node0",
 				RWMType:       "nil",
 				nodeID:        0,
+				oldSucc:       []uint32{0},
+				currentSucc:   []uint32{1},
 				expectedError: models.ErrNilRWSPointer,
 			},
 			{
@@ -294,13 +299,17 @@ func TestUpdate(t *testing.T) {
 				DBType:        "one-node0",
 				RWMType:       "empty",
 				nodeID:        0,
-				expectedError: models.ErrEmptyRWS,
+				oldSucc:       []uint32{0},
+				currentSucc:   []uint32{1},
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "node not found in the DB",
 				DBType:        "one-node1",
 				RWMType:       "one-node1",
 				nodeID:        0,
+				oldSucc:       []uint32{0},
+				currentSucc:   []uint32{1},
 				expectedError: models.ErrNodeNotFoundDB,
 			},
 			{

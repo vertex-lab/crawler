@@ -163,110 +163,45 @@ func TestTotalVisits(t *testing.T) {
 	}
 }
 
-func TestIsEmpty(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
-
-	testCases := []struct {
-		name          string
-		RWSType       string
-		expectedEmpty bool
-	}{
-		{
-			name:          "nil RWS",
-			RWSType:       "nil",
-			expectedEmpty: true,
-		},
-		{
-			name:          "empty RWS",
-			RWSType:       "empty",
-			expectedEmpty: true,
-		},
-		{
-			name:          "non-empty RWS",
-			RWSType:       "one-walk0",
-			expectedEmpty: false,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			RWS, err := SetupRWS(cl, test.RWSType)
-			if err != nil {
-				t.Fatalf("SetupRWS(): expected nil, got %v", err)
-			}
-
-			empty := RWS.IsEmpty()
-			if empty != test.expectedEmpty {
-				t.Errorf("IsEmpty(): expected %v, got %v", test.expectedEmpty, empty)
-			}
-		})
-	}
-}
-
 func TestValidate(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
-	testCases := []struct {
-		name          string
-		RWSType       string
-		expectedEmpty bool
-		expectedError error
-	}{
-		{
-			name:          "nil RWS, expected empty",
-			RWSType:       "nil",
-			expectedEmpty: true,
-			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "nil RWS, expected non-empty",
-			RWSType:       "nil",
-			expectedEmpty: false,
-			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "empty RWS, expected empty",
-			RWSType:       "empty",
-			expectedEmpty: true,
-			expectedError: nil,
-		},
-		{
-			name:          "empty RWS, expected non-empty",
-			RWSType:       "empty",
-			expectedEmpty: false,
-			expectedError: models.ErrEmptyRWS,
-		},
-		{
-			name:          "non-empty RWS, expected empty",
-			RWSType:       "one-walk0",
-			expectedEmpty: true,
-			expectedError: models.ErrNonEmptyRWS,
-		},
-		{
-			name:          "non-empty RWS, expected non-empty",
-			RWSType:       "one-walk0",
-			expectedEmpty: false,
-			expectedError: nil,
-		},
-	}
+	t.Run("nil RWS", func(t *testing.T) {
+		RWS, err := SetupRWS(cl, "nil")
+		if err != nil {
+			t.Fatalf("SetupRWS(): expected nil, got %v", err)
+		}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
+		err = RWS.Validate()
+		if !errors.Is(err, models.ErrNilRWSPointer) {
+			t.Errorf("Validate(): expected %v, got %v", models.ErrNilRWSPointer, err)
+		}
+	})
 
-			RWS, err := SetupRWS(cl, test.RWSType)
-			if err != nil {
-				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+	t.Run("invalid walksPerNode", func(t *testing.T) {
+		RWS, _ := NewRWS(context.Background(), cl, 0.85, 1)
+		RWS.walksPerNode = 0
+
+		err := RWS.Validate()
+		if !errors.Is(err, models.ErrInvalidWalksPerNode) {
+			t.Errorf("Validate(): expected %v, got %v", models.ErrInvalidWalksPerNode, err)
+		}
+	})
+
+	t.Run("invalid alphas", func(t *testing.T) {
+		RWS, _ := NewRWS(context.Background(), cl, 0.85, 1)
+		invalidAlphas := []float32{1.1, 0.0, -1.0, -0.11, 55}
+
+		for _, alpha := range invalidAlphas {
+			RWS.alpha = alpha
+
+			err := RWS.Validate()
+			if !errors.Is(err, models.ErrInvalidAlpha) {
+				t.Errorf("Validate(): expected %v, got %v", models.ErrInvalidAlpha, err)
 			}
-
-			err = RWS.Validate(test.expectedEmpty)
-			if !errors.Is(err, test.expectedError) {
-				t.Errorf("Validate(): expected %v, got %v", test.expectedError, err)
-			}
-		})
-	}
+		}
+	})
 }
 
 func TestVisitCounts(t *testing.T) {
@@ -325,73 +260,6 @@ func TestVisitCounts(t *testing.T) {
 			}
 
 			visits, err := RWS.VisitCounts(test.nodeIDs)
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
-			}
-
-			if !reflect.DeepEqual(visits, test.expectedVisits) {
-				t.Errorf("VisitCount(0): expected %v, got %v", test.expectedVisits, visits)
-			}
-		})
-	}
-}
-
-func TestVisitCountsLUA(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
-
-	testCases := []struct {
-		name           string
-		RWSType        string
-		nodeIDs        []uint32
-		expectedVisits map[uint32]int
-		expectedError  error
-	}{
-		{
-			name:           "nil RWS",
-			RWSType:        "nil",
-			nodeIDs:        []uint32{0},
-			expectedVisits: map[uint32]int{},
-			expectedError:  models.ErrNilRWSPointer,
-		},
-		{
-			name:           "empty RWS",
-			RWSType:        "empty",
-			nodeIDs:        []uint32{0},
-			expectedVisits: map[uint32]int{0: 0},
-			expectedError:  nil,
-		},
-		{
-			name:           "empty nodeIDs",
-			RWSType:        "one-node0",
-			nodeIDs:        []uint32{},
-			expectedVisits: map[uint32]int{},
-			expectedError:  nil,
-		},
-		{
-			name:           "one node RWS",
-			RWSType:        "one-node0",
-			nodeIDs:        []uint32{0},
-			expectedVisits: map[uint32]int{0: 1},
-			expectedError:  nil,
-		},
-		{
-			name:           "triangle RWS",
-			RWSType:        "triangle",
-			nodeIDs:        []uint32{0, 1, 2, 99}, // 99 is not in the RWS
-			expectedVisits: map[uint32]int{0: 3, 1: 3, 2: 3, 99: 0},
-			expectedError:  nil,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			RWS, err := SetupRWS(cl, test.RWSType)
-			if err != nil {
-				t.Fatalf("SetupRWS(): expected nil, got %v", err)
-			}
-
-			visits, err := RWS.VisitCountsLUA(test.nodeIDs)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
 			}

@@ -74,36 +74,8 @@ func (RWS *RandomWalkStore) TotalVisits() int {
 	return visits
 }
 
-// IsEmpty() returns whether RWS is empty (ignores errors).
-func (RWS *RandomWalkStore) IsEmpty() bool {
-	return RWS == nil || len(RWS.WalkIndex) == 0
-}
-
-// DEPRECATED NodeCount() returns the number of nodes in the RWS (ignores errors).
-func (RWS *RandomWalkStore) NodeCount() int {
-	if RWS.IsEmpty() {
-		return 0
-	}
-	return len(RWS.WalksVisiting)
-}
-
-// DEPRECATED AllNodes() returns a slice with all the nodeIDs in the RWS.
-func (RWS *RandomWalkStore) AllNodes() []uint32 {
-	if RWS.IsEmpty() {
-		return []uint32{}
-	}
-
-	nodeIDs := make([]uint32, 0, RWS.NodeCount())
-	for nodeID := range RWS.WalksVisiting {
-		nodeIDs = append(nodeIDs, nodeID)
-	}
-
-	return nodeIDs
-}
-
-// Validate() checks the fields alpha, walksPerNode and whether the RWS is nil, empty or
-// non-empty and returns an appropriate error based on the requirement.
-func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
+// Validate() that RWS is not nil, and the fields alpha and  walksPerNode
+func (RWS *RandomWalkStore) Validate() error {
 
 	if RWS == nil {
 		return models.ErrNilRWSPointer
@@ -115,15 +87,6 @@ func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
 
 	if RWS.walksPerNode <= 0 {
 		return models.ErrInvalidWalksPerNode
-	}
-
-	empty := RWS.IsEmpty()
-	if empty && !expectEmptyRWS {
-		return models.ErrEmptyRWS
-	}
-
-	if !empty && expectEmptyRWS {
-		return models.ErrNonEmptyRWS
 	}
 
 	return nil
@@ -158,7 +121,7 @@ func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error
 // WalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
 func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (WalkSet, error) {
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -172,20 +135,22 @@ func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (WalkSet, error) {
 // Walks() returns a map of walks by walkID that visit nodeID.
 // - if limit > 0, the map contains up to that many key-value pairs.
 // - if limit < 0, all walks are returned
+// - if no walks are found for nodeID, an error is returned
 func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 
-	walkIDs, err := RWS.WalkIDs(nodeID)
+	walkSet, err := RWS.WalkIDs(nodeID)
 	if err != nil {
 		return nil, err
 	}
 
-	if limit <= 0 || limit > walkIDs.Cardinality() {
-		limit = walkIDs.Cardinality()
+	if limit <= 0 || limit > walkSet.Cardinality() {
+		limit = walkSet.Cardinality()
 	}
 
-	// extract into the map format
+	walkIDs := walkSet.ToSlice() // we use ToSlice() instead of Iter() to avoid potential deadlocks
+
 	walkMap := make(map[uint32]models.RandomWalk, limit)
-	for _, walkID := range walkIDs.ToSlice() { // we use ToSlice instead of Iter() to avoid potential for deadlocks
+	for _, walkID := range walkIDs {
 		if len(walkMap) >= limit {
 			break
 		}
@@ -237,7 +202,7 @@ func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 // is not found, no walk gets removed.
 func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return err
 	}
 
@@ -264,7 +229,7 @@ func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 // PruneWalk() prunes the specified walk, cutting at cutIndex (walk[:cutIndex])
 func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 
-	if err := RWS.Validate(false); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return err
 	}
 
@@ -295,13 +260,12 @@ func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 // the walkID to the WalkSet of each node in the new walkSegment.
 func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error {
 
-	// If there is nothing to graft
-	if len(walkSegment) == 0 {
-		return nil
+	if err := RWS.Validate(); err != nil {
+		return err
 	}
 
-	if err := RWS.Validate(false); err != nil {
-		return err
+	if len(walkSegment) == 0 {
+		return nil
 	}
 
 	if _, exists := RWS.WalkIndex[walkID]; !exists {

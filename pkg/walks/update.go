@@ -21,7 +21,11 @@ URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 func (RWM *RandomWalkManager) Update(DB models.Database, nodeID uint32,
 	oldSucc []uint32, currentSucc []uint32) error {
 
-	if err := checkInputs(RWM, DB, false); err != nil {
+	if err := DB.Validate(); err != nil {
+		return err
+	}
+
+	if err := RWM.Store.Validate(); err != nil {
 		return err
 	}
 

@@ -127,7 +127,7 @@ func (RWS *RandomWalkStore) WalksPerNode() uint16 {
 // TotalVisits() returns the total number of visits.
 // In case of any error, the default value 0 is returned.
 func (RWS *RandomWalkStore) TotalVisits() int {
-	if err := RWS.validateFields(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return 0
 	}
 
@@ -144,38 +144,8 @@ func (RWS *RandomWalkStore) TotalVisits() int {
 	return int(visits)
 }
 
-// IsEmpty() returns false if the size of the hash key "walks" is > 0, otherwise true.
-func (RWS *RandomWalkStore) IsEmpty() bool {
-	if RWS == nil {
-		return true
-	}
-
-	len, err := RWS.client.HLen(RWS.ctx, KeyWalks).Result()
-	return err != nil || len == 0
-}
-
-// Validate() checks the fields alpha, walksPerNode and whether the RWS is nil, empty or
-// non-empty and returns an appropriate error based on the requirement.
-func (RWS *RandomWalkStore) Validate(expectEmptyRWS bool) error {
-
-	if err := RWS.validateFields(); err != nil {
-		return err
-	}
-
-	empty := RWS.IsEmpty()
-	if empty && !expectEmptyRWS {
-		return models.ErrEmptyRWS
-	}
-
-	if !empty && expectEmptyRWS {
-		return models.ErrNonEmptyRWS
-	}
-
-	return nil
-}
-
-// validateFields() checks the fields of the RWS struct and returns the appropriate error.
-func (RWS *RandomWalkStore) validateFields() error {
+// Validate() checks the fields of the RWS struct and returns the appropriate error.
+func (RWS *RandomWalkStore) Validate() error {
 
 	if RWS == nil {
 		return models.ErrNilRWSPointer
@@ -200,8 +170,8 @@ func (RWS *RandomWalkStore) validateFields() error {
 // times it was visited by a walk.
 func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error) {
 
-	if RWS == nil || RWS.client == nil {
-		return map[uint32]int{}, models.ErrNilRWSPointer
+	if err := RWS.Validate(); err != nil {
+		return map[uint32]int{}, err
 	}
 
 	if len(nodeIDs) == 0 {
@@ -227,58 +197,10 @@ func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error
 	return visitMap, nil
 }
 
-// VisitCounts() returns a map that associates each nodeID with the number of
-// times it was visited by a walk.
-func (RWS *RandomWalkStore) VisitCountsLUA(nodeIDs []uint32) (map[uint32]int, error) {
-
-	if RWS == nil || RWS.client == nil {
-		return map[uint32]int{}, models.ErrNilRWSPointer
-	}
-
-	if len(nodeIDs) == 0 {
-		return map[uint32]int{}, nil
-	}
-
-	// Prepare keys for the Lua script
-	keys := make([]string, len(nodeIDs))
-	for i, nodeID := range nodeIDs {
-		keys[i] = KeyWalksVisiting(nodeID)
-	}
-
-	// Lua script for batching SCARD commands
-	luaScript := `
-		local results = {}
-		for i, key in ipairs(KEYS) do
-			results[i] = redis.call('SCARD', key)
-		end
-		return results
-	`
-
-	// execute the Lua script
-	result, err := RWS.client.Eval(RWS.ctx, luaScript, keys, KeyWalks).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute Lua script: %v", err)
-	}
-
-	// Parse the results into the visitMap
-	visitMap := make(map[uint32]int, len(nodeIDs))
-	counts, ok := result.([]interface{})
-	if !ok {
-		return map[uint32]int{}, fmt.Errorf("unexpected result type: %T", result)
-	}
-
-	for i, count := range counts {
-		nodeID := nodeIDs[i]
-		visitMap[nodeID] = int(count.(int64)) // Redis results are returned as int64
-	}
-
-	return visitMap, nil
-}
-
 // Walks() returns a map of walks by walksID that visit nodeID.
 func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 
-	if err := RWS.validateFields(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -331,7 +253,7 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 // is invalid, no one gets added.
 func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 
-	if err := RWS.validateFields(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return err
 	}
 
@@ -379,7 +301,7 @@ func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 // is not found, no walk gets removed.
 func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 
-	if err := RWS.validateFields(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return err
 	}
 
@@ -436,7 +358,7 @@ func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 // pruned and grafted successfully.
 func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegment models.RandomWalk) error {
 
-	if err := RWS.validateFields(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return err
 	}
 

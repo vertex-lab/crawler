@@ -15,7 +15,11 @@ factor `alpha`. The walks are added to the RandomWalkStore.
 */
 func (RWM *RandomWalkManager) Generate(DB models.Database, nodeID uint32) error {
 
-	if err := checkInputs(RWM, DB, false); err != nil {
+	if err := DB.Validate(); err != nil {
+		return err
+	}
+
+	if err := RWM.Store.Validate(); err != nil {
 		return err
 	}
 
@@ -37,7 +41,11 @@ the Update() method.
 */
 func (RWM *RandomWalkManager) GenerateAll(DB models.Database) error {
 
-	if err := checkInputs(RWM, DB, true); err != nil {
+	if err := DB.Validate(); err != nil {
+		return err
+	}
+
+	if err := RWM.Store.Validate(); err != nil {
 		return err
 	}
 
@@ -141,16 +149,16 @@ func generateWalk(DB models.Database, startingNodeID uint32,
 
 /*
 performs a walk step nodeID --> nextNodeID in successorIDs and returns
-`nextNodeID` and `shouldStop`.
+`nextID` and `stop`.
 
-`shouldStop` is true if and only if:
+`stop` is true if and only if:
 
 - successorIDs is empty
 
 - nextNodeID was already visited in one of the previous steps (walk). In other
 words, when a cycle is found.
 */
-func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
+func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (nextID uint32, stop bool) {
 
 	// if it is a dandling node, stop
 	succLenght := len(successorIDs)
@@ -158,33 +166,13 @@ func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (uint32, bool) {
 		return math.MaxUint32, true
 	}
 
-	// randomly select the next node
 	randomIndex := rng.Intn(succLenght)
-	nextNodeID := successorIDs[randomIndex]
+	nextID = successorIDs[randomIndex]
 
 	// if there is a cycle, stop
-	if slices.Contains(walk, nextNodeID) {
+	if slices.Contains(walk, nextID) {
 		return math.MaxUint32, true
 	}
 
-	return nextNodeID, false
-}
-
-// checkInputs function is used to check whether the inputs are valid.
-// If not, an appropriate error is returned
-func checkInputs(RWM *RandomWalkManager, DB models.Database, expectEmptyRWM bool) error {
-
-	// checks if DB is nil or an empty database
-	err := DB.Validate()
-	if err != nil {
-		return err
-	}
-
-	// checks if RWM is not nil and whether it should be empty or not
-	err = RWM.Store.Validate(expectEmptyRWM)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return nextID, false
 }
