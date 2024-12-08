@@ -45,14 +45,6 @@ type RandomWalkStore interface {
 	// - if limit <= 0, all walks are returned
 	Walks(nodeID uint32, limit int) (map[uint32]RandomWalk, error)
 
-	// WalksRand() returns a map of walks by walkID chosen at random from the walks
-	// that visit nodeID, according to a specified probability of selection.
-	WalksRand(nodeID uint32, probabilityOfSelection float32) (map[uint32]RandomWalk, error)
-
-	// CommonWalks() returns a map of walks by walkID that contain both nodeID
-	// and at least one of the removedNode in removedNodes.
-	CommonWalks(nodeID uint32, removedNodes []uint32) (map[uint32]RandomWalk, error)
-
 	// AddWalk() adds a walk to the RandomWalkStore.
 	AddWalks(walks []RandomWalk) error
 

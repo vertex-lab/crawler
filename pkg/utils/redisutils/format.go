@@ -1,7 +1,6 @@
 package redisutils
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -123,53 +122,4 @@ func ParseFloat32(strVal string) (float32, error) {
 func ParseFloat64(strVal string) (float64, error) {
 	parsedVal, err := strconv.ParseFloat(strVal, 64)
 	return parsedVal, err
-}
-
-// ParseWalkMap parses the result of a Redis Lua script into a map[uint32]models.RandomWalk.
-// The input `result` should be a Redis result containing two slices:
-// - strWalkIDs as strings, and
-// - strWalks as serialized strings, which will be parsed into models.RandomWalk.
-func ParseWalkMap(result interface{}) (map[uint32]models.RandomWalk, error) {
-
-	resultList, ok := result.([]interface{})
-	if !ok || len(resultList) != 2 {
-		return nil, fmt.Errorf("unexpected result format: %v", result)
-	}
-
-	// convert the interfaces to slices of strings
-	var strWalkIDs []string
-	for _, v := range resultList[0].([]interface{}) {
-		strWalkID, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("unexpected format for walkID: %v", v)
-		}
-		strWalkIDs = append(strWalkIDs, strWalkID)
-	}
-
-	var strWalks []string
-	for _, v := range resultList[1].([]interface{}) {
-		strWalk, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("unexpected format for walk: %v", v)
-		}
-		strWalks = append(strWalks, strWalk)
-	}
-
-	// create the walkMap with parsed RandomWalks
-	walkMap := make(map[uint32]models.RandomWalk, len(strWalkIDs))
-	for i, strWalkID := range strWalkIDs {
-		walkID, err := ParseID(strWalkID)
-		if err != nil {
-			return nil, err
-		}
-
-		walk, err := ParseWalk(strWalks[i])
-		if err != nil {
-			return nil, err
-		}
-
-		walkMap[uint32(walkID)] = walk
-	}
-
-	return walkMap, nil
 }

@@ -3,9 +3,6 @@
 package mock
 
 import (
-	"math"
-	"math/rand"
-
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
@@ -199,50 +196,6 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 	return walkMap, nil
 }
 
-/*
-CommonWalks returns a map of candidate walks by walkID that MIGHT
-be updated inside the method RWM.updateRemovedNodes().
-
-These candidate walks are the one that contain both nodeID and at least one
-of the removed node in removedNodes.
-*/
-func (RWS *RandomWalkStore) CommonWalks(nodeID uint32,
-	removedNodes []uint32) (map[uint32]models.RandomWalk, error) {
-
-	if err := RWS.Validate(false); err != nil {
-		return nil, err
-	}
-
-	// get the IDs of the walks that visit nodeID
-	nodeWalkIDs, err := RWS.WalkIDs(nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	// get the IDs of the walks that visit one of the removedNodes
-	unionRemovedNodesWalkIDs := mapset.NewSet[uint32]()
-	for _, removedNode := range removedNodes {
-
-		removedWalkIDs, err := RWS.WalkIDs(removedNode)
-		if err != nil {
-			return nil, err
-		}
-
-		unionRemovedNodesWalkIDs.Append(removedWalkIDs.ToSlice()...)
-	}
-
-	// get the walks that contain both nodeID and one of the removedNodes
-	candidateWalkIDs := nodeWalkIDs.Intersect(unionRemovedNodesWalkIDs)
-
-	// extract into the map format
-	walkMap := make(map[uint32]models.RandomWalk, candidateWalkIDs.Cardinality())
-	for walkID := range candidateWalkIDs.Iter() {
-		walkMap[walkID] = RWS.WalkIndex[walkID]
-	}
-
-	return walkMap, nil
-}
-
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no one gets added.
 func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
@@ -394,41 +347,6 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int,
 	}
 
 	return nil
-}
-
-/*
-WalksForUpdateAdded returns a slice of random walks that WILL be updated
-inside the method RWM.updateAddedNodes().
-These walks will be chosen at random from the walks that visit nodeID, according to
-a specified probability of selection.
-*/
-func (RWS *RandomWalkStore) WalksRand(nodeID uint32,
-	probabilityOfSelection float32) (map[uint32]models.RandomWalk, error) {
-
-	walkIDs, err := RWS.WalkIDs(nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	expectedSize := expectedSize(walkIDs.Cardinality(), probabilityOfSelection)
-	walkMap := make(map[uint32]models.RandomWalk, expectedSize)
-
-	for walkID := range walkIDs.Iter() {
-		if rand.Float32() > probabilityOfSelection {
-			continue
-		}
-
-		walkMap[walkID] = RWS.WalkIndex[walkID]
-	}
-
-	return walkMap, nil
-}
-
-// ------------------------------------HELPERS----------------------------------
-
-// expectedSize() returns the nearest integer of cardinality * probability
-func expectedSize(cardinality int, probability float32) int {
-	return int(math.Round(float64(cardinality) * float64(probability)))
 }
 
 // SetupRWS() returns a RWS setup based on the RWSType.
