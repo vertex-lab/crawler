@@ -14,8 +14,7 @@ This project implements the algorithms described in [this paper](http://snap.sta
 
 ## Structure
 
-`/cmd/app/main.go`: the main function, which should:
-- generate the random walks on restart
+`/cmd/crawler.go`: the main function, which should:
 - listen for graph updates (e.g. a node is added, or a node has changed it's out-edges)
 - update the random walks
 
@@ -26,11 +25,11 @@ This project implements the algorithms described in [this paper](http://snap.sta
 - `/pkg/store/mock/`: Implementation in-memory, for tests.
 
 `/pkg/database/`: contains two implementations of the `Database` interface, which deals with saving and fetching nodes and edges from a persistent database.
-- `/pkg/database/redisdb/`: Implementation using redis, for production use (WIP).
+- `/pkg/database/redisdb/`: Implementation using redis, for production use.
 - `/pkg/database/mock/`: Implementation in-memory, for tests.
 
-`/pkg/walks/`: responsible for all the logic around the random walks, including generating new random walks and updating existing ones.
+`/pkg/walks/`: responsible for all the logic around the random walks, including generating, removing and updating.
 
 `/pkg/pagerank/`: contains the definitions of all algorithms that use random walks, such as pagerank and personalized pagerank.
 
-`/tests/stochastic/`: contains stochastic tests that ensure that the walk logic and the algorithms (pagerank, personalized pagerank) work together as expected.
+`/tests/algos/`: contains stochastic tests that ensure that the walk logic and the algorithms (pagerank, personalized pagerank) work together as expected.
