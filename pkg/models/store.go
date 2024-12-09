@@ -50,7 +50,7 @@ type RandomWalkStore interface {
 	/*PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
 	These functions need to be coupled together to leverage the atomicity of Redis transactions.
 
-	Example:
+	# Example:
 	1. Pruning: walk = {0,1,2,3} gets pruned with cutIndex = 1, becoming walk[:cutIndex] = {0,1}
 	2. Grafting: walkSegment = {4,5} is added to the walk, resulting in walk = {0,1,4,5}*/
 	PruneGraftWalk(walkID uint32, cutIndex int, walkSegment RandomWalk) error
