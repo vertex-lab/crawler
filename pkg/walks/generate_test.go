@@ -199,7 +199,7 @@ func TestGenerate(t *testing.T) {
 			name:          "empty DB",
 			DBType:        "empty",
 			RWMType:       "one-node1",
-			expectedError: models.ErrEmptyDB,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:          "node not in DB",

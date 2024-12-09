@@ -16,8 +16,16 @@ import (
 	"errors"
 )
 
-const StatusActive = "active" // we generate random walks from this node.
-const StatusInactive = "inactive"
+const (
+	KeyID       string = "id"
+	KeyPubkey   string = "pubkey"
+	KeyEventTS  string = "event_timestamp"
+	KeyStatus   string = "status"
+	KeyPagerank string = "pagerank"
+
+	StatusActive   string = "active" // we generate random walks for this node
+	StatusInactive string = "inactive"
+)
 
 // NodeMeta contains the metadata about a node, meaning everything that is not a relationship
 type NodeMeta struct {
@@ -52,6 +60,9 @@ type NodeDiff struct {
 // The Database interface abstracts the DB basic functions
 type Database interface {
 
+	// Size() returns the number of nodes in the DB (ignores errors).
+	Size() int
+
 	// ContainsNode() returns wheter a specified nodeID is found in the DB
 	ContainsNode(nodeID uint32) bool
 
@@ -70,9 +81,6 @@ type Database interface {
 	// UpdateNode() updates the nodeID using the new values inside node.
 	UpdateNode(nodeID uint32, nodeDiff *NodeDiff) error
 
-	// IsDandling() returns whether a node has any successor
-	IsDandling(nodeID uint32) bool
-
 	// Successors() returns a slice that contains the IDs of all successors of a node
 	Successors(nodeID uint32) ([]uint32, error)
 
@@ -90,9 +98,6 @@ type Database interface {
 
 	// AllNodes() returns a slice with the IDs of all nodes in the DB
 	AllNodes() ([]uint32, error)
-
-	// Size() returns the number of nodes in the DB (ignores errors).
-	Size() int
 
 	// SetPagerank() set the pagerank in the database according to the pagerankMap
 	SetPagerank(PagerankMap) error

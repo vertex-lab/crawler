@@ -145,7 +145,6 @@ func TestFullyUsed(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-
 	t.Run("simple cases", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -170,7 +169,7 @@ func TestLoad(t *testing.T) {
 				WCType:        "empty",
 				nodeID:        0,
 				limit:         100,
-				expectedError: models.ErrEmptyRWS,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "node not found RWS",

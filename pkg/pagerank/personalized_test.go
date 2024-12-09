@@ -15,7 +15,6 @@ import (
 )
 
 func TestCheckInputs(t *testing.T) {
-
 	testCases := []struct {
 		name          string
 		DBType        string
@@ -33,28 +32,12 @@ func TestCheckInputs(t *testing.T) {
 			expectedError: models.ErrNilDBPointer,
 		},
 		{
-			name:          "empty DB",
-			DBType:        "empty",
-			RWSType:       "one-node0",
-			nodeID:        0,
-			topK:          5,
-			expectedError: models.ErrEmptyDB,
-		},
-		{
 			name:          "nil RWS",
 			DBType:        "one-node0",
 			RWSType:       "nil",
 			nodeID:        0,
 			topK:          5,
 			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "empty RWS",
-			DBType:        "one-node0",
-			RWSType:       "empty",
-			nodeID:        0,
-			topK:          5,
-			expectedError: models.ErrEmptyRWS,
 		},
 		{
 			name:          "node not in DB",
@@ -64,14 +47,6 @@ func TestCheckInputs(t *testing.T) {
 			topK:          5,
 			expectedError: models.ErrNodeNotFoundDB,
 		},
-		// {
-		// 	name:          "node not in RWS",
-		// 	DBType:        "one-node1",
-		// 	RWSType:       "one-node0",
-		// 	nodeID:        1,
-		// 	topK:          5,
-		// 	expectedError: models.ErrNodeNotFoundRWS,
-		// },
 		{
 			name:          "invalid topK",
 			DBType:        "one-node0",
@@ -83,10 +58,8 @@ func TestCheckInputs(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
-
 			err := checkInputs(DB, RWS, test.nodeID, test.topK)
 
 			if !errors.Is(err, test.expectedError) {
@@ -135,7 +108,6 @@ func TestCountAndNormalize(t *testing.T) {
 }
 
 func TestReached(t *testing.T) {
-
 	testCases := []struct {
 		name            string
 		targetLength    int
@@ -155,9 +127,9 @@ func TestReached(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			pWalk := NewPersonalizedWalk(0, test.targetLength)
 			reached := pWalk.Reached(test.targetLength)
+
 			if reached != test.expectedReached {
 				t.Errorf("Reached(): expected %v, got %v", test.expectedReached, reached)
 			}
@@ -166,7 +138,6 @@ func TestReached(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-
 	testCases := []struct {
 		name            string
 		pWalkType       string
@@ -186,7 +157,6 @@ func TestReset(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			pWalk := SetupPWalk(test.pWalkType, 10)
 			pWalk.Reset()
 
@@ -206,7 +176,6 @@ func TestReset(t *testing.T) {
 }
 
 func TestAppendNode(t *testing.T) {
-
 	testCases := []struct {
 		name                string
 		pWalkType           string
@@ -229,7 +198,6 @@ func TestAppendNode(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			pWalk := SetupPWalk(test.pWalkType, 10)
 			pWalk.AppendNode(test.nextNodeID)
 
@@ -245,7 +213,6 @@ func TestAppendNode(t *testing.T) {
 }
 
 func TestAppendWalk(t *testing.T) {
-
 	testCases := []struct {
 		name            string
 		pWalkType       string
@@ -268,7 +235,6 @@ func TestAppendWalk(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			pWalk := SetupPWalk(test.pWalkType, 10)
 			pWalk.AppendWalk(test.walkSegment)
 
@@ -295,7 +261,7 @@ func TestPersonalizedWalk(t *testing.T) {
 			RWSType:        "empty",
 			startingNodeID: 0,
 			requiredLenght: 5,
-			expectedError:  models.ErrEmptyRWS,
+			expectedError:  models.ErrNodeNotFoundRWS,
 		},
 		{
 			name:           "node not found RWS",
@@ -335,13 +301,11 @@ func TestPersonalizedWalk(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
 			rng := rand.New(rand.NewSource(42))
 
 			pWalk, err := personalizedWalk(DB, RWS, test.startingNodeID, test.requiredLenght, rng)
-
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
 			}
@@ -349,8 +313,6 @@ func TestPersonalizedWalk(t *testing.T) {
 			// check the visits match the expected ones.
 			// Note: Order of visits cannot be inforced due to walkSet.Iter()
 			if test.expectedVisits != nil {
-
-				// count the visits
 				visits := make(map[uint32]int, 3)
 				for _, nodeID := range pWalk {
 					visits[nodeID]++
@@ -367,9 +329,7 @@ func TestPersonalizedWalk(t *testing.T) {
 }
 
 func TestPersonalizedPagerank(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
-
 		testCases := []struct {
 			name          string
 			DBType        string
@@ -392,7 +352,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				RWSType:       "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: models.ErrEmptyDB,
+				expectedError: models.ErrNodeNotFoundDB,
 			},
 			{
 				name:          "nil RWS",
@@ -408,7 +368,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				DBType:        "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: models.ErrEmptyRWS,
+				expectedError: models.ErrNodeNotFoundRWS,
 			},
 			{
 				name:          "node not in the RWS",
@@ -430,10 +390,8 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-
 				DB := mockdb.SetupDB(test.DBType)
 				RWS := mockstore.SetupRWS(test.RWSType)
-
 				_, err := Personalized(DB, RWS, test.nodeID, test.topK)
 
 				if !errors.Is(err, test.expectedError) {

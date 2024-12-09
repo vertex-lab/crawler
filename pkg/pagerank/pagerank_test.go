@@ -18,12 +18,11 @@ import (
 
 func TestPagerank(t *testing.T) {
 	testCases := []struct {
-		name                string
-		DBType              string
-		RWSType             string
-		expectedPagerank    models.PagerankMap
-		expectedTotalVisits int
-		expectedError       error
+		name             string
+		DBType           string
+		RWSType          string
+		expectedPagerank models.PagerankMap
+		expectedError    error
 	}{
 		{
 			name:          "nil DB",
@@ -50,21 +49,19 @@ func TestPagerank(t *testing.T) {
 			expectedError: models.ErrEmptyRWS,
 		},
 		{
-			name:                "just one node",
-			DBType:              "one-node0",
-			RWSType:             "one-node0",
-			expectedError:       nil,
-			expectedTotalVisits: 1,
+			name:          "just one node",
+			DBType:        "one-node0",
+			RWSType:       "one-node0",
+			expectedError: nil,
 			expectedPagerank: models.PagerankMap{
 				0: 1.0,
 			},
 		},
 		{
-			name:                "simple RWS",
-			DBType:              "simple",
-			RWSType:             "simple",
-			expectedError:       nil,
-			expectedTotalVisits: 2,
+			name:          "simple RWS",
+			DBType:        "simple",
+			RWSType:       "simple",
+			expectedError: nil,
 			expectedPagerank: models.PagerankMap{
 				0: 0.5,
 				1: 0.5,
@@ -72,11 +69,10 @@ func TestPagerank(t *testing.T) {
 			},
 		},
 		{
-			name:                "triangle RWS",
-			DBType:              "triangle",
-			RWSType:             "triangle",
-			expectedError:       nil,
-			expectedTotalVisits: 9,
+			name:          "triangle RWS",
+			DBType:        "triangle",
+			RWSType:       "triangle",
+			expectedError: nil,
 			expectedPagerank: models.PagerankMap{
 				0: 1.0 / 3.0,
 				1: 1.0 / 3.0,
@@ -95,16 +91,8 @@ func TestPagerank(t *testing.T) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
 			}
 
-			// in case of no errors, check the pagerank and the totalVisits.
-			if err == nil {
-				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
-					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
-				}
-
-				visits := RWS.TotalVisits()
-				if visits != test.expectedTotalVisits {
-					t.Errorf("Pagerank(): expected visits %v, got %v", test.expectedTotalVisits, visits)
-				}
+			if Distance(pagerank, test.expectedPagerank) > 1e-10 {
+				t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
 			}
 		})
 	}
@@ -125,13 +113,6 @@ func TestLazyPagerank(t *testing.T) {
 			RWSType:       "one-node0",
 			nodeIDs:       []uint32{0},
 			expectedError: models.ErrNilDBPointer,
-		},
-		{
-			name:          "empty DB",
-			DBType:        "empty",
-			RWSType:       "one-node0",
-			nodeIDs:       []uint32{0},
-			expectedError: models.ErrEmptyDB,
 		},
 		{
 			name:          "nil RWS",

@@ -284,7 +284,7 @@ func TestUpdate(t *testing.T) {
 				nodeID:        0,
 				oldSucc:       []uint32{0},
 				currentSucc:   []uint32{1},
-				expectedError: models.ErrEmptyDB,
+				expectedError: models.ErrNodeNotFoundDB,
 			},
 			{
 				name:          "nil RWM",

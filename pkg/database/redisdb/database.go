@@ -14,6 +14,15 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
+const (
+	KeyDatabase        string = "database"
+	KeyLastNodeID      string = "lastNodeID"
+	KeyKeyIndex        string = "keyIndex"
+	KeyNodePrefix      string = "node:"
+	KeyFollowsPrefix   string = "follows:"
+	KeyFollowersPrefix string = "followers:"
+)
+
 // Database fulfills the Database interface defined in models
 type Database struct {
 	client *redis.Client
@@ -47,34 +56,14 @@ func NewDatabase(ctx context.Context, cl *redis.Client) (*Database, error) {
 	return DB, nil
 }
 
-// validateFields() check if DB and client are nil and returns the appropriare error
-func (DB *Database) validateFields() error {
-
+// Validate() check if DB and client are nil and returns the appropriare error
+func (DB *Database) Validate() error {
 	if DB == nil {
 		return models.ErrNilDBPointer
 	}
 
 	if DB.client == nil {
-		return ErrNilClientPointer
-	}
-
-	return nil
-}
-
-// Validate() returns an error if the DB is nil or has no nodes
-func (DB *Database) Validate() error {
-
-	if err := DB.validateFields(); err != nil {
-		return err
-	}
-
-	len, err := DB.client.HLen(DB.ctx, KeyKeyIndex).Result()
-	if err != nil {
-		return err
-	}
-
-	if len <= 0 {
-		return models.ErrEmptyDB
+		return models.ErrNilClientPointer
 	}
 
 	return nil
@@ -83,7 +72,7 @@ func (DB *Database) Validate() error {
 // NodeByID() retrieves a node by its nodeID.
 func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return &models.NodeMeta{}, err
 	}
 
@@ -108,7 +97,7 @@ func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
 // NodeByKey() retrieves a node by its pubkey.
 func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return &models.NodeMeta{}, err
 	}
 
@@ -122,7 +111,6 @@ func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
 		return &models.NodeMeta{}, err
 	}
 
-	// get the node by the nodeID
 	cmd := DB.client.HGetAll(DB.ctx, KeyNode(nodeID))
 	if cmd.Err() != nil {
 		return &models.NodeMeta{}, cmd.Err()
@@ -138,7 +126,7 @@ func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
 // AddNode() adds a node to the database and returns its assigned nodeID.
 func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return math.MaxUint32, err
 	}
 
@@ -151,28 +139,22 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 		return math.MaxUint32, models.ErrNodeAlreadyInDB
 	}
 
-	// get the nodeID outside the transaction. This implies that there might be "holes",
-	// meaning IDs not associated with any node
+	// get the nodeID outside the transaction. This implies that there might
+	// be "holes", meaning IDs not associated with any node
 	nodeID, err := DB.client.HIncrBy(DB.ctx, KeyDatabase, KeyLastNodeID, 1).Result()
 	if err != nil {
 		return math.MaxUint32, err
 	}
 	node.Metadata.ID = uint32(nodeID)
 
-	// begin the transaction
+	// add pubkey to the KeyIndex, and node
 	pipe := DB.client.TxPipeline()
-
-	// add pubkey to the KeyIndex
 	pipe.HSetNX(DB.ctx, KeyKeyIndex, node.Metadata.Pubkey, nodeID)
-
-	// add the node metadata in a node HASH
 	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata)
 
-	// add successors and predecessors
 	AddSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
 	AddPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
 
-	// execute the transaction
 	if _, err := pipe.Exec(DB.ctx); err != nil {
 		return math.MaxUint32, err
 	}
@@ -182,19 +164,13 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 
 // AddSuccessors() adds the successors of nodeID to the database
 func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedSucc []uint32) {
-
-	if len(addedSucc) == 0 {
-		return // early return to avoid errors
-	}
-
-	// format successors
-	strAddedSucc := make([]string, 0, len(addedSucc))
-	for _, s := range addedSucc {
-		strAddedSucc = append(strAddedSucc, redisutils.FormatID(s))
+	strSucc := redisutils.FormatIDs(addedSucc)
+	if len(strSucc) == 0 {
+		return
 	}
 
 	// add successors to the follows set of nodeID
-	pipe.SAdd(ctx, KeyFollows(nodeID), strAddedSucc)
+	pipe.SAdd(ctx, KeyFollows(nodeID), strSucc)
 
 	// add nodeID to the followers of the other nodes
 	for _, added := range addedSucc {
@@ -204,19 +180,13 @@ func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, add
 
 // RemoveSuccessors() adds the successors of nodeID to the database
 func RemoveSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, removedSucc []uint32) {
-
-	if len(removedSucc) == 0 {
-		return // early return to avoid errors
-	}
-
-	// format successors
-	strRemovedSucc := make([]string, 0, len(removedSucc))
-	for _, s := range removedSucc {
-		strRemovedSucc = append(strRemovedSucc, redisutils.FormatID(s))
+	strSucc := redisutils.FormatIDs(removedSucc)
+	if len(strSucc) == 0 {
+		return
 	}
 
 	// remove successors from the follows set of nodeID
-	pipe.SRem(ctx, KeyFollows(nodeID), strRemovedSucc)
+	pipe.SRem(ctx, KeyFollows(nodeID), strSucc)
 
 	// remove nodeID from the followers of the removedSucc
 	for _, removed := range removedSucc {
@@ -226,19 +196,13 @@ func RemoveSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, 
 
 // AddPredecessors() adds the predecessors of nodeID to the database
 func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedPred []uint32) {
-
-	if len(addedPred) == 0 {
-		return // early return to avoid errors
-	}
-
-	// format predecessors
-	strAddedPred := make([]string, 0, len(addedPred))
-	for _, p := range addedPred {
-		strAddedPred = append(strAddedPred, redisutils.FormatID(p))
+	strPred := redisutils.FormatIDs(addedPred)
+	if len(strPred) == 0 {
+		return
 	}
 
 	// add predecessors to the followers set of nodeID
-	pipe.SAdd(ctx, KeyFollowers(nodeID), strAddedPred)
+	pipe.SAdd(ctx, KeyFollowers(nodeID), strPred)
 
 	// add nodeID to the follows of the other nodes
 	for _, added := range addedPred {
@@ -249,11 +213,11 @@ func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, a
 // UpdateNode() updates the nodeID using the new values inside the nodeDiff.
 func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return err
 	}
 
-	// check if the nodeID exists
+	// check if nodeID exists
 	exists, err := DB.client.Exists(DB.ctx, KeyNode(nodeID)).Result()
 	if err != nil {
 		return err
@@ -262,26 +226,21 @@ func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 		return models.ErrNodeNotFoundDB
 	}
 
-	// begin the transaction
-	pipe := DB.client.TxPipeline()
-
 	// update the node HASH. Only the non empty fields will be updated, thanks to "omitempty"
+	pipe := DB.client.TxPipeline()
 	pipe.HSet(DB.ctx, KeyNode(nodeID), nodeDiff.Metadata).Err()
 
-	// update successors and predecessors
 	AddSuccessors(DB.ctx, pipe, nodeID, nodeDiff.AddedSucc)
 	RemoveSuccessors(DB.ctx, pipe, nodeID, nodeDiff.RemovedSucc)
 
-	// execute the transaction
 	_, err = pipe.Exec(DB.ctx)
 	return err
 }
 
-// ContainsNode() returns wheter a specified nodeID is found in the DB. In case of
-// errors, it returns the default false.
+// ContainsNode() returns wheter the DB contains nodeID. In case of errors returns false.
 func (DB *Database) ContainsNode(nodeID uint32) bool {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return false
 	}
 
@@ -293,31 +252,10 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 	return exists == 1
 }
 
-// IsDandling() returns whether a node has any successor. In case of errors,
-// it returns the default false.
-func (DB *Database) IsDandling(nodeID uint32) bool {
-
-	if err := DB.validateFields(); err != nil {
-		return false
-	}
-
-	exists, err := DB.client.Exists(DB.ctx, KeyNode(nodeID)).Result()
-	if err != nil || exists <= 0 {
-		return false
-	}
-
-	card, err := DB.client.SCard(DB.ctx, KeyFollows(nodeID)).Result()
-	if err != nil {
-		return false
-	}
-
-	return card == 0
-}
-
 // Successors() returns a slice that contains the IDs of all successors of a node
 func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -342,7 +280,7 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 // If a pubkey is not found, nil is returned
 func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -356,7 +294,6 @@ func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
 	}
 
 	for i, strNodeID := range nodeIDs {
-
 		// whatever is not nil, parse it to uint32
 		if strNodeID != nil {
 			nodeID, err := redisutils.ParseID(strNodeID.(string))
@@ -374,7 +311,7 @@ func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
 // If a nodeID is not found, nil is returned
 func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -385,7 +322,7 @@ func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 	pipe := DB.client.Pipeline()
 	cmds := make([]*redis.StringCmd, len(nodeIDs))
 	for i, nodeID := range nodeIDs {
-		cmds[i] = pipe.HGet(DB.ctx, KeyNode(nodeID), "pubkey")
+		cmds[i] = pipe.HGet(DB.ctx, KeyNode(nodeID), models.KeyPubkey)
 	}
 
 	// if the error is redis.Nil, deal with it later
@@ -411,19 +348,20 @@ func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 // in determining the number of nodes returned.
 func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return []uint32{}, 0, err
 	}
-	lenPrefix := len(KeyNodePrefix)
-	match := KeyNodePrefix + "*" // node:*
 
-	strNodeIDs, newCursor, err := DB.client.Scan(DB.ctx, cursor, match, int64(limit)).Result()
+	lenPrefix := len(KeyNodePrefix)
+	match := KeyNodePrefix + "*"
+
+	strIDs, newCursor, err := DB.client.Scan(DB.ctx, cursor, match, int64(limit)).Result()
 	if err != nil {
 		return []uint32{}, 0, err
 	}
 
-	nodeIDs := make([]uint32, 0, len(strNodeIDs))
-	for _, strNodeID := range strNodeIDs {
+	nodeIDs := make([]uint32, 0, len(strIDs))
+	for _, strNodeID := range strIDs {
 
 		nodeID, err := redisutils.ParseID(strNodeID[lenPrefix:])
 		if err != nil {
@@ -439,21 +377,21 @@ func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error
 // AllNodes() returns a slice with the IDs of all nodes in the DB
 func (DB *Database) AllNodes() ([]uint32, error) {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
-	strNodeIDs, err := DB.client.HVals(DB.ctx, KeyKeyIndex).Result()
+	strIDs, err := DB.client.HVals(DB.ctx, KeyKeyIndex).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	if len(strNodeIDs) == 0 {
+	if len(strIDs) == 0 {
 		return nil, models.ErrEmptyDB
 	}
 
-	nodeIDs := make([]uint32, 0, len(strNodeIDs))
-	for _, ID := range strNodeIDs {
+	nodeIDs := make([]uint32, 0, len(strIDs))
+	for _, ID := range strIDs {
 
 		nodeID, err := redisutils.ParseID(ID)
 		if err != nil {
@@ -466,11 +404,10 @@ func (DB *Database) AllNodes() ([]uint32, error) {
 	return nodeIDs, nil
 }
 
-// Size() returns the number of nodes in the DB. In case of errors, it returns
-// the default value of 0.
+// Size() returns the number of nodes in the DB. In case of errors, it returns 0.
 func (DB *Database) Size() int {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return 0
 	}
 
@@ -482,56 +419,12 @@ func (DB *Database) Size() int {
 	return int(size)
 }
 
-func (DB *Database) SetPagerankLua(pagerankMap models.PagerankMap) error {
-
-	if err := DB.validateFields(); err != nil {
-		return err
-	}
-
-	if len(pagerankMap) == 0 {
-		return nil
-	}
-
-	// prepare the keys and values for the Lua script
-	keys := make([]string, 0, len(pagerankMap))
-	values := make([]interface{}, 0, len(pagerankMap))
-	for nodeID, rank := range pagerankMap {
-		keys = append(keys, KeyNode(nodeID))
-		values = append(values, rank)
-	}
-
-	luaScript := `
-	for i = 1, #KEYS do
-		if redis.call('EXISTS', KEYS[i]) == 0 then
-			return KEYS[i]
-		end
-		redis.call('HSET', KEYS[i], 'pagerank', ARGV[i])
-	end
-	return 'OK'
-    `
-
-	res, err := DB.client.Eval(DB.ctx, luaScript, keys, values...).Result()
-	if err != nil {
-		return err
-	}
-
-	resStr, ok := res.(string)
-	if !ok {
-		return fmt.Errorf("unexpected return type %T", res)
-	}
-	if resStr != "OK" {
-		return fmt.Errorf("%w: %v", models.ErrNodeNotFoundDB, res.(string))
-	}
-
-	return nil
-}
-
 // SetPagerank() writes the pagerank values on the specified nodeIDs.
 // Before writing, it ensures that all keys exists. If that's not the case
 // no writes occur and an error is returned.
 func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 
-	if err := DB.validateFields(); err != nil {
+	if err := DB.Validate(); err != nil {
 		return err
 	}
 
@@ -564,9 +457,9 @@ func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 	}
 
 	// write the new pagerank scores
-	writePipe := DB.client.Pipeline()
+	writePipe := DB.client.TxPipeline()
 	for i, val := range vals {
-		writePipe.HSet(DB.ctx, keys[i], "pagerank", val)
+		writePipe.HSet(DB.ctx, keys[i], models.KeyPagerank, val)
 	}
 	if _, err := writePipe.Exec(DB.ctx); err != nil {
 		return err
@@ -574,66 +467,6 @@ func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 
 	return nil
 }
-
-// func (DB *Database) PagerankLUA() error {
-
-// 	if err := DB.validateFields(); err != nil {
-// 		return err
-// 	}
-
-// 	luaScript := `
-// 		local nodePrefix = KEYS[1]
-// 		local keyIndex = KEYS[2]
-// 		local walksVisiting = KEYS[3]
-
-// 		local nodeIDs = redis.call('HVALS', keyIndex)
-// 		local totalVisits = 0
-// 		local visitMap = {}
-
-// 		for i, nodeID in ipairs(nodeIDs) do
-// 			local visits = redis.call('SCARD', walksVisiting .. nodeID)
-// 			visitMap[nodeID] = visits
-// 			totalVisits = totalVisits + visits
-// 		end
-
-// 		-- If the total visits is zero, return an empty map to avoid division by zero
-// 		if totalVisits == 0 then
-// 			return 'NO VISITS'
-// 		end
-
-// 		-- Calculate Pagerank for each node and store it in a result map
-// 		for nodeID, visits in pairs(visitMap) do
-// 			redis.call('HSET', nodePrefix .. nodeID, 'pagerank', visits / totalVisits)
-// 		end
-
-// 		return 'OK'
-// 	`
-// 	_ = luaScript
-
-// 	keys := []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}
-// 	// sha1, err := DB.client.ScriptLoad(context.Background(), luaScript).Result()
-// 	// if err != nil {
-// 	// 	return err
-// 	// }
-// 	// return fmt.Errorf("sha1: %v", sha1)
-
-// 	// res, err := DB.client.Eval(DB.ctx, luaScript, []string{KeyNodePrefix, KeyKeyIndex, redistore.KeyWalksVisitingPrefix}).Result()
-// 	// if err != nil {
-// 	// 	return err
-// 	// }
-// 	const scriptSHA = "22b8ddc9699ff7699d9fc68d5b158db136590d96"
-
-// 	res, err := DB.client.EvalSha(DB.ctx, scriptSHA, keys).Result()
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if res == "NO VISITS" {
-// 		return models.ErrEmptyDB
-// 	}
-
-// 	return nil
-// }
 
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
@@ -645,6 +478,15 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	switch DBType {
 	case "nil":
 		return nil, nil
+
+	case "nil-client":
+		DB, err := NewDatabase(ctx, cl)
+		if err != nil {
+			return nil, err
+		}
+
+		DB.client = nil
+		return DB, nil
 
 	case "empty":
 		DB, err := NewDatabase(ctx, cl)
@@ -794,7 +636,6 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 		return DB, nil
 
 	case "triangle":
-
 		DB, err := NewDatabase(context.Background(), cl)
 		if err != nil {
 			return nil, err
@@ -871,15 +712,6 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 	}
 	return DB, nil
 }
-
-//----------------------------------REDIS-KEYS----------------------------------
-
-const KeyDatabase string = "database"
-const KeyLastNodeID string = "lastNodeID"
-const KeyKeyIndex string = "keyIndex"
-const KeyNodePrefix string = "node:"
-const KeyFollowsPrefix string = "follows:"
-const KeyFollowersPrefix string = "followers:"
 
 // KeyNode() returns the Redis key for the node with specified nodeID
 func KeyNode(nodeID interface{}) string {

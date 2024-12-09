@@ -34,13 +34,8 @@ func NewDatabase() *Database {
 
 // Validate() returns an error if the DB is nil or has no nodes
 func (DB *Database) Validate() error {
-
 	if DB == nil {
 		return models.ErrNilDBPointer
-	}
-
-	if len(DB.NodeIndex) == 0 {
-		return models.ErrEmptyDB
 	}
 
 	return nil
@@ -172,40 +167,6 @@ func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
 	return &node.Metadata, nil
 }
 
-// IsDandling returns whether a node has no successors (dandling).
-// In case of errors, returns the default true.
-func (DB *Database) IsDandling(nodeID uint32) bool {
-
-	Successors, err := DB.Successors(nodeID)
-	if err != nil {
-		return true
-	}
-
-	return len(Successors) == 0
-}
-
-// RandomSuccessor() returns a random successor of nodeID. In case of error
-// it returns MaxUint32 as the nodeID.
-func (DB *Database) RandomSuccessor(nodeID uint32) (uint32, error) {
-
-	if err := DB.Validate(); err != nil {
-		return math.MaxUint32, err
-	}
-
-	node, exists := DB.NodeIndex[nodeID]
-	if !exists {
-		return math.MaxUint32, models.ErrNodeNotFoundDB
-	}
-
-	// if it is a dandling node
-	if len(node.Successors) == 0 {
-		return math.MaxUint32, nil
-	}
-
-	randomIndex := rand.Intn((len(node.Successors)))
-	return node.Successors[randomIndex], nil
-}
-
 // Successors() returns the slice of successors of nodeID.
 func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 
@@ -327,7 +288,6 @@ func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error
 
 // function that returns a DB setup based on the DBType
 func SetupDB(DBType string) *Database {
-
 	odell := "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
 	calle := "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63"
 	pip := "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"

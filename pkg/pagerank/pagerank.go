@@ -7,8 +7,17 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+// Distance() returns the L1 distance between two maps.
 func Distance(map1, map2 models.PagerankMap) float64 {
-	distance := 0.0
+	if len(map1) != len(map2) {
+		return math.Inf(1)
+	}
+
+	if len(map1) == 0 {
+		return 0
+	}
+
+	var distance float64
 	for key := range map1 {
 		distance += math.Abs(map1[key] - map2[key])
 	}
@@ -31,15 +40,22 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMa
 		return nil, err
 	}
 
+	if len(nodeIDs) == 0 {
+		return nil, models.ErrEmptyDB
+	}
+
 	visitMap, err := RWS.VisitCounts(nodeIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	// get the total visits
-	totalVisits := 0.0
+	var totalVisits float64
 	for _, visits := range visitMap {
 		totalVisits += float64(visits)
+	}
+
+	if totalVisits == 0 {
+		return nil, models.ErrEmptyRWS
 	}
 
 	// compute the pagerank as the frequency of visits
@@ -51,8 +67,7 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMa
 	return pagerank, nil
 }
 
-// LazyPagerank() computes the pagerank scores of only the specified nodes nodeIDs.
-// It fetches the current value of totalVisits, which could be slightly
+// LazyPagerank() computes the pagerank scores of only the specified nodeIDs.
 func LazyPagerank(DB models.Database, RWS models.RandomWalkStore, nodeIDs []uint32) (models.PagerankMap, error) {
 
 	if len(nodeIDs) == 0 {
@@ -68,6 +83,10 @@ func LazyPagerank(DB models.Database, RWS models.RandomWalkStore, nodeIDs []uint
 	}
 
 	totalVisits := RWS.TotalVisits()
+	if totalVisits == 0 {
+		return nil, models.ErrEmptyRWS
+	}
+
 	visitMap, err := RWS.VisitCounts(nodeIDs)
 	if err != nil {
 		return nil, err

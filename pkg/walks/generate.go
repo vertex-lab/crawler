@@ -54,6 +54,10 @@ func (RWM *RandomWalkManager) GenerateAll(DB models.Database) error {
 		return err
 	}
 
+	if len(nodeIDs) == 0 {
+		return models.ErrEmptyDB
+	}
+
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return RWM.generateWalks(DB, nodeIDs, rng)
 }

@@ -52,7 +52,13 @@ func Personalized(DB models.Database, RWS models.RandomWalkStore,
 func personalized(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, topK uint16, rng *rand.Rand) (models.PagerankMap, error) {
 
-	if DB.IsDandling(nodeID) {
+	succ, err := DB.Successors(nodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// if it's a dandling node
+	if len(succ) == 0 {
 		return models.PagerankMap{nodeID: 1.0}, nil
 	}
 

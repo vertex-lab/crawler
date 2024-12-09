@@ -19,8 +19,6 @@ type RandomWalkStore struct {
 	// Associates a nodeID to the set of walkIDs that visited that node.
 	WalksVisiting map[uint32]WalkSet
 
-	//mu sync.RWMutex
-
 	// The dampening factor, which is the probability of stopping at each step of the random walk. Default is 0.85
 	alpha float32
 
@@ -46,10 +44,9 @@ func NewRWS(alpha float32, walksPerNode uint16) (*RandomWalkStore, error) {
 	RWS := &RandomWalkStore{
 		WalkIndex:     make(map[uint32]models.RandomWalk),
 		WalksVisiting: make(map[uint32]WalkSet),
-		//mu:            sync.RWMutex{},
-		alpha:        alpha,
-		walksPerNode: walksPerNode,
-		totalVisits:  0,
+		alpha:         alpha,
+		walksPerNode:  walksPerNode,
+		totalVisits:   0,
 	}
 	return RWS, nil
 }
