@@ -4,17 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"slices"
 	"strconv"
 	"testing"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
-	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestNewRWS(t *testing.T) {
@@ -734,33 +731,48 @@ func TestInterface(t *testing.T) {
 // ------------------------------------BENCHMARKS------------------------------
 
 func BenchmarkVisitCounts(b *testing.B) {
-	b.Run("FixedWalksPerNode", func(b *testing.B) {
-		edgesPerNode := 100
-		rng := rand.New(rand.NewSource(69))
-
-		// Different DB sizes
-		for _, nodesSize := range []int{100, 1000, 10000} {
-			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
+	b.Run("fixed number of nodes", func(b *testing.B) {
+		nodesNum := 100
+		for _, walksNum := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
 				cl := redisutils.SetupClient()
 				defer redisutils.CleanupRedis(cl)
 
-				nodeIDs := make([]uint32, 0, nodesSize)
-				for i := 0; i < nodesSize; i++ {
+				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
+				if err != nil {
+					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
+				}
+
+				nodeIDs := make([]uint32, 0, nodesNum)
+				for i := 0; i < nodesNum; i++ {
 					nodeIDs = append(nodeIDs, uint32(i))
 				}
 
-				// Setup DB and RWS
-				DB, err := redisdb.GenerateDB(cl, nodesSize, edgesPerNode, rng)
-				if err != nil {
-					b.Fatalf("GenerateDB(): expected nil, got %v", err)
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := RWS.VisitCounts(nodeIDs); err != nil {
+						b.Fatalf("benchmark failed: %v", err)
+					}
 				}
-				RWS, err := NewRWS(context.Background(), cl, 0.85, 10)
+			})
+		}
+	})
+
+	b.Run("fixed number of walks", func(b *testing.B) {
+		walksNum := 10000
+		for _, nodesNum := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("nodesNum=%d", nodesNum), func(b *testing.B) {
+				cl := redisutils.SetupClient()
+				defer redisutils.CleanupRedis(cl)
+
+				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
 				if err != nil {
-					b.Fatalf("NewRWS(): expected nil, got %v", err)
+					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
 				}
-				RWM := walks.RandomWalkManager{Store: RWS}
-				if err := RWM.GenerateAll(DB); err != nil {
-					b.Fatalf("GenerateAll(): expected nil, got %v", err)
+
+				nodeIDs := make([]uint32, 0, nodesNum)
+				for i := 0; i < nodesNum; i++ {
+					nodeIDs = append(nodeIDs, uint32(i))
 				}
 
 				b.ResetTimer()
@@ -775,29 +787,16 @@ func BenchmarkVisitCounts(b *testing.B) {
 }
 
 func BenchmarkWalks(b *testing.B) {
-	b.Run("FixedDB", func(b *testing.B) {
-		nodesSize := 100
-		edgesPerNode := 10
-		rng := rand.New(rand.NewSource(69))
-
-		// Different DB sizes
-		for _, walkPerNode := range []int{1, 10, 100} {
-			b.Run(fmt.Sprintf("walksPerNode=%d", walkPerNode), func(b *testing.B) {
+	b.Run("fixed number of nodes", func(b *testing.B) {
+		nodesNum := 1000
+		for _, walksNum := range []int{1000, 10000, 100000} {
+			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
 				cl := redisutils.SetupClient()
 				defer redisutils.CleanupRedis(cl)
 
-				// Setup DB and RWS
-				DB, err := redisdb.GenerateDB(cl, nodesSize, edgesPerNode, rng)
+				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
 				if err != nil {
-					b.Fatalf("GenerateDB(): expected nil, got %v", err)
-				}
-				RWS, err := NewRWS(context.Background(), cl, 0.85, uint16(walkPerNode))
-				if err != nil {
-					b.Fatalf("NewRWS(): expected nil, got %v", err)
-				}
-				RWM := walks.RandomWalkManager{Store: RWS}
-				if err := RWM.GenerateAll(DB); err != nil {
-					b.Fatalf("GenerateAll(): expected nil, got %v", err)
+					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
 				}
 
 				b.ResetTimer()

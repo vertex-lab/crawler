@@ -60,7 +60,7 @@ func TestPagerankStatic(t *testing.T) {
 			expectedPR := setup.ExpectedPR
 
 			// generate walks
-			RWM, _ := walks.NewRWM("mock", alpha, walkPerNode)
+			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
 			if err := RWM.GenerateAll(DB); err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
@@ -138,7 +138,7 @@ func TestPagerankDynamic(t *testing.T) {
 			DB.NodeIndex[nodeID].Successors = oldSuccessors
 
 			// generate walks
-			RWM, _ := walks.NewRWM("mock", alpha, walkPerNode)
+			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
 			err := RWM.GenerateAll(DB)
 			if err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)

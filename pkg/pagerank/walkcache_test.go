@@ -390,7 +390,7 @@ func TestCropWalk(t *testing.T) {
 
 func BenchmarkLoad(b *testing.B) {
 	DB := mockdb.SetupDB("triangle")
-	RWM, _ := walks.NewRWM("mock", 0.85, 1000)
+	RWM, _ := walks.NewMockRWM(0.85, 1000)
 	RWM.GenerateAll(DB)
 
 	b.ResetTimer()

@@ -352,7 +352,7 @@ func TestUpdate(t *testing.T) {
 		// generate the first DB
 		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
 		DB1 := mock.GenerateDB(nodesNum, edgesPerNode, rng1)
-		RWM, _ := NewRWM("mock", 0.85, 10)
+		RWM, _ := NewMockRWM(0.85, 10)
 		RWM.GenerateAll(DB1)
 
 		// generate another DB
@@ -403,7 +403,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 
-	RWM, _ := NewRWM("mock", 0.85, 10)
+	RWM, _ := NewMockRWM(0.85, 10)
 	RWM.GenerateAll(DB)
 
 	oldSuccessorMap := make(map[uint32][]uint32, nodesSize)
@@ -457,7 +457,7 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 
-	RWM, _ := NewRWM("mock", 0.85, 10)
+	RWM, _ := NewMockRWM(0.85, 10)
 	RWM.GenerateAll(DB)
 
 	// Store the changes here

@@ -52,7 +52,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 			expectedPPR0 := setup.ExpectedPPR0
 
 			// generate walks
-			RWM, _ := walks.NewRWM("mock", alpha, walkPerNode)
+			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
 			err := RWM.GenerateAll(DB)
 			if err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, got %v", err)

@@ -5,6 +5,7 @@ package redistore
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -250,7 +251,7 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 }
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
-// is invalid, no one gets added.
+// is invalid, no walk gets added.
 func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 
 	if err := RWS.Validate(); err != nil {
@@ -351,11 +352,9 @@ func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 	return nil
 }
 
-// PruneGraftWalk() encapsulates the functions of Pruning and
-// Grafting ( = appending to) a walk.
+// PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
 // These functions need to be coupled together to leverage the atomicity of
-// Redis transactions. This ensures that a walk is either uneffected or is both
-// pruned and grafted successfully.
+// Redis transactions.
 func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegment models.RandomWalk) error {
 
 	if err := RWS.Validate(); err != nil {
@@ -407,7 +406,7 @@ func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int, walkSegm
 	return nil
 }
 
-// SetupRWS returns a RandomWalkStore ready to be used in tests
+// SetupRWS returns a RandomWalkStore ready to be used in tests.
 func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 	if cl == nil {
 		return nil, models.ErrNilClientPointer
@@ -524,4 +523,29 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 	default:
 		return nil, nil
 	}
+}
+
+// GenerateRWS() randomly generates walks and adds them to the RWS.
+func GenerateRWS(cl *redis.Client, nodesNum, walksNum int) (*RandomWalkStore, error) {
+	RWS, err := NewRWS(context.Background(), cl, 0.85, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	walks := make([]models.RandomWalk, 0, walksNum)
+	for i := 0; i < walksNum; i++ {
+		walk := make(models.RandomWalk, 0, 7)
+		for j := 0; j < 7; j++ {
+			nodeID := uint32(rand.IntN(nodesNum))
+			walk = append(walk, nodeID)
+		}
+
+		walks = append(walks, walk)
+	}
+
+	if err := RWS.AddWalks(walks); err != nil {
+		return nil, err
+	}
+
+	return RWS, nil
 }

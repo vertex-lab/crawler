@@ -449,7 +449,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
-		RWM, _ := walks.NewRWM("mock", 0.85, 10)
+		RWM, _ := walks.NewMockRWM(0.85, 10)
 		RWM.GenerateAll(DB)
 
 		if _, err := Personalized(DB, RWM.Store, 0, 5); err != nil {
@@ -470,7 +470,7 @@ func BenchmarkPersonalized(b *testing.B) {
 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewRWM("mock", 0.85, walksPerNode)
+		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
 		RWM.GenerateAll(DB)
 
 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {

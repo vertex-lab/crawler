@@ -214,7 +214,7 @@ func BenchmarkPagerankMock(b *testing.B) {
 		// Different walksPerNode
 		for _, walksPerNode := range []uint16{1, 10, 100} {
 			b.Run(fmt.Sprintf("walksPerNode=%d", walksPerNode), func(b *testing.B) {
-				RWM, _ := walks.NewRWM("mock", 0.85, walksPerNode)
+				RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
 				RWM.GenerateAll(DB)
 
 				b.ResetTimer()
@@ -238,7 +238,7 @@ func BenchmarkPagerankMock(b *testing.B) {
 			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
 
 				DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
-				RWM, _ := walks.NewRWM("mock", 0.85, 10)
+				RWM, _ := walks.NewMockRWM(0.85, 10)
 				RWM.GenerateAll(DB)
 
 				b.ResetTimer()

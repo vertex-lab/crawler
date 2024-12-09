@@ -156,7 +156,7 @@ func TestGenerateWalks(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := mock.SetupDB(test.DBType)
-			RWM, _ := NewRWM("mock", 0.85, 2)
+			RWM, _ := NewMockRWM(0.85, 2)
 			rng := rand.New(rand.NewSource(69))
 
 			err := RWM.generateWalks(DB, test.nodeIDs, rng)
@@ -296,7 +296,7 @@ func TestGenerateAll(t *testing.T) {
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		DB := mock.GenerateDB(nodesNum, edgesPerNode, rng)
-		RWM, _ := NewRWM("mock", 0.85, 10)
+		RWM, _ := NewMockRWM(0.85, 10)
 		RWM.GenerateAll(DB)
 
 		// check that each walk in the WalkSet of nodeID contains nodeID
@@ -362,7 +362,7 @@ func BenchmarkGenerateRandomWalks(b *testing.B) {
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
-	RWM, _ := NewRWM("mock", 0.85, 10)
+	RWM, _ := NewMockRWM(0.85, 10)
 
 	b.ResetTimer()
 
@@ -387,7 +387,7 @@ func BenchmarkGenerateAll(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 
-		RWM, _ := NewRWM("mock", 0.85, 10)
+		RWM, _ := NewMockRWM(0.85, 10)
 		err := RWM.GenerateAll(DB)
 		if err != nil {
 			b.Fatalf("GenerateAll() failed: %v", err)

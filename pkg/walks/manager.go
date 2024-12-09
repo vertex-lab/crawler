@@ -2,8 +2,12 @@
 package walks
 
 import (
+	"context"
+
+	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
 	mock "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/store/redistore"
 )
 
 // RandomWalkManager wraps the RandomWalkStore and extends its functionalities
@@ -12,22 +16,22 @@ type RandomWalkManager struct {
 	Store models.RandomWalkStore
 }
 
-// NewRandomWalkManager initialise RandomWalkManager based on the specified type
-func NewRWM(storeType string,
-	alpha float32, walksPerNode uint16) (*RandomWalkManager, error) {
-
-	switch storeType {
-	case "redis":
-		return nil, nil
-
-	default:
-		// defaults to the mock RandomWalkStore
-		RWS, err := mock.NewRWS(alpha, walksPerNode)
-		if err != nil {
-			return nil, err
-		}
-		return &RandomWalkManager{Store: RWS}, nil
+// NewRWM() returns a RWM using the Redis RWS.
+func NewRWM(cl *redis.Client, alpha float32, walksPerNode uint16) (*RandomWalkManager, error) {
+	RWS, err := redistore.NewRWS(context.Background(), cl, alpha, walksPerNode)
+	if err != nil {
+		return nil, err
 	}
+	return &RandomWalkManager{Store: RWS}, nil
+}
+
+// NewMockRWM() returns a RWM using the mock RWS
+func NewMockRWM(alpha float32, walksPerNode uint16) (*RandomWalkManager, error) {
+	RWS, err := mock.NewRWS(alpha, walksPerNode)
+	if err != nil {
+		return nil, err
+	}
+	return &RandomWalkManager{Store: RWS}, nil
 }
 
 // function that returns a RWM setup based on the RWMType.

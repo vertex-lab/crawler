@@ -291,12 +291,7 @@ func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error
 	return nil
 }
 
-/*
-PruneGraftWalk() encapsulates the functions of Pruning and Grafting a walk.
-These functions need to be coupled together to leverage the atomicity of
-Redis transactions. This ensures that a walk is either uneffected or is both
-pruned and grafted successfully.
-*/
+// PruneGraftWalk() encapsulates the functions of Pruning and Grafting a walk.
 func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int,
 	walkSegment models.RandomWalk) error {
 
@@ -372,6 +367,6 @@ func SetupRWS(RWSType string) *RandomWalkStore {
 		return RWS
 
 	default:
-		return nil // Default to nil for unrecognized scenarios
+		return nil
 	}
 }

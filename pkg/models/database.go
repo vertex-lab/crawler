@@ -52,6 +52,9 @@ type NodeDiff struct {
 // The Database interface abstracts the DB basic functions
 type Database interface {
 
+	// ContainsNode() returns wheter a specified nodeID is found in the DB
+	ContainsNode(nodeID uint32) bool
+
 	// Validate() returns the appropriate error if the DB is nil or empty
 	Validate() error
 
@@ -66,9 +69,6 @@ type Database interface {
 
 	// UpdateNode() updates the nodeID using the new values inside node.
 	UpdateNode(nodeID uint32, nodeDiff *NodeDiff) error
-
-	// ContainsNode() returns wheter a specified nodeID is found in the DB
-	ContainsNode(nodeID uint32) bool
 
 	// IsDandling() returns whether a node has any successor
 	IsDandling(nodeID uint32) bool
