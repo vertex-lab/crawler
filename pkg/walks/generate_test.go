@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	mock "github.com/vertex-lab/crawler/pkg/database/mock"
+	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 )
 
 func TestWalkStep(t *testing.T) {
-
 	testCases := []struct {
 		name           string
 		successorIDs   []uint32
@@ -65,7 +65,6 @@ func TestWalkStep(t *testing.T) {
 }
 
 func TestGenerateWalk(t *testing.T) {
-
 	testCases := []struct {
 		name          string
 		DBType        string
@@ -89,7 +88,7 @@ func TestGenerateWalk(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 
-			DB := mock.SetupDB(test.DBType)
+			DB := mockdb.SetupDB(test.DBType)
 			rng := rand.New(rand.NewSource(42))
 
 			walk, err := generateWalk(DB, 1, 0.85, rng)
@@ -155,7 +154,7 @@ func TestGenerateWalks(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			DB := mock.SetupDB(test.DBType)
+			DB := mockdb.SetupDB(test.DBType)
 			RWM, _ := NewMockRWM(0.85, 2)
 			rng := rand.New(rand.NewSource(69))
 
@@ -225,7 +224,7 @@ func TestGenerate(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			DB := mock.SetupDB(test.DBType)
+			DB := mockdb.SetupDB(test.DBType)
 			RWM := SetupRWM(test.RWMType)
 
 			if err := RWM.Generate(DB, 0); !errors.Is(err, test.expectedError) {
@@ -275,10 +274,8 @@ func TestGenerateAll(t *testing.T) {
 		}
 
 		for _, test := range testCases {
-
 			t.Run(test.name, func(t *testing.T) {
-
-				DB := mock.SetupDB(test.DBType)
+				DB := mockdb.SetupDB(test.DBType)
 				RWM := SetupRWM(test.RWMType)
 
 				err := RWM.GenerateAll(DB)
@@ -290,18 +287,15 @@ func TestGenerateAll(t *testing.T) {
 	})
 
 	t.Run("fuzzy test", func(t *testing.T) {
-
 		nodesNum := 200
 		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-		DB := mock.GenerateDB(nodesNum, edgesPerNode, rng)
+		DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 		RWM, _ := NewMockRWM(0.85, 10)
 		RWM.GenerateAll(DB)
 
 		// check that each walk in the WalkSet of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-
 			walks, err := RWM.Store.Walks(nodeID, -1)
 			if err != nil {
 				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
@@ -314,6 +308,93 @@ func TestGenerateAll(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestStartsWith(t *testing.T) {
+	testCases := []struct {
+		name         string
+		walk         models.RandomWalk
+		nodeID       uint32
+		expectedBool bool
+	}{
+		{
+			name:         "nil random walk",
+			walk:         nil,
+			nodeID:       0,
+			expectedBool: false,
+		},
+		{
+			name:         "empty random walk",
+			walk:         models.RandomWalk{},
+			nodeID:       0,
+			expectedBool: false,
+		},
+		{
+			name:         "valid walk, doesn't start with 0",
+			walk:         models.RandomWalk{1, 2, 3},
+			nodeID:       0,
+			expectedBool: false,
+		},
+		{
+			name:         "valid walk, starts with 0",
+			walk:         models.RandomWalk{1, 2, 3},
+			nodeID:       1,
+			expectedBool: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if startsWith(test.walk, test.nodeID) != test.expectedBool {
+				t.Fatalf("containsInvalidStep(): expected %v, got %v", test.expectedBool, startsWith(test.walk, test.nodeID))
+			}
+		})
+	}
+}
+
+func TestRemove(t *testing.T) {
+	testCases := []struct {
+		name          string
+		RWMType       string
+		expectedWalks map[uint32]models.RandomWalk
+		expectedError error
+	}{
+		{
+			name:          "nil RWM",
+			RWMType:       "nil",
+			expectedError: models.ErrNilRWSPointer,
+			expectedWalks: nil,
+		},
+		{
+			name:          "node not found RWS",
+			RWMType:       "one-node1",
+			expectedError: models.ErrNodeNotFoundRWS,
+			expectedWalks: map[uint32]models.RandomWalk{0: {1}},
+		},
+		{
+			name:          "valid",
+			RWMType:       "triangle",
+			expectedError: nil,
+			expectedWalks: map[uint32]models.RandomWalk{
+				1: {1, 2, 0},
+				2: {2, 0, 1},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			RWS := mockstore.SetupRWS(test.RWMType)
+			RWM := &RandomWalkManager{Store: RWS}
+			if err := RWM.Remove(0); !errors.Is(err, test.expectedError) {
+				t.Fatalf("Remove(0): expected %v, got %v", test.expectedError, err)
+			}
+
+			if RWS != nil && !reflect.DeepEqual(RWS.WalkIndex, test.expectedWalks) {
+				t.Errorf("Remove(0): expected %v, got %v", test.expectedWalks, RWS.WalkIndex)
+			}
+		})
+	}
 }
 
 // ---------------------------------BENCHMARKS---------------------------------
@@ -338,58 +419,44 @@ func BenchmarkRNGPCG(b *testing.B) {
 }
 
 func BenchmarkGenerateWalk(b *testing.B) {
-
-	// initial setup
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
+	DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-
-		_, err := generateWalk(DB, 0, 0.85, rng)
-		if err != nil {
+		if _, err := generateWalk(DB, 0, 0.85, rng); err != nil {
 			b.Fatalf("generateWalk() failed: %v", err)
 		}
 	}
 }
 
 func BenchmarkGenerateRandomWalks(b *testing.B) {
-
-	// initial setup
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
+	DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
 	RWM, _ := NewMockRWM(0.85, 10)
 
 	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
-
-		err := RWM.generateWalks(DB, []uint32{0}, rng)
-		if err != nil {
+		if err := RWM.generateWalks(DB, []uint32{0}, rng); err != nil {
 			b.Fatalf("Generate() failed: %v", err)
 		}
 	}
 }
 
 func BenchmarkGenerateAll(b *testing.B) {
-
-	// initial setup
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
+	DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
 
 	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
-
 		RWM, _ := NewMockRWM(0.85, 10)
-		err := RWM.GenerateAll(DB)
-		if err != nil {
+		if err := RWM.GenerateAll(DB); err != nil {
 			b.Fatalf("GenerateAll() failed: %v", err)
 		}
 	}

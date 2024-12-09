@@ -31,7 +31,7 @@ func (RWM *RandomWalkManager) Generate(DB models.Database, nodeID uint32) error 
 GenerateAll() generates `walksPerNode` random walks for ALL nodes in the database
 using dampening factor `alpha`. The walk pointers are added to the RandomWalkStore.
 
-NOTE:
+# NOTE:
 
 This function is computationally expensive and should be called only when
 the RandomWalkManager is empty. During the normal execution of the program,
@@ -127,20 +127,17 @@ func generateWalk(DB models.Database, startingNodeID uint32,
 			break
 		}
 
-		// get the successorIDs of the current node. This can be improved
-		// by checking a successor cache first.
+		// get the successorIDs of the current node. This can be improved by checking a successor cache first.
 		successorIDs, err := DB.Successors(currentNodeID)
 		if err != nil {
 			return nil, err
 		}
 
-		// perform a walk step; break if one of the condition in WalkStep is triggered
 		currentNodeID, shouldBreak = WalkStep(successorIDs, walk, rng)
 		if shouldBreak {
 			break
 		}
 
-		// else, append to the walk
 		walk = append(walk, currentNodeID)
 	}
 
@@ -175,4 +172,37 @@ func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (nextID uint32, stop 
 	}
 
 	return nextID, false
+}
+
+// Remove() removes all the walks that originated from nodeID.
+func (RWM *RandomWalkManager) Remove(nodeID uint32) error {
+
+	if err := RWM.Store.Validate(); err != nil {
+		return err
+	}
+
+	walkMap, err := RWM.Store.Walks(nodeID, -1)
+	if err != nil {
+		return err
+	}
+
+	walksToRemove := make([]uint32, 0, RWM.Store.WalksPerNode())
+	for walkID, walk := range walkMap {
+		if !startsWith(walk, nodeID) {
+			continue
+		}
+
+		walksToRemove = append(walksToRemove, walkID)
+	}
+
+	return RWM.Store.RemoveWalks(walksToRemove)
+}
+
+// startsWith() returns whether walk starts with nodeID.
+func startsWith(walk models.RandomWalk, nodeID uint32) bool {
+	if len(walk) == 0 {
+		return false
+	}
+
+	return walk[0] == nodeID
 }

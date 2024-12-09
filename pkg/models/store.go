@@ -36,9 +36,9 @@ type RandomWalkStore interface {
 	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
 	VisitCounts(nodeIDs []uint32) (map[uint32]int, error)
 
-	// Walks() returns a map of walks by walksID that visit nodeID.
-	// - if limit > 0, the map contains up to that many key-value pairs.
-	// - if limit <= 0, all walks are returned
+	/*Walks() returns a map of walks by walksID that visit nodeID.
+	- if limit > 0, the map contains up to that many key-value pairs.
+	- if limit <= 0, all walks are returned */
 	Walks(nodeID uint32, limit int) (map[uint32]RandomWalk, error)
 
 	// AddWalks() adds all the walks to the RandomWalkStore.
@@ -47,11 +47,12 @@ type RandomWalkStore interface {
 	// RemoveWalks() removes all the walks associated with the walkIDs.
 	RemoveWalks(walkIDs []uint32) error
 
-	// PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
-	// These functions need to be coupled together to leverage the atomicity of Redis transactions.
-	// Example:
-	// 1. Pruning: walk = {0,1,2,3} gets pruned with cutIndex = 1, becoming walk[:cutIndex] = {0,1}
-	// 2. Grafting: walkSegment = {4,5} is added to the walk, resulting in walk = {0,1,4,5}
+	/*PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
+	These functions need to be coupled together to leverage the atomicity of Redis transactions.
+
+	Example:
+	1. Pruning: walk = {0,1,2,3} gets pruned with cutIndex = 1, becoming walk[:cutIndex] = {0,1}
+	2. Grafting: walkSegment = {4,5} is added to the walk, resulting in walk = {0,1,4,5}*/
 	PruneGraftWalk(walkID uint32, cutIndex int, walkSegment RandomWalk) error
 }
 
