@@ -75,14 +75,8 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 	}
 
 	for walkID, walk := range walkMap {
-
-		cutIndex, err := containsInvalidStep(walk, nodeID, removedSucc)
-		if err != nil {
-			return err
-		}
-
-		// if it doesn't need an update, skip
-		if cutIndex < 0 {
+		cutIndex, contains := containsInvalidStep(walk, nodeID, removedSucc)
+		if !contains {
 			continue
 		}
 
@@ -170,30 +164,18 @@ func generateWalkSegment(DB models.Database, candidateNodes []uint32, currentWal
 	return sliceutils.DeleteCyclesInPlace(currentWalk, newWalkSegment), nil
 }
 
-/*
-containsInvalidStep() returns the index or position where the RandomWalk needs to be
-Pruned and Grafted.
-
-This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes.
-
-cutIndex = -1 signals no need to update.
-*/
-func containsInvalidStep(walk models.RandomWalk, nodeID uint32,
-	removedNodes []uint32) (int, error) {
-
-	if err := models.Validate(walk); err != nil {
-		return -1, err
-	}
-
+// containsInvalidStep() returns the index or position where the RandomWalk needs to be
+// Pruned and Grafted. This happens if the walk contains an invalid hop nodeID --> removedNode in removedNodes.
+func containsInvalidStep(walk models.RandomWalk, nodeID uint32, removedNodes []uint32) (int, bool) {
 	for i := 0; i < len(walk)-1; i++ {
 		// if it contains a hop (nodeID --> removedNode)
 		if walk[i] == nodeID && slices.Contains(removedNodes, walk[i+1]) {
 			// it needs to be updated from (i+1)th element (included) onwards
 			cutIndex := i + 1
-			return cutIndex, nil
+			return cutIndex, true
 		}
 	}
-	return -1, nil
+	return -1, false
 }
 
 // estimateWalksToUpdate() returns the number of walks that needs to be updated in updateAddedNodes().

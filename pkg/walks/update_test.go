@@ -17,44 +17,44 @@ func TestContainsInvalidStep(t *testing.T) {
 		name             string
 		walk             models.RandomWalk
 		expectedCutIndex int
-		expectedError    error
+		expectedContains bool
 	}{
 		{
 			name:             "nil random walk",
 			walk:             nil,
-			expectedError:    models.ErrNilWalkPointer,
 			expectedCutIndex: -1,
+			expectedContains: false,
 		},
 		{
 			name:             "empty random walk",
 			walk:             models.RandomWalk{},
-			expectedError:    models.ErrEmptyWalk,
 			expectedCutIndex: -1,
+			expectedContains: false,
 		},
 		{
 			name:             "normal random walk, no updates",
 			walk:             models.RandomWalk{1},
-			expectedError:    nil,
 			expectedCutIndex: -1,
+			expectedContains: false,
 		},
 		{
 			name:             "normal random walk, updates",
 			walk:             models.RandomWalk{1, 2, 3},
-			expectedError:    nil,
 			expectedCutIndex: 1,
+			expectedContains: true,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			cutIndex, err := containsInvalidStep(test.walk, 1, []uint32{2})
+			cutIndex, contains := containsInvalidStep(test.walk, 1, []uint32{2})
 
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("NeedsUpdate(): expected %v, got %v", test.expectedError, err)
+			if contains != test.expectedContains {
+				t.Fatalf("containsInvalidStep(): expected %v, got %v", test.expectedContains, contains)
 			}
 
 			if cutIndex != test.expectedCutIndex {
-				t.Errorf("NeedsUpdate(): expected %v, got %v", test.expectedCutIndex, cutIndex)
+				t.Errorf("containsInvalidStep(): expected %v, got %v", test.expectedCutIndex, cutIndex)
 			}
 		})
 	}
