@@ -9,14 +9,6 @@ import (
 
 // Distance() returns the L1 distance between two maps.
 func Distance(map1, map2 models.PagerankMap) float64 {
-	if len(map1) != len(map2) {
-		return math.Inf(1)
-	}
-
-	if len(map1) == 0 {
-		return 0
-	}
-
 	var distance float64
 	for key := range map1 {
 		distance += math.Abs(map1[key] - map2[key])
