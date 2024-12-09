@@ -55,7 +55,7 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestAddSuccessors(t *testing.T) {
+func TestAddFollows(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -65,7 +65,7 @@ func TestAddSuccessors(t *testing.T) {
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
 
-	AddSuccessors(ctx, pipe, nodeID, addedSucc)
+	AddFollows(ctx, pipe, nodeID, addedSucc)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -86,7 +86,7 @@ func TestAddSuccessors(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(followIDs, addedSucc) {
-		t.Fatalf("AddSuccessors(): expected %v, got %v", addedSucc, followIDs)
+		t.Fatalf("AddFollows(): expected %v, got %v", addedSucc, followIDs)
 	}
 
 	// check the succ have nodeID as a follower
@@ -98,12 +98,12 @@ func TestAddSuccessors(t *testing.T) {
 		}
 
 		if !isMember {
-			t.Fatalf("AddSuccessors(): expected nodeID = %d part of followers:%d", nodeID, succ)
+			t.Fatalf("AddFollows(): expected nodeID = %d part of followers:%d", nodeID, succ)
 		}
 	}
 }
 
-func TestRemoveSuccessors(t *testing.T) {
+func TestRemoveFollows(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -115,7 +115,7 @@ func TestRemoveSuccessors(t *testing.T) {
 	// add succ to Redis
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
-	AddSuccessors(ctx, pipe, nodeID, succ)
+	AddFollows(ctx, pipe, nodeID, succ)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -123,7 +123,7 @@ func TestRemoveSuccessors(t *testing.T) {
 	// remove succ from Redis
 	pipe = cl.TxPipeline()
 	ctx = context.Background()
-	RemoveSuccessors(ctx, pipe, nodeID, removedSucc)
+	RemoveFollows(ctx, pipe, nodeID, removedSucc)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -144,7 +144,7 @@ func TestRemoveSuccessors(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(followIDs, remainingSucc) {
-		t.Fatalf("RemoveSuccessors(): expected %v, got %v", remainingSucc, followIDs)
+		t.Fatalf("RemoveFollows(): expected %v, got %v", remainingSucc, followIDs)
 	}
 
 	// check the remainingSucc have nodeID as a follower
@@ -155,7 +155,7 @@ func TestRemoveSuccessors(t *testing.T) {
 		}
 
 		if !isMember {
-			t.Fatalf("RemoveSuccessors(): expected nodeID = %d part of followers:%d", nodeID, succ)
+			t.Fatalf("RemoveFollows(): expected nodeID = %d part of followers:%d", nodeID, succ)
 		}
 	}
 
@@ -167,12 +167,12 @@ func TestRemoveSuccessors(t *testing.T) {
 		}
 
 		if isMember {
-			t.Fatalf("RemoveSuccessors(): expected nodeID = %d NOT part of followers:%d", nodeID, succ)
+			t.Fatalf("RemoveFollows(): expected nodeID = %d NOT part of followers:%d", nodeID, succ)
 		}
 	}
 }
 
-func TestAddPredecessors(t *testing.T) {
+func TestAddFollowers(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -182,7 +182,7 @@ func TestAddPredecessors(t *testing.T) {
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
 
-	AddPredecessors(ctx, pipe, nodeID, predecessors)
+	AddFollowers(ctx, pipe, nodeID, predecessors)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -203,7 +203,7 @@ func TestAddPredecessors(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(followerIDs, predecessors) {
-		t.Fatalf("AddSuccessors(): expected %v, got %v", predecessors, followerIDs)
+		t.Fatalf("AddFollows(): expected %v, got %v", predecessors, followerIDs)
 	}
 
 	// check the pred have nodeID as a follows
@@ -215,7 +215,7 @@ func TestAddPredecessors(t *testing.T) {
 		}
 
 		if !isMember {
-			t.Fatalf("AddSuccessors(): expected nodeID = %d part of follows:%d", nodeID, pred)
+			t.Fatalf("AddFollows(): expected nodeID = %d part of follows:%d", nodeID, pred)
 		}
 	}
 }
@@ -620,7 +620,7 @@ func TestContainsNode(t *testing.T) {
 	}
 }
 
-func TestSuccessors(t *testing.T) {
+func TestFollows(t *testing.T) {
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -669,13 +669,13 @@ func TestSuccessors(t *testing.T) {
 				t.Fatalf("SetupDb(): expected nil, got %v", err)
 			}
 
-			succ, err := DB.Successors(test.nodeID)
+			succ, err := DB.Follows(test.nodeID)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Successors(%d): expected %v, got %v", test.nodeID, test.expectedError, err)
+				t.Fatalf("Follows(%d): expected %v, got %v", test.nodeID, test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(succ, test.expectedSlice) {
-				t.Errorf("Successors(%d): expected %v, got %v", test.nodeID, test.expectedSlice, succ)
+				t.Errorf("Follows(%d): expected %v, got %v", test.nodeID, test.expectedSlice, succ)
 			}
 		})
 	}

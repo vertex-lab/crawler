@@ -134,8 +134,8 @@ func TestPagerankDynamic(t *testing.T) {
 			changes := setup.PotentialChanges
 
 			// setup the old state
-			nodeID, oldSuccessors, currentSuccessors := SetupOldState(DB, changes)
-			DB.NodeIndex[nodeID].Successors = oldSuccessors
+			nodeID, oldFollows, currentFollows := SetupOldState(DB, changes)
+			DB.NodeIndex[nodeID].Follows = oldFollows
 
 			// generate walks
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
@@ -145,10 +145,10 @@ func TestPagerankDynamic(t *testing.T) {
 			}
 
 			// update the graph to the current state
-			DB.NodeIndex[nodeID].Successors = currentSuccessors
+			DB.NodeIndex[nodeID].Follows = currentFollows
 
 			// update the random walks
-			if err = RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors); err != nil {
+			if err = RWM.Update(DB, nodeID, oldFollows, currentFollows); err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
@@ -165,8 +165,8 @@ func TestPagerankDynamic(t *testing.T) {
 				t.Errorf("expected %v\n; pr %v\n\n", expectedPR, pr)
 
 				t.Errorf("nodeID: %v", nodeID)
-				t.Errorf("oldSucc: %v", oldSuccessors)
-				t.Errorf("currentSucc: %v", currentSuccessors)
+				t.Errorf("oldSucc: %v", oldFollows)
+				t.Errorf("currentSucc: %v", currentFollows)
 			}
 		})
 	}

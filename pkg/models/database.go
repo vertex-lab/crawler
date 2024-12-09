@@ -38,9 +38,9 @@ type NodeMeta struct {
 
 // Node represent the basic structure of a node in the graph
 type Node struct {
-	Metadata     NodeMeta
-	Successors   []uint32
-	Predecessors []uint32
+	Metadata  NodeMeta
+	Follows   []uint32
+	Followers []uint32
 }
 
 // NodeDiff represent the updates to do for a specified node.
@@ -51,10 +51,10 @@ type NodeDiff struct {
 	Metadata NodeMeta
 
 	// The slice of nodeIDs to be added to the node's successors
-	AddedSucc []uint32
+	AddedFollows []uint32
 
 	// The slice of nodeIDs to be removed from the node's successors
-	RemovedSucc []uint32
+	RemovedFollows []uint32
 }
 
 // The Database interface abstracts the DB basic functions
@@ -81,8 +81,8 @@ type Database interface {
 	// UpdateNode() updates the nodeID using the new values inside node.
 	UpdateNode(nodeID uint32, nodeDiff *NodeDiff) error
 
-	// Successors() returns a slice that contains the IDs of all successors of a node
-	Successors(nodeID uint32) ([]uint32, error)
+	// Follows() returns a slice that contains the IDs of all successors of a node
+	Follows(nodeID uint32) ([]uint32, error)
 
 	// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 	// If a pubkey is not found, nil is returned

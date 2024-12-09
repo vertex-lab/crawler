@@ -152,8 +152,8 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	pipe.HSetNX(DB.ctx, KeyKeyIndex, node.Metadata.Pubkey, nodeID)
 	pipe.HSet(DB.ctx, KeyNode(nodeID), node.Metadata)
 
-	AddSuccessors(DB.ctx, pipe, uint32(nodeID), node.Successors)
-	AddPredecessors(DB.ctx, pipe, uint32(nodeID), node.Predecessors)
+	AddFollows(DB.ctx, pipe, uint32(nodeID), node.Follows)
+	AddFollowers(DB.ctx, pipe, uint32(nodeID), node.Followers)
 
 	if _, err := pipe.Exec(DB.ctx); err != nil {
 		return math.MaxUint32, err
@@ -162,40 +162,40 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 	return uint32(nodeID), nil
 }
 
-// AddSuccessors() adds the successors of nodeID to the database
-func AddSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedSucc []uint32) {
-	strSucc := redisutils.FormatIDs(addedSucc)
-	if len(strSucc) == 0 {
+// AddFollows() adds the successors of nodeID to the database
+func AddFollows(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedFollows []uint32) {
+	strFollows := redisutils.FormatIDs(addedFollows)
+	if len(strFollows) == 0 {
 		return
 	}
 
 	// add successors to the follows set of nodeID
-	pipe.SAdd(ctx, KeyFollows(nodeID), strSucc)
+	pipe.SAdd(ctx, KeyFollows(nodeID), strFollows)
 
 	// add nodeID to the followers of the other nodes
-	for _, added := range addedSucc {
+	for _, added := range addedFollows {
 		pipe.SAdd(ctx, KeyFollowers(added), nodeID)
 	}
 }
 
-// RemoveSuccessors() adds the successors of nodeID to the database
-func RemoveSuccessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, removedSucc []uint32) {
-	strSucc := redisutils.FormatIDs(removedSucc)
-	if len(strSucc) == 0 {
+// RemoveFollows() adds the successors of nodeID to the database
+func RemoveFollows(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, removedFollows []uint32) {
+	strFollows := redisutils.FormatIDs(removedFollows)
+	if len(strFollows) == 0 {
 		return
 	}
 
 	// remove successors from the follows set of nodeID
-	pipe.SRem(ctx, KeyFollows(nodeID), strSucc)
+	pipe.SRem(ctx, KeyFollows(nodeID), strFollows)
 
-	// remove nodeID from the followers of the removedSucc
-	for _, removed := range removedSucc {
+	// remove nodeID from the followers of the removedFollows
+	for _, removed := range removedFollows {
 		pipe.SRem(ctx, KeyFollowers(removed), nodeID)
 	}
 }
 
-// AddPredecessors() adds the predecessors of nodeID to the database
-func AddPredecessors(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedPred []uint32) {
+// AddFollowers() adds the predecessors of nodeID to the database
+func AddFollowers(ctx context.Context, pipe redis.Pipeliner, nodeID uint32, addedPred []uint32) {
 	strPred := redisutils.FormatIDs(addedPred)
 	if len(strPred) == 0 {
 		return
@@ -230,8 +230,8 @@ func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 	pipe := DB.client.TxPipeline()
 	pipe.HSet(DB.ctx, KeyNode(nodeID), nodeDiff.Metadata).Err()
 
-	AddSuccessors(DB.ctx, pipe, nodeID, nodeDiff.AddedSucc)
-	RemoveSuccessors(DB.ctx, pipe, nodeID, nodeDiff.RemovedSucc)
+	AddFollows(DB.ctx, pipe, nodeID, nodeDiff.AddedFollows)
+	RemoveFollows(DB.ctx, pipe, nodeID, nodeDiff.RemovedFollows)
 
 	_, err = pipe.Exec(DB.ctx)
 	return err
@@ -252,20 +252,20 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 	return exists == 1
 }
 
-// Successors() returns a slice that contains the IDs of all successors of a node
-func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
+// Follows() returns a slice that contains the IDs of all successors of a node
+func (DB *Database) Follows(nodeID uint32) ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
-	strSucc, err := DB.client.SMembers(DB.ctx, KeyFollows(nodeID)).Result()
+	strFollows, err := DB.client.SMembers(DB.ctx, KeyFollows(nodeID)).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	successors := make([]uint32, 0, len(strSucc))
-	for _, ID := range strSucc {
+	successors := make([]uint32, 0, len(strFollows))
+	for _, ID := range strFollows {
 		succ, err := redisutils.ParseID(ID)
 		if err != nil {
 			return nil, err
@@ -571,8 +571,8 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 				Status:   models.StatusActive,
 				Pagerank: 1.0,
 			},
-			Successors:   []uint32{},
-			Predecessors: []uint32{},
+			Follows:   []uint32{},
+			Followers: []uint32{},
 		}
 
 		if _, err := DB.AddNode(&node); err != nil {
@@ -595,8 +595,8 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 				Status:   models.StatusActive,
 				Pagerank: 1.0,
 			},
-			Successors:   []uint32{},
-			Predecessors: []uint32{},
+			Follows:   []uint32{},
+			Followers: []uint32{},
 		}
 
 		if _, err := DB.AddNode(&node); err != nil {
@@ -624,8 +624,8 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 					Status:   models.StatusInactive,
 					Pagerank: initialPagerank,
 				},
-				Successors:   []uint32{},
-				Predecessors: []uint32{},
+				Follows:   []uint32{},
+				Followers: []uint32{},
 			}
 
 			if _, err := DB.AddNode(&node); err != nil {
@@ -646,19 +646,19 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 				Metadata: models.NodeMeta{
 					Pubkey: "zero",
 				},
-				Successors: []uint32{1},
+				Follows: []uint32{1},
 			},
 			{
 				Metadata: models.NodeMeta{
 					Pubkey: "one",
 				},
-				Successors: []uint32{2},
+				Follows: []uint32{2},
 			},
 			{
 				Metadata: models.NodeMeta{
 					Pubkey: "two",
 				},
-				Successors: []uint32{0},
+				Follows: []uint32{0},
 			},
 		}
 
@@ -689,22 +689,22 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 
 	for i := 0; i < nodesNum; i++ {
 		// create random successors for each node
-		randomSuccessors := make([]uint32, 0, successorsPerNode)
-		for len(randomSuccessors) != successorsPerNode {
+		randomFollows := make([]uint32, 0, successorsPerNode)
+		for len(randomFollows) != successorsPerNode {
 
 			succ := uint32(rng.Intn(nodesNum))
-			if slices.Contains(randomSuccessors, succ) {
+			if slices.Contains(randomFollows, succ) {
 				continue
 			}
 
-			randomSuccessors = append(randomSuccessors, succ)
+			randomFollows = append(randomFollows, succ)
 		}
 
 		node := &models.Node{
 			Metadata: models.NodeMeta{
 				Pubkey:  redisutils.FormatID(uint32(i)),
 				EventTS: 0},
-			Successors: randomSuccessors}
+			Follows: randomFollows}
 
 		if _, err := DB.AddNode(node); err != nil {
 			return nil, err

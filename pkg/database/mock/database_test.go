@@ -182,14 +182,14 @@ func TestUpdateNode(t *testing.T) {
 			DBType: "simple",
 			nodeID: 0,
 			nodeDiff: &models.NodeDiff{
-				Metadata:    models.NodeMeta{Pubkey: "zero", EventTS: 11},
-				AddedSucc:   []uint32{2},
-				RemovedSucc: []uint32{1},
+				Metadata:       models.NodeMeta{Pubkey: "zero", EventTS: 11},
+				AddedFollows:   []uint32{2},
+				RemovedFollows: []uint32{1},
 			},
 
 			expectedNode: &models.Node{
-				Metadata:   models.NodeMeta{Pubkey: "zero", EventTS: 11},
-				Successors: []uint32{2},
+				Metadata: models.NodeMeta{Pubkey: "zero", EventTS: 11},
+				Follows:  []uint32{2},
 			},
 		},
 	}
@@ -333,7 +333,7 @@ func TestNodeByID(t *testing.T) {
 	}
 }
 
-func TestSuccessors(t *testing.T) {
+func TestFollows(t *testing.T) {
 	testCases := []struct {
 		name          string
 		DBType        string
@@ -366,20 +366,20 @@ func TestSuccessors(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			succ, err := DB.Successors(1)
+			succ, err := DB.Follows(1)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Successors(1): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("Follows(1): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check that the expected result is equal to the result
 			if test.expectedSlice != nil {
 				if succ == nil {
-					t.Errorf("Successors(1): expected %v, got nil", test.expectedSlice)
+					t.Errorf("Follows(1): expected %v, got nil", test.expectedSlice)
 				}
 
 				if !reflect.DeepEqual(succ, test.expectedSlice) {
-					t.Errorf("Successors(1): expected %v, got %v", test.expectedSlice, succ)
+					t.Errorf("Follows(1): expected %v, got %v", test.expectedSlice, succ)
 				}
 			}
 		})

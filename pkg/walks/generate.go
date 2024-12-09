@@ -132,7 +132,7 @@ func generateWalk(DB models.Database, startingNodeID uint32,
 		}
 
 		// get the successorIDs of the current node. This can be improved by checking a successor cache first.
-		successorIDs, err := DB.Successors(currentNodeID)
+		successorIDs, err := DB.Follows(currentNodeID)
 		if err != nil {
 			return nil, err
 		}

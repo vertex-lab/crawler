@@ -52,7 +52,7 @@ func Personalized(DB models.Database, RWS models.RandomWalkStore,
 func personalized(DB models.Database, RWS models.RandomWalkStore,
 	nodeID uint32, topK uint16, rng *rand.Rand) (models.PagerankMap, error) {
 
-	succ, err := DB.Successors(nodeID)
+	succ, err := DB.Follows(nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
 		// if all walks have been used, do a walk step
 		if WC.FullyUsed(pWalk.currentNodeID) {
 
-			successorIDs, err := DB.Successors(pWalk.currentNodeID)
+			successorIDs, err := DB.Follows(pWalk.currentNodeID)
 			if err != nil {
 				return nil, err
 			}

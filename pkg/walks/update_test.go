@@ -123,7 +123,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		// update the DB
 		commonSucc := []uint32{2}
-		DB.NodeIndex[nodeID].Successors = commonSucc
+		DB.NodeIndex[nodeID].Follows = commonSucc
 
 		rng := rand.New(rand.NewSource(5))
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
@@ -226,7 +226,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		// update the DB
 		currentSucc := []uint32{2}
-		DB.NodeIndex[nodeID].Successors = currentSucc
+		DB.NodeIndex[nodeID].Follows = currentSucc
 
 		rng := rand.New(rand.NewSource(5))
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
@@ -362,9 +362,9 @@ func TestUpdate(t *testing.T) {
 
 		// update one node at the time
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			oldSucc := DB1.NodeIndex[nodeID].Successors
-			newSucc := DB2.NodeIndex[nodeID].Successors
-			DB1.NodeIndex[nodeID].Successors = newSucc
+			oldSucc := DB1.NodeIndex[nodeID].Follows
+			newSucc := DB2.NodeIndex[nodeID].Follows
+			DB1.NodeIndex[nodeID].Follows = newSucc
 
 			if err := RWM.Update(DB1, nodeID, oldSucc, newSucc); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
@@ -403,27 +403,27 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 	b.Run("Update(), 10% new successors", func(b *testing.B) {
 		// prepare the graph changes
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
-			oldSuccessors, _ := DB.Successors(nodeID)
-			currentSuccessors := make([]uint32, len(oldSuccessors))
-			copy(currentSuccessors, oldSuccessors)
+			oldFollows, _ := DB.Follows(nodeID)
+			currentFollows := make([]uint32, len(oldFollows))
+			copy(currentFollows, oldFollows)
 
 			// add 10% new nodes
 			for i := 0; i < edgesPerNode/10; i++ {
 
 				newNode := uint32(rng.Intn(nodesSize))
-				currentSuccessors = append(currentSuccessors, newNode)
+				currentFollows = append(currentFollows, newNode)
 			}
-			oldSuccessorMap[nodeID] = oldSuccessors
-			currentSuccessorMap[nodeID] = currentSuccessors
+			oldSuccessorMap[nodeID] = oldFollows
+			currentSuccessorMap[nodeID] = currentFollows
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			nodeID := uint32(i % nodesSize)
-			oldSuccessors := oldSuccessorMap[nodeID]
-			currentSuccessors := currentSuccessorMap[nodeID]
+			oldFollows := oldSuccessorMap[nodeID]
+			currentFollows := currentSuccessorMap[nodeID]
 
-			err := RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors)
+			err := RWM.Update(DB, nodeID, oldFollows, currentFollows)
 			if err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}
@@ -461,14 +461,14 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		// prepare the graph changes
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
 
-			oldSuccessors, _ := DB.Successors(nodeID)
-			currentSuccessors := make([]uint32, len(oldSuccessors)-edgesPerNode/10)
+			oldFollows, _ := DB.Follows(nodeID)
+			currentFollows := make([]uint32, len(oldFollows)-edgesPerNode/10)
 
 			// remove 10% of the nodes
-			copy(currentSuccessors, oldSuccessors[edgesPerNode/10:])
+			copy(currentFollows, oldFollows[edgesPerNode/10:])
 
-			oldSuccessorMap[nodeID] = oldSuccessors
-			currentSuccessorMap[nodeID] = currentSuccessors
+			oldSuccessorMap[nodeID] = oldFollows
+			currentSuccessorMap[nodeID] = currentFollows
 		}
 
 		b.ResetTimer()
@@ -477,10 +477,10 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 
 			nodeID := uint32(i % nodesSize)
-			oldSuccessors := oldSuccessorMap[nodeID]
-			currentSuccessors := currentSuccessorMap[nodeID]
+			oldFollows := oldSuccessorMap[nodeID]
+			currentFollows := currentSuccessorMap[nodeID]
 
-			err := RWM.Update(DB, nodeID, oldSuccessors, currentSuccessors)
+			err := RWM.Update(DB, nodeID, oldFollows, currentFollows)
 			if err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}

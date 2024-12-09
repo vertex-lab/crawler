@@ -93,32 +93,32 @@ func ProcessFollowListEvent(
 
 	// parse pubkeys and fetch/assign nodeIDs
 	followPubkeys := ParsePubkeys(event)
-	newSucc, err := AssignNodeIDs(ctx, DB, followPubkeys)
+	newFollows, err := AssignNodeIDs(ctx, DB, followPubkeys)
 	if err != nil {
 		return err
 	}
 
-	oldSucc, err := DB.Successors(author.ID)
+	oldFollows, err := DB.Follows(author.ID)
 	if err != nil {
 		return err
 	}
 
-	removedSucc, _, addedSucc := sliceutils.Partition(oldSucc, newSucc)
+	removedFollows, _, addedFollows := sliceutils.Partition(oldFollows, newFollows)
 
 	// update the author's node in the database
 	authorNodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
 			EventTS: event.CreatedAt.Time().Unix(),
 		},
-		AddedSucc:   addedSucc,
-		RemovedSucc: removedSucc,
+		AddedFollows:   addedFollows,
+		RemovedFollows: removedFollows,
 	}
 	if err := DB.UpdateNode(author.ID, &authorNodeDiff); err != nil {
 		return err
 	}
 
 	// update the random walks
-	if err := RWM.Update(DB, author.ID, oldSucc, newSucc); err != nil {
+	if err := RWM.Update(DB, author.ID, oldFollows, newFollows); err != nil {
 		return err
 	}
 
@@ -135,7 +135,7 @@ func ProcessFollowListEvent(
 
 	} else {
 		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
-		impactedNodes := append(addedSucc, removedSucc...)
+		impactedNodes := append(addedFollows, removedFollows...)
 		pagerankMap, err = pagerank.LazyPagerank(DB, RWM.Store, impactedNodes)
 		if err != nil {
 			return err

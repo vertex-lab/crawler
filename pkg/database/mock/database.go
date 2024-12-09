@@ -76,7 +76,7 @@ func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 	}
 
 	DB.updateNodeMeta(nodeID, nodeDiff)
-	DB.updateNodeSuccessors(nodeID, nodeDiff)
+	DB.updateNodeFollows(nodeID, nodeDiff)
 	return nil
 }
 
@@ -101,29 +101,29 @@ func (DB *Database) updateNodeMeta(nodeID uint32, nodeDiff *models.NodeDiff) {
 	}
 }
 
-// updateNodeSuccessors() updates the successors of nodeID by adding nodeDiff.AddedSucc
-// and removing nodeDiff.RemovedSucc.
-func (DB *Database) updateNodeSuccessors(nodeID uint32, nodeDiff *models.NodeDiff) {
+// updateNodeFollows() updates the successors of nodeID by adding nodeDiff.AddedFollows
+// and removing nodeDiff.RemovedFollows.
+func (DB *Database) updateNodeFollows(nodeID uint32, nodeDiff *models.NodeDiff) {
 
-	oldSucc := DB.NodeIndex[nodeID].Successors
+	oldFollows := DB.NodeIndex[nodeID].Follows
 
 	// adding new successors
-	for _, addedSucc := range nodeDiff.AddedSucc {
-		if !slices.Contains(oldSucc, addedSucc) {
-			oldSucc = append(oldSucc, addedSucc)
+	for _, addedFollows := range nodeDiff.AddedFollows {
+		if !slices.Contains(oldFollows, addedFollows) {
+			oldFollows = append(oldFollows, addedFollows)
 		}
 	}
 
 	// removing successors
-	newSucc := make([]uint32, 0, len(oldSucc)-len(nodeDiff.RemovedSucc))
-	for _, succ := range oldSucc {
+	newFollows := make([]uint32, 0, len(oldFollows)-len(nodeDiff.RemovedFollows))
+	for _, succ := range oldFollows {
 
-		if !slices.Contains(nodeDiff.RemovedSucc, succ) {
-			newSucc = append(newSucc, succ)
+		if !slices.Contains(nodeDiff.RemovedFollows, succ) {
+			newFollows = append(newFollows, succ)
 		}
 	}
 
-	DB.NodeIndex[nodeID].Successors = newSucc
+	DB.NodeIndex[nodeID].Follows = newFollows
 }
 
 // ContainsNode() returns whether nodeID is found in the DB
@@ -167,8 +167,8 @@ func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
 	return &node.Metadata, nil
 }
 
-// Successors() returns the slice of successors of nodeID.
-func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
+// Follows() returns the slice of successors of nodeID.
+func (DB *Database) Follows(nodeID uint32) ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -178,7 +178,7 @@ func (DB *Database) Successors(nodeID uint32) ([]uint32, error) {
 	if !exists {
 		return nil, models.ErrNodeNotFoundDB
 	}
-	return node.Successors, nil
+	return node.Follows, nil
 }
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
@@ -302,37 +302,37 @@ func SetupDB(DBType string) *Database {
 
 	case "dandling":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{1}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "one-node0":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{0}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{0}}
 		DB.LastNodeID = 0
 		return DB
 
 	case "one-node1":
 		DB := NewDatabase()
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{1}}
 		DB.LastNodeID = 1
 		return DB
 
 	case "triangle":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{0}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{0}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "simple":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -341,9 +341,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex["zero"] = 0
 		DB.KeyIndex["one"] = 1
 		DB.KeyIndex["two"] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: "zero", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: "one", EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: "two", EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: "zero", EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: "one", EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: "two", EventTS: 0, Pagerank: 0.26}, Follows: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -352,16 +352,16 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}, Followers: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}, Followers: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{}, Followers: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
 	case "pip":
 		DB := NewDatabase()
 		DB.KeyIndex[pip] = 0
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 1.0}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 1.0}, Follows: []uint32{}, Followers: []uint32{}}
 		DB.LastNodeID = 0
 		return DB
 
@@ -370,9 +370,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{1}, Predecessors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Successors: []uint32{}, Predecessors: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Successors: []uint32{}, Predecessors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}, Followers: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}, Followers: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{}, Followers: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -392,20 +392,20 @@ func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 
 	for i := 0; i < nodesNum; i++ {
 		// create random successors for each node
-		randomSuccessors := make([]uint32, 0, successorsPerNode)
-		for len(randomSuccessors) != successorsPerNode {
+		randomFollows := make([]uint32, 0, successorsPerNode)
+		for len(randomFollows) != successorsPerNode {
 
 			succ := uint32(rng.Intn(nodesNum))
-			if slices.Contains(randomSuccessors, succ) {
+			if slices.Contains(randomFollows, succ) {
 				continue
 			}
 
-			randomSuccessors = append(randomSuccessors, succ)
+			randomFollows = append(randomFollows, succ)
 		}
 
 		DB.NodeIndex[uint32(i)] = &models.Node{
-			Metadata:   models.NodeMeta{EventTS: 0},
-			Successors: randomSuccessors}
+			Metadata: models.NodeMeta{EventTS: 0},
+			Follows:  randomFollows}
 	}
 	return DB
 }

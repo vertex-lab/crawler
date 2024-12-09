@@ -35,12 +35,12 @@ func SetupOldState(DB *mock.Database,
 		pos++
 	}
 
-	currentSucc := DB.NodeIndex[randomNodeID].Successors
+	currentSucc := DB.NodeIndex[randomNodeID].Follows
 	changes := potentialChanges[randomNodeID]
 
 	// randomly select one of the potential changes as the old successors
 	randomIndex := rand.Intn(len(changes))
-	oldSucc := changes[randomIndex].OldSuccessors
+	oldSucc := changes[randomIndex].OldFollows
 
 	return randomNodeID, oldSucc, currentSucc
 }
@@ -53,10 +53,10 @@ type TestSetup struct {
 	PotentialChanges map[uint32][]Change
 }
 
-// A struct to represent a change in successors, from OldSuccessors to CurrentSuccessors,
+// A struct to represent a change in successors, from OldFollows to CurrentFollows,
 // which is present in the DB
 type Change struct {
-	OldSuccessors []uint32
+	OldFollows []uint32
 }
 
 /*
@@ -68,7 +68,7 @@ Pagerank (alpha = 0.85) of 0 and potential changes based on the graph type.
 potentialChanges is nil for graphs that contains short cycles. The reason is that
 updateRemovedNodes is known to return incorrect results when the probability
 of cycles involving nodeID --> removedNode is high. For the same reason,
-potentialChanges should not include oldSuccessors that make the corrisponding graph cyclic.
+potentialChanges should not include oldFollows that make the corrisponding graph cyclic.
 */
 func SetupGraph(graphType string) TestSetup {
 	DB := mock.NewDatabase()
@@ -78,11 +78,11 @@ func SetupGraph(graphType string) TestSetup {
 
 	switch graphType {
 	case "dandlings":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[3] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[4] = &models.Node{Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[3] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[4] = &models.Node{Follows: []uint32{}}
 		expectedPR = models.PagerankMap{
 			0: 0.20,
 			1: 0.20,
@@ -99,16 +99,16 @@ func SetupGraph(graphType string) TestSetup {
 		}
 		// because of symmetry, these are all the possible changes
 		potentialChanges[0] = []Change{
-			{OldSuccessors: []uint32{1}},
-			{OldSuccessors: []uint32{1, 2}},
-			{OldSuccessors: []uint32{1, 2, 3}},
-			{OldSuccessors: []uint32{1, 2, 3, 4}},
+			{OldFollows: []uint32{1}},
+			{OldFollows: []uint32{1, 2}},
+			{OldFollows: []uint32{1, 2, 3}},
+			{OldFollows: []uint32{1, 2, 3, 4}},
 		}
 
 	case "triangle":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{0}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{0}}
 		expectedPR = models.PagerankMap{
 			0: 0.3333,
 			1: 0.3333,
@@ -116,10 +116,10 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "cyclic1":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1, 3}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{0}}
-		DB.NodeIndex[3] = &models.Node{Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{1, 3}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{2}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{0}}
+		DB.NodeIndex[3] = &models.Node{Follows: []uint32{}}
 		expectedPR = models.PagerankMap{
 			0: 0.29700319989476004,
 			1: 0.20616253803697476,
@@ -128,11 +128,11 @@ func SetupGraph(graphType string) TestSetup {
 		}
 
 	case "acyclic1":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1, 2}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{3}}
-		DB.NodeIndex[3] = &models.Node{Successors: []uint32{1}}
-		DB.NodeIndex[4] = &models.Node{Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{1, 2}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{3}}
+		DB.NodeIndex[3] = &models.Node{Follows: []uint32{1}}
+		DB.NodeIndex[4] = &models.Node{Follows: []uint32{}}
 		expectedPR = models.PagerankMap{
 			0: 0.11185368285521291,
 			1: 0.36950360789646736,
@@ -150,35 +150,35 @@ func SetupGraph(graphType string) TestSetup {
 
 		potentialChanges[0] = []Change{
 			// simple additions
-			{OldSuccessors: []uint32{}},
-			{OldSuccessors: []uint32{1}},
-			{OldSuccessors: []uint32{2}},
+			{OldFollows: []uint32{}},
+			{OldFollows: []uint32{1}},
+			{OldFollows: []uint32{2}},
 
 			// simple removals
-			{OldSuccessors: []uint32{1, 2, 4}},
-			{OldSuccessors: []uint32{1, 2, 3}},
+			{OldFollows: []uint32{1, 2, 4}},
+			{OldFollows: []uint32{1, 2, 3}},
 
 			// addition and removals
-			{OldSuccessors: []uint32{1, 3}},
-			{OldSuccessors: []uint32{2, 3}},
-			{OldSuccessors: []uint32{4}},
+			{OldFollows: []uint32{1, 3}},
+			{OldFollows: []uint32{2, 3}},
+			{OldFollows: []uint32{4}},
 		}
 
 		potentialChanges[4] = []Change{
 			// simple removals
-			{OldSuccessors: []uint32{0}},
-			{OldSuccessors: []uint32{1}},
-			{OldSuccessors: []uint32{2}},
-			{OldSuccessors: []uint32{3}},
-			{OldSuccessors: []uint32{0, 1}},
+			{OldFollows: []uint32{0}},
+			{OldFollows: []uint32{1}},
+			{OldFollows: []uint32{2}},
+			{OldFollows: []uint32{3}},
+			{OldFollows: []uint32{0, 1}},
 		}
 	case "acyclic2":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1, 2}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[3] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[4] = &models.Node{Successors: []uint32{3, 5}}
-		DB.NodeIndex[5] = &models.Node{Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{1, 2}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[3] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[4] = &models.Node{Follows: []uint32{3, 5}}
+		DB.NodeIndex[5] = &models.Node{Follows: []uint32{}}
 		expectedPR = models.PagerankMap{
 			0: 0.12987025255292317,
 			1: 0.18506487372353833,
@@ -198,32 +198,32 @@ func SetupGraph(graphType string) TestSetup {
 
 		potentialChanges[0] = []Change{
 			// simple additions
-			{OldSuccessors: []uint32{}},
-			{OldSuccessors: []uint32{1}},
+			{OldFollows: []uint32{}},
+			{OldFollows: []uint32{1}},
 
 			// simple removals
-			{OldSuccessors: []uint32{1, 2, 3}},
-			{OldSuccessors: []uint32{1, 2, 4}},
+			{OldFollows: []uint32{1, 2, 3}},
+			{OldFollows: []uint32{1, 2, 4}},
 
 			// addition and removals
-			{OldSuccessors: []uint32{1, 3}},
-			{OldSuccessors: []uint32{1, 4}},
-			{OldSuccessors: []uint32{3}},
-			{OldSuccessors: []uint32{4}},
+			{OldFollows: []uint32{1, 3}},
+			{OldFollows: []uint32{1, 4}},
+			{OldFollows: []uint32{3}},
+			{OldFollows: []uint32{4}},
 		}
 
 		potentialChanges[1] = []Change{
 			// simple removals
-			{OldSuccessors: []uint32{2}},
-			{OldSuccessors: []uint32{3}},
-			{OldSuccessors: []uint32{4}},
+			{OldFollows: []uint32{2}},
+			{OldFollows: []uint32{3}},
+			{OldFollows: []uint32{4}},
 		}
 
 	case "acyclic3":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1, 2}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[3] = &models.Node{Successors: []uint32{1, 2}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{1, 2}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[3] = &models.Node{Follows: []uint32{1, 2}}
 		expectedPR = models.PagerankMap{
 			0: 0.17543839772251532,
 			1: 0.32456160227748454,
@@ -239,21 +239,21 @@ func SetupGraph(graphType string) TestSetup {
 
 		potentialChanges[0] = []Change{
 			// simple additions
-			{OldSuccessors: []uint32{}},
-			{OldSuccessors: []uint32{1}},
+			{OldFollows: []uint32{}},
+			{OldFollows: []uint32{1}},
 
 			// simple removals
-			{OldSuccessors: []uint32{1, 2, 3}},
+			{OldFollows: []uint32{1, 2, 3}},
 
 			// addition and removals
-			{OldSuccessors: []uint32{1, 3}},
+			{OldFollows: []uint32{1, 3}},
 		}
 
 	case "acyclic4":
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{1, 2}}
-		DB.NodeIndex[1] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Successors: []uint32{}}
-		DB.NodeIndex[3] = &models.Node{Successors: []uint32{1}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{1, 2}}
+		DB.NodeIndex[1] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Follows: []uint32{}}
+		DB.NodeIndex[3] = &models.Node{Follows: []uint32{1}}
 		expectedPR = models.PagerankMap{
 			0: 0.17543839772251535,
 			1: 0.3991232045549693,
@@ -269,16 +269,16 @@ func SetupGraph(graphType string) TestSetup {
 
 		potentialChanges[0] = []Change{
 			// simple additions
-			{OldSuccessors: []uint32{}},
-			{OldSuccessors: []uint32{1}},
-			{OldSuccessors: []uint32{2}},
+			{OldFollows: []uint32{}},
+			{OldFollows: []uint32{1}},
+			{OldFollows: []uint32{2}},
 
 			// simple removals
-			{OldSuccessors: []uint32{1, 2, 3}},
+			{OldFollows: []uint32{1, 2, 3}},
 
 			// addition and removals
-			{OldSuccessors: []uint32{1, 3}},
-			{OldSuccessors: []uint32{2, 3}},
+			{OldFollows: []uint32{1, 3}},
+			{OldFollows: []uint32{2, 3}},
 		}
 
 	case "cyclicLong50":
@@ -287,14 +287,14 @@ func SetupGraph(graphType string) TestSetup {
 		expectedPR = make(models.PagerankMap, 50)
 		expectedPPR0 = make(models.PagerankMap, 50)
 		for nodeID := uint32(0); nodeID < 49; nodeID++ {
-			DB.NodeIndex[nodeID] = &models.Node{Successors: []uint32{nodeID + 1}}
+			DB.NodeIndex[nodeID] = &models.Node{Follows: []uint32{nodeID + 1}}
 
 			expectedPR[nodeID] = 1.0 / 50.0
 			expectedPPR0[nodeID] = 0.15 * math.Pow(0.85, float64(nodeID))
 		}
 
 		// closing the big cycle
-		DB.NodeIndex[49] = &models.Node{Successors: []uint32{0}}
+		DB.NodeIndex[49] = &models.Node{Follows: []uint32{0}}
 		expectedPR[49] = 1.0 / 50.0
 		expectedPPR0[49] = 0.15 * math.Pow(0.85, float64(49))
 
@@ -302,18 +302,18 @@ func SetupGraph(graphType string) TestSetup {
 		// that produce cycles non shorter than 25
 		potentialChanges[0] = []Change{
 			// simple additions
-			{OldSuccessors: []uint32{}},
+			{OldFollows: []uint32{}},
 
 			// simple removals
-			{OldSuccessors: []uint32{1, 25}},
+			{OldFollows: []uint32{1, 25}},
 
 			// addition and removals
-			{OldSuccessors: []uint32{25}},
+			{OldFollows: []uint32{25}},
 		}
 
 	default:
 		// just one node
-		DB.NodeIndex[0] = &models.Node{Successors: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Follows: []uint32{}}
 		expectedPR = models.PagerankMap{0: 1.0}
 		expectedPPR0 = models.PagerankMap{0: 1.0}
 	}
