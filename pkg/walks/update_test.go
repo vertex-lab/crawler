@@ -103,7 +103,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mock.SetupDB(test.DBType)
-				RWM := SetupRWM(test.RWMType)
+				RWM := SetupMockRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 				err := RWM.updateRemovedNodes(DB, 0, test.removedFollows, []uint32{2}, rng)
 
@@ -117,7 +117,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		DB := mock.SetupDB("triangle")
-		RWM := SetupRWM("triangle")
+		RWM := SetupMockRWM("triangle")
 
 		nodeID := uint32(0)
 		removeFollows := []uint32{1}
@@ -208,7 +208,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mock.SetupDB(test.DBType)
-				RWM := SetupRWM(test.RWMType)
+				RWM := SetupMockRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 				err := RWM.updateAddedNodes(DB, 0, test.addedFollows, test.newOutDegree, rng)
@@ -221,7 +221,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		DB := mock.SetupDB("simple")
-		RWM := SetupRWM("simple")
+		RWM := SetupMockRWM("simple")
 		nodeID := uint32(0)
 		addedFollows := []uint32{2}
 
@@ -336,7 +336,7 @@ func TestUpdate(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mock.SetupDB(test.DBType)
-				RWM := SetupRWM(test.RWMType)
+				RWM := SetupMockRWM(test.RWMType)
 
 				removed, common, added := sliceutils.Partition(test.oldFollows, test.currentFollows)
 

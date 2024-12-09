@@ -213,6 +213,7 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 	if err != nil {
 		return map[uint32]models.RandomWalk{}, err
 	}
+
 	if len(strIDs) == 0 {
 		return map[uint32]models.RandomWalk{}, models.ErrNodeNotFoundRWS
 	}

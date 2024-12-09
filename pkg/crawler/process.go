@@ -355,10 +355,9 @@ func DemoteNode(
 	RWM *walks.RandomWalkManager,
 	nodeID uint32) error {
 
-	_ = RWM
-	// if err := RWM.Remove(DB, nodeID); err != nil {
-	// 	return err
-	// }
+	if err := RWM.Remove(nodeID); err != nil {
+		return err
+	}
 
 	nodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{

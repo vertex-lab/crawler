@@ -225,7 +225,7 @@ func TestGenerate(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := mockdb.SetupDB(test.DBType)
-			RWM := SetupRWM(test.RWMType)
+			RWM := SetupMockRWM(test.RWMType)
 
 			if err := RWM.Generate(DB, 0); !errors.Is(err, test.expectedError) {
 				t.Errorf("generateWalks(): expected %v, got %v", test.expectedError, err)
@@ -276,7 +276,7 @@ func TestGenerateAll(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
-				RWM := SetupRWM(test.RWMType)
+				RWM := SetupMockRWM(test.RWMType)
 
 				err := RWM.GenerateAll(DB)
 				if !errors.Is(err, test.expectedError) {

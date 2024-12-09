@@ -368,7 +368,7 @@ func SetupDB(DBType string) *Database {
 	case "promotion-demotion":
 		DB := NewDatabase()
 		DB.KeyIndex[odell] = 0
-		DB.KeyIndex[calle] = 1
+		DB.KeyIndex[calle] = 1 // the only active
 		DB.KeyIndex[pip] = 2
 		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}, Followers: []uint32{}}
 		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}, Followers: []uint32{0}}

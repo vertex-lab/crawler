@@ -191,7 +191,7 @@ func TestProcessFollowListEvent(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
-				RWM := walks.SetupRWM(test.RWSType)
+				RWM := walks.SetupMockRWM(test.RWSType)
 
 				err := ProcessFollowListEvent(context.Background(), &validEvent, DB, RWM)
 
@@ -297,7 +297,7 @@ func TestArbiterScan(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
-				RWM := walks.SetupRWM(test.RWMType)
+				RWM := walks.SetupMockRWM(test.RWMType)
 
 				err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
 					return nil
@@ -314,7 +314,7 @@ func TestArbiterScan(t *testing.T) {
 		t.Run("demotion", func(t *testing.T) {
 			// calle will be demoted to inactive, because the threshold is 1.0
 			DB := mockdb.SetupDB("promotion-demotion")
-			RWM := walks.SetupRWM("one-node1")
+			RWM := walks.SetupMockRWM("one-node1")
 
 			err := ArbiterScan(context.Background(), DB, RWM, 1.0, func(pk string) error {
 				return nil
@@ -333,11 +333,22 @@ func TestArbiterScan(t *testing.T) {
 			if node.Metadata.Status != models.StatusInactive {
 				t.Errorf("expected status of nodeID %d %v, got %v", 1, models.StatusActive, node.Metadata.Status)
 			}
+
+			// check the only walk (from calle) has been removed
+			walks, err := RWM.Store.Walks(1, -1)
+			if err != nil {
+				t.Errorf("Walks(): expected nil, got %v", err)
+			}
+
+			if len(walks) > 0 {
+				t.Errorf("expected no walks, got %v", walks)
+			}
+
 		})
 		t.Run("promotion", func(t *testing.T) {
 			// pip and odell will be promoted from inactive to active
 			DB := mockdb.SetupDB("promotion-demotion")
-			RWM := walks.SetupRWM("one-node1")
+			RWM := walks.SetupMockRWM("one-node1")
 			queue := []string{}
 
 			err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
@@ -391,7 +402,7 @@ func TestNodeArbiter(t *testing.T) {
 	go HandleSignals(cancel, logger)
 
 	DB := mockdb.SetupDB("one-node0")
-	RWM := walks.SetupRWM("one-node0")
+	RWM := walks.SetupMockRWM("one-node0")
 	NodeArbiter(ctx, logger, DB, RWM, 5, func(pk string) error {
 		return nil
 	})

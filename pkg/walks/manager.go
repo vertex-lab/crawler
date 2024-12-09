@@ -35,6 +35,6 @@ func NewMockRWM(alpha float32, walksPerNode uint16) (*RandomWalkManager, error) 
 }
 
 // function that returns a RWM setup based on the RWMType.
-func SetupRWM(RWMType string) *RandomWalkManager {
+func SetupMockRWM(RWMType string) *RandomWalkManager {
 	return &RandomWalkManager{Store: mock.SetupRWS(RWMType)}
 }
