@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/vertex-lab/crawler/pkg/pagerank"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestPagerankStatic(t *testing.T) {
-
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
 	const walkPerNode = 10000
@@ -53,25 +53,20 @@ func TestPagerankStatic(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
-			// setup the graph and pagerank
 			setup := SetupGraph(test.graphType)
 			DB := setup.DB
 			expectedPR := setup.ExpectedPR
 
-			// generate walks
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
 			if err := RWM.GenerateAll(DB); err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
-			// compute pagerank
 			pr, err := pagerank.Pagerank(DB, RWM.Store)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}
 
-			// compute the error
 			distance := pagerank.Distance(expectedPR, pr)
 			if distance > maxExpectedDistance {
 				t.Errorf("Pagerank(): expected distance %v, pr %v\n", maxExpectedDistance, distance)
@@ -126,8 +121,6 @@ func TestPagerankDynamic(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
-			// setup the graph, pagerank and changes
 			setup := SetupGraph(test.graphType)
 			DB := setup.DB
 			expectedPR := setup.ExpectedPR
@@ -146,19 +139,16 @@ func TestPagerankDynamic(t *testing.T) {
 
 			// update the graph to the current state
 			DB.NodeIndex[nodeID].Follows = currentFollows
-
-			// update the random walks
-			if err = RWM.Update(DB, nodeID, oldFollows, currentFollows); err != nil {
+			removed, common, added := sliceutils.Partition(oldFollows, currentFollows)
+			if err = RWM.Update(DB, nodeID, removed, common, added); err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
-			// compute pagerank
 			pr, err := pagerank.Pagerank(DB, RWM.Store)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}
 
-			// check the error
 			distance := pagerank.Distance(expectedPR, pr)
 			if distance > maxExpectedDistance {
 				t.Errorf("Pagerank(): expected distance %v, pr %v\n\n", maxExpectedDistance, distance)

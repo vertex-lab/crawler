@@ -94,12 +94,9 @@ func TestPartition(t *testing.T) {
 		expectedAdded   []uint32
 	}{
 		{
-			name:            "empty slices",
-			slice1:          []uint32{},
-			slice2:          []uint32{},
-			expectedRemoved: []uint32{},
-			expectedCommon:  []uint32{},
-			expectedAdded:   []uint32{},
+			name:   "empty slices",
+			slice1: []uint32{},
+			slice2: []uint32{},
 		},
 		{
 			name:            "normal",

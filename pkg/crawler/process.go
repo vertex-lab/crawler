@@ -86,7 +86,6 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	// if the event is older than what we have, stop
 	if event.CreatedAt.Time().Unix() < author.EventTS {
 		return nil
 	}
@@ -103,22 +102,20 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	removedFollows, _, addedFollows := sliceutils.Partition(oldFollows, newFollows)
+	removed, common, added := sliceutils.Partition(oldFollows, newFollows)
 
-	// update the author's node in the database
 	authorNodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
 			EventTS: event.CreatedAt.Time().Unix(),
 		},
-		AddedFollows:   addedFollows,
-		RemovedFollows: removedFollows,
+		AddedFollows:   added,
+		RemovedFollows: removed,
 	}
 	if err := DB.UpdateNode(author.ID, &authorNodeDiff); err != nil {
 		return err
 	}
 
-	// update the random walks
-	if err := RWM.Update(DB, author.ID, oldFollows, newFollows); err != nil {
+	if err := RWM.Update(DB, author.ID, removed, common, added); err != nil {
 		return err
 	}
 
@@ -135,14 +132,13 @@ func ProcessFollowListEvent(
 
 	} else {
 		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
-		impactedNodes := append(addedFollows, removedFollows...)
+		impactedNodes := append(added, removed...)
 		pagerankMap, err = pagerank.LazyPagerank(DB, RWM.Store, impactedNodes)
 		if err != nil {
 			return err
 		}
 	}
 
-	// set the pagerank
 	if err := DB.SetPagerank(pagerankMap); err != nil {
 		return err
 	}

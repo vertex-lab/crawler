@@ -10,8 +10,8 @@ import (
 )
 
 /*
-Update() updates the RandomWalkManager when a node's successors change from
-oldSucc to currentSucc.
+Update() updates the RandomWalkManager when a node's follows changes.
+These changes are represented by some removed follows, common follows and added follows
 
 # REFERENCES
 
@@ -19,7 +19,7 @@ oldSucc to currentSucc.
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func (RWM *RandomWalkManager) Update(DB models.Database, nodeID uint32,
-	oldSucc []uint32, currentSucc []uint32) error {
+	removed, common, added []uint32) error {
 
 	if err := DB.Validate(); err != nil {
 		return err
@@ -34,21 +34,12 @@ func (RWM *RandomWalkManager) Update(DB models.Database, nodeID uint32,
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return RWM.update(DB, nodeID, oldSucc, currentSucc, rng)
-}
-
-// update() implements the internal logic of the Update method. It accepts a
-// random number generator for reproducibility in tests.
-func (RWM *RandomWalkManager) update(DB models.Database, nodeID uint32,
-	oldSucc []uint32, currentSucc []uint32, rng *rand.Rand) error {
-
-	removedSucc, commonSucc, addedSucc := sliceutils.Partition(oldSucc, currentSucc)
-
-	if err := RWM.updateRemovedNodes(DB, nodeID, removedSucc, commonSucc, rng); err != nil {
+	if err := RWM.updateRemovedNodes(DB, nodeID, removed, common, rng); err != nil {
 		return err
 	}
 
-	if err := RWM.updateAddedNodes(DB, nodeID, addedSucc, len(currentSucc), rng); err != nil {
+	followsCount := len(common) + len(added)
+	if err := RWM.updateAddedNodes(DB, nodeID, added, followsCount, rng); err != nil {
 		return err
 	}
 
@@ -57,15 +48,15 @@ func (RWM *RandomWalkManager) update(DB models.Database, nodeID uint32,
 
 /*
 updateRemovedNodes() updates the RWM by "pruning" and "grafting" all the walks that
-contain the invalid step `nodeID` --> `removedID` in `removedSucc`.
+contain the invalid step `nodeID` --> `removedID` in `removed`.
 
 After the execution of this method, the state of the walks of nodeID is as if nodeID
-only successors are the common successors `commonSucc`.
+only follows are the common follows `common`.
 */
 func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint32,
-	removedSucc, commonSucc []uint32, rng *rand.Rand) error {
+	removed, common []uint32, rng *rand.Rand) error {
 
-	if len(removedSucc) == 0 {
+	if len(removed) == 0 {
 		return nil
 	}
 
@@ -75,13 +66,13 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 	}
 
 	for walkID, walk := range walkMap {
-		cutIndex, contains := containsInvalidStep(walk, nodeID, removedSucc)
+		cutIndex, contains := containsInvalidStep(walk, nodeID, removed)
 		if !contains {
 			continue
 		}
 
 		// generate a new walk segment that will replace the invalid segment of the walk
-		newWalkSegment, err := generateWalkSegment(DB, commonSucc, walk[:cutIndex], RWM.Store.Alpha(), rng)
+		newWalkSegment, err := generateWalkSegment(DB, common, walk[:cutIndex], RWM.Store.Alpha(), rng)
 		if err != nil {
 			return err
 		}
@@ -97,16 +88,16 @@ func (RWM *RandomWalkManager) updateRemovedNodes(DB models.Database, nodeID uint
 
 /*
 a method that updates the RWM by "pruning" some randomly selected walks of nodeID
-and by "grafting" them using the newly added nodes
+and by "grafting" them using the newly added nodes as the starting points.
 */
 func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32,
-	addedSucc []uint32, currentSuccSize int, rng *rand.Rand) error {
+	added []uint32, followsCount int, rng *rand.Rand) error {
 
-	if len(addedSucc) == 0 {
+	if len(added) == 0 {
 		return nil
 	}
 
-	limit, err := estimateWalksToUpdate(RWM, nodeID, len(addedSucc), currentSuccSize)
+	limit, err := estimateWalksToUpdate(RWM, nodeID, len(added), followsCount)
 	if err != nil {
 		return err
 	}
@@ -125,7 +116,7 @@ func (RWM *RandomWalkManager) updateAddedNodes(DB models.Database, nodeID uint32
 		var newWalkSegment models.RandomWalk
 		if rng.Float32() < RWM.Store.Alpha() {
 
-			newWalkSegment, err = generateWalkSegment(DB, addedSucc, walk[:cutIndex], RWM.Store.Alpha(), rng)
+			newWalkSegment, err = generateWalkSegment(DB, added, walk[:cutIndex], RWM.Store.Alpha(), rng)
 			if err != nil {
 				return err
 			}
@@ -148,19 +139,16 @@ candidateNodes, and ensures that the currentWalk + newWalkSegment doesn't contai
 func generateWalkSegment(DB models.Database, candidateNodes []uint32, currentWalk models.RandomWalk,
 	alpha float32, rng *rand.Rand) (models.RandomWalk, error) {
 
-	// select the next node
-	successorID, shouldStop := WalkStep(candidateNodes, currentWalk, rng)
-	if shouldStop {
+	successorID, stop := WalkStep(candidateNodes, currentWalk, rng)
+	if stop {
 		return models.RandomWalk{}, nil
 	}
 
-	// generate the new walk segment
 	newWalkSegment, err := generateWalk(DB, successorID, alpha, rng)
 	if err != nil {
 		return nil, err
 	}
 
-	// remove potential cycles
 	return sliceutils.DeleteCyclesInPlace(currentWalk, newWalkSegment), nil
 }
 
@@ -188,6 +176,5 @@ func estimateWalksToUpdate(RWM *RandomWalkManager, nodeID uint32, addedSize int,
 
 	walksNum := float32(walkMap[nodeID])
 	p := float32(addedSize) / float32(currentSize)
-
 	return int(p * walksNum), nil
 }

@@ -39,16 +39,12 @@ Time complexity O(n * logn + m * logm), where n and m are the lengths of the sli
 This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
 */
 func Difference(slice1, slice2 []uint32) []uint32 {
-
-	// Sort both slices first
 	slices.Sort(slice1)
 	slices.Sort(slice2)
 	difference := []uint32{}
 
 	i, j := 0, 0
 	lenOld, lenNew := len(slice1), len(slice2)
-
-	// Use two pointers to compare both sorted lists
 	for i < lenOld && j < lenNew {
 		if slice1[i] < slice2[j] {
 			// the element is in slice1 but not in slice2
@@ -77,19 +73,13 @@ added = slice2 - slice1
 Time complexity O(n * logn + m * logm), where n and m are the lengths of the slices.
 This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
 */
-func Partition(slice1, slice2 []uint32) ([]uint32, []uint32, []uint32) {
-
-	// Sort both slices first
+func Partition(slice1, slice2 []uint32) (removed, common, added []uint32) {
 	slices.Sort(slice1)
 	slices.Sort(slice2)
-	removed := []uint32{}
-	common := []uint32{}
-	added := []uint32{}
 
 	i, j := 0, 0
 	lenOld, lenNew := len(slice1), len(slice2)
 
-	// Use two pointers to compare both sorted lists
 	for i < lenOld && j < lenNew {
 
 		if slice1[i] < slice2[j] {
@@ -113,7 +103,6 @@ func Partition(slice1, slice2 []uint32) ([]uint32, []uint32, []uint32) {
 	// Add all elements not traversed
 	removed = append(removed, slice1[i:]...)
 	added = append(added, slice2[j:]...)
-
 	return removed, common, added
 }
 

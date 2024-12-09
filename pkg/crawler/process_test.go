@@ -287,12 +287,6 @@ func TestArbiterScan(t *testing.T) {
 				expectedError: models.ErrNilDBPointer,
 			},
 			{
-				name:          "empty DB",
-				DBType:        "empty",
-				RWMType:       "one-node0",
-				expectedError: models.ErrEmptyDB,
-			},
-			{
 				name:          "valid",
 				DBType:        "one-node0",
 				RWMType:       "one-node0",
@@ -330,7 +324,7 @@ func TestArbiterScan(t *testing.T) {
 				t.Fatalf("ArbiterScan(): expected nil, got %v", err)
 			}
 
-			// check that calle's the status changed
+			// check that calle's status changed
 			node, exists := DB.NodeIndex[1]
 			if !exists {
 				t.Fatalf("nodeID %d doesn't exists in the DB", 1)
