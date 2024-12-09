@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -360,38 +361,29 @@ func TestUpdate(t *testing.T) {
 		DB2 := mock.GenerateDB(nodesNum, edgesPerNode, rng2)
 
 		// update one node at the time
-		c := 0
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-
 			oldSucc := DB1.NodeIndex[nodeID].Successors
 			newSucc := DB2.NodeIndex[nodeID].Successors
 			DB1.NodeIndex[nodeID].Successors = newSucc
 
-			time.Sleep(10 * time.Millisecond)
 			if err := RWM.Update(DB1, nodeID, oldSucc, newSucc); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
 			}
-
-			c++
-			if c > 2 {
-				break
-			}
 		}
 
-		// // check that each walk in the Walks of nodeID contains nodeID
-		// for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
+		// check that each walk in the Walks of nodeID contains nodeID
+		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
+			walks, err := RWM.Store.Walks(nodeID, -1)
+			if err != nil {
+				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
+			}
 
-		// 	walks, err := RWM.Store.Walks(nodeID, -1)
-		// 	if err != nil {
-		// 		t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
-		// 	}
-
-		// 	for _, walk := range walks {
-		// 		if !slices.Contains(walk, nodeID) {
-		// 			t.Fatalf("walk %v should contain nodeID = %d", walk, nodeID)
-		// 		}
-		// 	}
-		// }
+			for _, walk := range walks {
+				if !slices.Contains(walk, nodeID) {
+					t.Fatalf("walk %v should contain nodeID = %d", walk, nodeID)
+				}
+			}
+		}
 	})
 }
 
