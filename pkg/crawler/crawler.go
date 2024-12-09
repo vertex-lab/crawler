@@ -14,8 +14,12 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
-const bottom = 0.95
-const top = 0.001
+// constants for pagerankThreshold. bottom and top respectively represents
+// the bottom 5%, and top the top 0.1% of the pagerank distribution.
+const (
+	bottom float64 = 0.95
+	top    float64 = 0.001
+)
 
 var (
 	RelevantKinds = []int{
