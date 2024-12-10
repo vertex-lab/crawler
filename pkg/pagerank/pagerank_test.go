@@ -83,9 +83,10 @@ func TestPagerank(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
-			pagerank, err := Pagerank(DB, RWS)
+			pagerank, err := Pagerank(ctx, DB, RWS)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
@@ -163,9 +164,10 @@ func TestLazyPagerank(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
-			pagerank, err := LazyPagerank(DB, RWS, test.nodeIDs)
+			pagerank, err := LazyPagerank(ctx, DB, RWS, test.nodeIDs)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
@@ -185,8 +187,7 @@ func TestLazyPagerank(t *testing.T) {
 
 func BenchmarkPagerankMock(b *testing.B) {
 	b.Run("FixedDB", func(b *testing.B) {
-
-		// initial setup
+		ctx := context.Background()
 		nodesSize := 2000
 		edgesPerNode := 100
 		rng := rand.New(rand.NewSource(69))
@@ -196,12 +197,12 @@ func BenchmarkPagerankMock(b *testing.B) {
 		for _, walksPerNode := range []uint16{1, 10, 100} {
 			b.Run(fmt.Sprintf("walksPerNode=%d", walksPerNode), func(b *testing.B) {
 				RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-				RWM.GenerateAll(DB)
+				RWM.GenerateAll(ctx, DB)
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(DB, RWM.Store)
+					_, err := Pagerank(ctx, DB, RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}
@@ -211,21 +212,21 @@ func BenchmarkPagerankMock(b *testing.B) {
 	})
 
 	b.Run("FixedWalksPerNode", func(b *testing.B) {
+		ctx := context.Background()
 		edgesPerNode := 100
 		rng := rand.New(rand.NewSource(69))
 
-		// Different DB sizes
 		for _, nodesSize := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
 
 				DB := mockdb.GenerateDB(nodesSize, edgesPerNode, rng)
 				RWM, _ := walks.NewMockRWM(0.85, 10)
-				RWM.GenerateAll(DB)
+				RWM.GenerateAll(ctx, DB)
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(DB, RWM.Store)
+					_, err := Pagerank(ctx, DB, RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}
@@ -237,6 +238,7 @@ func BenchmarkPagerankMock(b *testing.B) {
 
 func BenchmarkPagerankRedis(b *testing.B) {
 	b.Run("FixedWalksPerNode", func(b *testing.B) {
+		ctx := context.Background()
 		edgesPerNode := 100
 		rng := rand.New(rand.NewSource(69))
 
@@ -256,14 +258,14 @@ func BenchmarkPagerankRedis(b *testing.B) {
 					b.Fatalf("NewRWS(): expected nil, got %v", err)
 				}
 				RWM := walks.RandomWalkManager{Store: RWS}
-				if err := RWM.GenerateAll(DB); err != nil {
+				if err := RWM.GenerateAll(ctx, DB); err != nil {
 					b.Fatalf("GenerateAll(): expected nil, got %v", err)
 				}
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 
-					_, err := Pagerank(DB, RWM.Store)
+					_, err := Pagerank(ctx, DB, RWM.Store)
 					if err != nil {
 						b.Fatalf("Benchmark failed: %v", err)
 					}

@@ -1,6 +1,7 @@
 package stochastictest
 
 import (
+	"context"
 	"testing"
 
 	"github.com/vertex-lab/crawler/pkg/pagerank"
@@ -8,10 +9,10 @@ import (
 )
 
 func TestPersonalizedPagerank(t *testing.T) {
-
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
 	const walkPerNode = 10000
+	ctx := context.Background()
 
 	tests := []struct {
 		name      string
@@ -53,13 +54,13 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 			// generate walks
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			err := RWM.GenerateAll(DB)
+			err := RWM.GenerateAll(ctx, DB)
 			if err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, got %v", err)
 			}
 
 			// compute pagerank
-			got, err := pagerank.Personalized(DB, RWM.Store, 0, 5)
+			got, err := pagerank.Personalized(ctx, DB, RWM.Store, 0, 5)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, got %v", err)
 			}

@@ -1,6 +1,7 @@
 package walks
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"reflect"
@@ -62,6 +63,7 @@ func TestContainsInvalidStep(t *testing.T) {
 }
 
 func TestUpdateRemovedNodes(t *testing.T) {
+	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name           string
@@ -105,7 +107,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 				DB := mock.SetupDB(test.DBType)
 				RWM := SetupMockRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-				err := RWM.updateRemovedNodes(DB, 0, test.removedFollows, []uint32{2}, rng)
+				err := RWM.updateRemovedNodes(ctx, DB, 0, test.removedFollows, []uint32{2}, rng)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
@@ -143,13 +145,13 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			},
 		}
 
-		if err := RWM.updateRemovedNodes(DB, nodeID, removeFollows, commonFollows, rng); err != nil {
+		if err := RWM.updateRemovedNodes(ctx, DB, nodeID, removeFollows, commonFollows, rng); err != nil {
 			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkMap, err := RWM.Store.Walks(nodeID, -1)
+			walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -162,6 +164,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 }
 
 func TestUpdateAddedNodes(t *testing.T) {
+	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -211,7 +214,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWM := SetupMockRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-				err := RWM.updateAddedNodes(DB, 0, test.addedFollows, test.newOutDegree, rng)
+				err := RWM.updateAddedNodes(ctx, DB, 0, test.addedFollows, test.newOutDegree, rng)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
 				}
@@ -240,13 +243,13 @@ func TestUpdateAddedNodes(t *testing.T) {
 			},
 		}
 
-		if err := RWM.updateAddedNodes(DB, nodeID, addedFollows, len(currentFollows), rng); err != nil {
+		if err := RWM.updateAddedNodes(ctx, DB, nodeID, addedFollows, len(currentFollows), rng); err != nil {
 			t.Errorf("updateAddedNodes(): expected nil, got %v", err)
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
 
-			walkMap, err := RWM.Store.Walks(nodeID, -1)
+			walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -258,6 +261,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
+	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name           string
@@ -340,7 +344,7 @@ func TestUpdate(t *testing.T) {
 
 				removed, common, added := sliceutils.Partition(test.oldFollows, test.currentFollows)
 
-				err := RWM.Update(DB, test.nodeID, removed, common, added)
+				err := RWM.Update(ctx, DB, test.nodeID, removed, common, added)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateAddedNodes(): expected %v, got %v", test.expectedError, err)
 				}
@@ -356,7 +360,7 @@ func TestUpdate(t *testing.T) {
 		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
 		DB1 := mock.GenerateDB(nodesNum, edgesPerNode, rng1)
 		RWM, _ := NewMockRWM(0.85, 10)
-		RWM.GenerateAll(DB1)
+		RWM.GenerateAll(ctx, DB1)
 
 		// generate another DB
 		rng2 := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -370,14 +374,14 @@ func TestUpdate(t *testing.T) {
 
 			removed, common, added := sliceutils.Partition(oldFollows, newFollows)
 
-			if err := RWM.Update(DB1, nodeID, removed, common, added); err != nil {
+			if err := RWM.Update(ctx, DB1, nodeID, removed, common, added); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
 			}
 		}
 
 		// check that each walk in the Walks of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			walks, err := RWM.Store.Walks(nodeID, -1)
+			walks, err := RWM.Store.Walks(ctx, nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -394,12 +398,13 @@ func TestUpdate(t *testing.T) {
 // ---------------------------------BENCHMARKS---------------------------------
 
 func BenchmarkUpdateAddedNodes(b *testing.B) {
+	ctx := context.Background()
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 	RWM, _ := NewMockRWM(0.85, 10)
-	RWM.GenerateAll(DB)
+	RWM.GenerateAll(ctx, DB)
 
 	removedMap := make(map[uint32][]uint32, nodesSize)
 	addedMap := make(map[uint32][]uint32, nodesSize)
@@ -422,7 +427,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			nodeID := uint32(i % nodesSize)
 
-			err := RWM.Update(DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID])
+			err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID])
 			if err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}
@@ -441,12 +446,13 @@ each node should only be updated once. Each subsequent update will be
 much cheaper because no walk will need an update, thus compromizing the measurement
 */
 func BenchmarkUpdateRemovedNodes(b *testing.B) {
+	ctx := context.Background()
 	nodesSize := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
 	RWM, _ := NewMockRWM(0.85, 10)
-	RWM.GenerateAll(DB)
+	RWM.GenerateAll(ctx, DB)
 
 	b.Run("Update(), 10% removed successors", func(b *testing.B) {
 		removedMap := make(map[uint32][]uint32, nodesSize)
@@ -464,7 +470,7 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			nodeID := uint32(i % nodesSize)
 
-			err := RWM.Update(DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID])
+			err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID])
 			if err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}

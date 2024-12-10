@@ -51,7 +51,7 @@ func ProcessEvents(
 			switch event.Kind {
 			case nostr.KindFollowList:
 
-				if err := ProcessFollowListEvent(ctx, event.Event, DB, RWM); err != nil {
+				if err := ProcessFollowListEvent(ctx, DB, RWM, event.Event); err != nil {
 					logger.Error("Error processing the eventID %v: %v", event.ID, err)
 
 					// re-add event to the queue
@@ -77,9 +77,9 @@ It updates the node metadata of the author, and updates the random walks.
 */
 func ProcessFollowListEvent(
 	ctx context.Context,
-	event *nostr.Event,
 	DB models.Database,
-	RWM *walks.RandomWalkManager) error {
+	RWM *walks.RandomWalkManager,
+	event *nostr.Event) error {
 
 	author, err := DB.NodeByKey(event.PubKey)
 	if err != nil {
@@ -115,7 +115,7 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	if err := RWM.Update(DB, author.ID, removed, common, added); err != nil {
+	if err := RWM.Update(ctx, DB, author.ID, removed, common, added); err != nil {
 		return err
 	}
 
@@ -124,7 +124,7 @@ func ProcessFollowListEvent(
 
 	if mass > 0.001 {
 		// full recomputation of pagerank
-		pagerankMap, err = pagerank.Pagerank(DB, RWM.Store)
+		pagerankMap, err = pagerank.Pagerank(ctx, DB, RWM.Store)
 		if err != nil {
 			return err
 		}
@@ -133,7 +133,7 @@ func ProcessFollowListEvent(
 	} else {
 		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
 		impactedNodes := append(added, removed...)
-		pagerankMap, err = pagerank.LazyPagerank(DB, RWM.Store, impactedNodes)
+		pagerankMap, err = pagerank.LazyPagerank(ctx, DB, RWM.Store, impactedNodes)
 		if err != nil {
 			return err
 		}
@@ -330,7 +330,7 @@ func PromoteNode(
 	RWM *walks.RandomWalkManager,
 	nodeID uint32) error {
 
-	if err := RWM.Generate(DB, nodeID); err != nil {
+	if err := RWM.Generate(ctx, DB, nodeID); err != nil {
 		return err
 	}
 
@@ -355,7 +355,7 @@ func DemoteNode(
 	RWM *walks.RandomWalkManager,
 	nodeID uint32) error {
 
-	if err := RWM.Remove(nodeID); err != nil {
+	if err := RWM.Remove(ctx, nodeID); err != nil {
 		return err
 	}
 

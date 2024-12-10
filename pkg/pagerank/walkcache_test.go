@@ -1,6 +1,7 @@
 package pagerank
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -145,6 +146,7 @@ func TestFullyUsed(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
+	ctx := context.Background()
 	t.Run("simple cases", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -216,11 +218,10 @@ func TestLoad(t *testing.T) {
 		}
 
 		for _, test := range testCases {
-
 			t.Run(test.name, func(t *testing.T) {
 				RWS := mockstore.SetupRWS(test.RWSType)
 				WC := SetupWC(test.WCType)
-				err := WC.Load(RWS, test.nodeID, test.limit)
+				err := WC.Load(ctx, RWS, test.nodeID, test.limit)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("Load(): expected %v, got %v", test.expectedError, err)
@@ -257,7 +258,7 @@ func TestLoad(t *testing.T) {
 
 		// load for all the nodes
 		for _, nodeID := range nodeIDs {
-			if err := WC.Load(RWS, nodeID, 100); err != nil {
+			if err := WC.Load(ctx, RWS, nodeID, 100); err != nil {
 				t.Fatalf("Load(): nodeID = %d; expected nil, got %v", nodeID, err)
 			}
 		}
@@ -388,25 +389,26 @@ func TestCropWalk(t *testing.T) {
 // ---------------------------------BENCHMARKS---------------------------------
 
 func BenchmarkLoad(b *testing.B) {
+	ctx := context.Background()
 	DB := mockdb.SetupDB("triangle")
 	RWM, _ := walks.NewMockRWM(0.85, 1000)
-	RWM.GenerateAll(DB)
+	RWM.GenerateAll(ctx, DB)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-
 		WC := NewWalkCache()
 		nodeID := uint32(i % 3)
-		if err := WC.Load(RWM.Store, nodeID, 1000); err != nil {
+		if err := WC.Load(ctx, RWM.Store, nodeID, 1000); err != nil {
 			b.Fatalf("Benchmark Load() failed: %v", err)
 		}
 	}
 }
 
 func BenchmarkNextWalk(b *testing.B) {
+	ctx := context.Background()
 	RWS := mockstore.SetupRWS("triangle")
 	WC := NewWalkCache()
-	WC.Load(RWS, 0, 10)
+	WC.Load(ctx, RWS, 0, 10)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

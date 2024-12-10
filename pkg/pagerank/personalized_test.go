@@ -1,6 +1,7 @@
 package pagerank
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -301,11 +302,12 @@ func TestPersonalizedWalk(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
 			rng := rand.New(rand.NewSource(42))
 
-			pWalk, err := personalizedWalk(DB, RWS, test.startingNodeID, test.requiredLenght, rng)
+			pWalk, err := personalizedWalk(ctx, DB, RWS, test.startingNodeID, test.requiredLenght, rng)
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
 			}
@@ -329,6 +331,7 @@ func TestPersonalizedWalk(t *testing.T) {
 }
 
 func TestPersonalizedPagerank(t *testing.T) {
+	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -392,7 +395,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWS := mockstore.SetupRWS(test.RWSType)
-				_, err := Personalized(DB, RWS, test.nodeID, test.topK)
+				_, err := Personalized(ctx, DB, RWS, test.nodeID, test.topK)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("Personalized(): expected %v, got %v", test.expectedError, err)
@@ -408,20 +411,21 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 		DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 		RWM, _ := walks.NewMockRWM(0.85, 10)
-		RWM.GenerateAll(DB)
+		RWM.GenerateAll(ctx, DB)
 
-		if _, err := Personalized(DB, RWM.Store, 0, 5); err != nil {
+		if _, err := Personalized(ctx, DB, RWM.Store, 0, 5); err != nil {
 			t.Fatalf("Personalized() expected nil, got %v", err)
 		}
 
 		// doing it two times to check that it donesn't change the DB or RWS
-		if _, err := Personalized(DB, RWM.Store, 0, 5); err != nil {
+		if _, err := Personalized(ctx, DB, RWM.Store, 0, 5); err != nil {
 			t.Errorf("Personalized() expected nil, got %v", err)
 		}
 	})
 }
 
 func BenchmarkPersonalized(b *testing.B) {
+	ctx := context.Background()
 	nodesNum := 2000
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
@@ -429,12 +433,12 @@ func BenchmarkPersonalized(b *testing.B) {
 
 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(DB)
+		RWM.GenerateAll(ctx, DB)
 
 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := Personalized(DB, RWM.Store, 0, 100); err != nil {
+				if _, err := Personalized(ctx, DB, RWM.Store, 0, 100); err != nil {
 					b.Fatalf("Benchmark failed: %v", err)
 				}
 			}

@@ -40,7 +40,7 @@ func main() {
 		panic(err)
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
-	if err := RWM.GenerateAll(DB); err != nil {
+	if err := RWM.GenerateAll(ctx, DB); err != nil {
 		panic(err)
 	}
 

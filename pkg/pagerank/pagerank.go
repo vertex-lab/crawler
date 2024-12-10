@@ -2,6 +2,7 @@
 package pagerank
 
 import (
+	"context"
 	"math"
 
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -17,7 +18,10 @@ func Distance(map1, map2 models.PagerankMap) float64 {
 }
 
 // Pagerank() computes the pagerank score for each node in the database.
-func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMap, error) {
+func Pagerank(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore) (models.PagerankMap, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -36,7 +40,7 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMa
 		return nil, models.ErrEmptyDB
 	}
 
-	visitMap, err := RWS.VisitCounts(nodeIDs)
+	visitMap, err := RWS.VisitCounts(ctx, nodeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +64,11 @@ func Pagerank(DB models.Database, RWS models.RandomWalkStore) (models.PagerankMa
 }
 
 // LazyPagerank() computes the pagerank scores of only the specified nodeIDs.
-func LazyPagerank(DB models.Database, RWS models.RandomWalkStore, nodeIDs []uint32) (models.PagerankMap, error) {
+func LazyPagerank(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore,
+	nodeIDs []uint32) (models.PagerankMap, error) {
 
 	if len(nodeIDs) == 0 {
 		return nil, nil
@@ -74,12 +82,12 @@ func LazyPagerank(DB models.Database, RWS models.RandomWalkStore, nodeIDs []uint
 		return nil, err
 	}
 
-	totalVisits := RWS.TotalVisits()
+	totalVisits := RWS.TotalVisits(ctx)
 	if totalVisits == 0 {
 		return nil, models.ErrEmptyRWS
 	}
 
-	visitMap, err := RWS.VisitCounts(nodeIDs)
+	visitMap, err := RWS.VisitCounts(ctx, nodeIDs)
 	if err != nil {
 		return nil, err
 	}

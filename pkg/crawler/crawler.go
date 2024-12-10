@@ -14,13 +14,6 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
-// constants for pagerankThreshold. bottom and top respectively represents
-// the bottom 5%, and top the top 0.1% of the pagerank distribution.
-const (
-	bottom float64 = 0.95
-	top    float64 = 0.001
-)
-
 var (
 	RelevantKinds = []int{
 		nostr.KindFollowList,
@@ -72,7 +65,7 @@ func Firehose(
 	logger *logger.Aggregate,
 	relays []string,
 	DB models.Database,
-	timeLimit int64, // use a small value here, or you will get rate-limited
+	timeLimit int64, // use a value <= 1000, or you will get rate-limited
 	queueHandler func(event nostr.RelayEvent) error) {
 
 	pool := nostr.NewSimplePool(ctx)
@@ -89,13 +82,12 @@ func Firehose(
 			continue
 		}
 
-		// query from the DB the node associated with the pubkey; If it's not found, skip (err != nil)
+		// If the node is not found (err != nil), skip
 		node, err := DB.NodeByKey(event.PubKey)
 		if err != nil {
 			continue
 		}
 
-		// if this event is older than what we have, skip
 		if event.CreatedAt.Time().Unix() < node.EventTS {
 			continue
 		}
@@ -105,7 +97,6 @@ func Firehose(
 			continue
 		}
 
-		// send the event to the queue
 		if err := queueHandler(event); err != nil {
 			logger.Error("Firehose queue handler: %v", err)
 			return
@@ -139,7 +130,6 @@ func QueryPubkeys(
 				return
 			}
 
-			// add to the batch, until the size is big enough to query
 			batch = append(batch, pubkey)
 			if len(batch) >= batchSize {
 
@@ -201,7 +191,7 @@ func QueryPubkeyBatch(
 	return nil
 }
 
-// close iterates over the relays in the pool and closes all connections.
+// Close() iterates over the relays in the pool and closes all connections.
 func close(funcName string, pool *nostr.SimplePool) {
 	fmt.Printf("\n  > %v: closing relay connections... ", funcName)
 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
@@ -211,10 +201,16 @@ func close(funcName string, pool *nostr.SimplePool) {
 	fmt.Printf("All closed!")
 }
 
+// constants for pagerankThreshold. bottom and top respectively represents
+// the bottom 5%, and top the top 0.1% of the pagerank distribution.
+const (
+	bottom float64 = 0.95
+	top    float64 = 0.001
+)
+
 /*
-pagerankThreshold returns the pagerank threshold used for deciding whether
-a node is active or inactive.
-It's based on the following approximated exponential distribution of pagerank:
+PagerankThreshold returns the pagerank satisfied by the `percentageCut` of the nodes
+according to the following (approximated) exponential distribution:
 
 	p_j ~ (1-b) / N^(1-b) * j^(-b)
 
@@ -234,7 +230,7 @@ func pagerankThreshold(graphSize int, percentageCut float64) float64 {
 	return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
 }
 
-// PrintEvent is a simple function that prints the event ID, PubKey and Timestamp.
+// PrintEvent() is a simple function that prints the event ID, PubKey and Timestamp.
 func PrintEvent(event nostr.RelayEvent) error {
 	fmt.Printf("\nevent ID: %v", event.ID)
 	fmt.Printf("\nevent pubkey: %v", event.PubKey)
@@ -242,7 +238,7 @@ func PrintEvent(event nostr.RelayEvent) error {
 	return nil
 }
 
-// HandleSignals listens for OS signals and triggers context cancellation.
+// HandleSignals() listens for OS signals and triggers context cancellation.
 func HandleSignals(cancel context.CancelFunc, logger *logger.Aggregate) {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)

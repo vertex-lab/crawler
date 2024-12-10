@@ -3,6 +3,8 @@
 package mock
 
 import (
+	"context"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
@@ -52,18 +54,21 @@ func NewRWS(alpha float32, walksPerNode uint16) (*RandomWalkStore, error) {
 }
 
 // Alpha() returns the dampening factor used for the RandomWalks
-func (RWS *RandomWalkStore) Alpha() float32 {
+func (RWS *RandomWalkStore) Alpha(ctx context.Context) float32 {
+	_ = ctx
 	return RWS.alpha
 }
 
 // WalkPerNode() returns the number of walks to be generated for each node in the DB
-func (RWS *RandomWalkStore) WalksPerNode() uint16 {
+func (RWS *RandomWalkStore) WalksPerNode(ctx context.Context) uint16 {
+	_ = ctx
 	return RWS.walksPerNode
 }
 
 // TotalVisits() returns the total number of visits.
-func (RWS *RandomWalkStore) TotalVisits() int {
-	visits := 0
+func (RWS *RandomWalkStore) TotalVisits(ctx context.Context) int {
+	_ = ctx
+	var visits int
 	for _, walkSet := range RWS.WalksVisiting {
 		visits += walkSet.Cardinality()
 	}
@@ -91,7 +96,8 @@ func (RWS *RandomWalkStore) Validate() error {
 
 // VisitCounts() returns a map that associates each nodeID with the number of
 // times it was visited by a walk.
-func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error) {
+func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) (map[uint32]int, error) {
+	_ = ctx
 	if RWS == nil || RWS.WalksVisiting == nil {
 		return map[uint32]int{}, models.ErrNilRWSPointer
 	}
@@ -116,8 +122,8 @@ func (RWS *RandomWalkStore) VisitCounts(nodeIDs []uint32) (map[uint32]int, error
 }
 
 // WalkIDs() returns up to `limit` RandomWalks that visit nodeID as a WalkIDSet, up to
-func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (WalkSet, error) {
-
+func (RWS *RandomWalkStore) WalkIDs(ctx context.Context, nodeID uint32) (WalkSet, error) {
+	_ = ctx
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
@@ -133,9 +139,9 @@ func (RWS *RandomWalkStore) WalkIDs(nodeID uint32) (WalkSet, error) {
 // - if limit > 0, the map contains up to that many key-value pairs.
 // - if limit < 0, all walks are returned
 // - if no walks are found for nodeID, an error is returned
-func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
+func (RWS *RandomWalkStore) Walks(ctx context.Context, nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
 
-	walkSet, err := RWS.WalkIDs(nodeID)
+	walkSet, err := RWS.WalkIDs(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +166,8 @@ func (RWS *RandomWalkStore) Walks(nodeID uint32, limit int) (map[uint32]models.R
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no one gets added.
-func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
-
+func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomWalk) error {
+	_ = ctx
 	if RWS == nil {
 		return models.ErrNilRWSPointer
 	}
@@ -197,8 +203,8 @@ func (RWS *RandomWalkStore) AddWalks(walks []models.RandomWalk) error {
 
 // RemoveWalks() removes the all the specified walks from the RWS. If one walkID
 // is not found, no walk gets removed.
-func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
-
+func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs []uint32) error {
+	_ = ctx
 	if err := RWS.Validate(); err != nil {
 		return err
 	}
@@ -224,8 +230,8 @@ func (RWS *RandomWalkStore) RemoveWalks(walkIDs []uint32) error {
 }
 
 // PruneWalk() prunes the specified walk, cutting at cutIndex (walk[:cutIndex])
-func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
-
+func (RWS *RandomWalkStore) PruneWalk(ctx context.Context, walkID uint32, cutIndex int) error {
+	_ = ctx
 	if err := RWS.Validate(); err != nil {
 		return err
 	}
@@ -255,8 +261,8 @@ func (RWS *RandomWalkStore) PruneWalk(walkID uint32, cutIndex int) error {
 
 // GraftWalk() grafts (extends) the walk with the walkSegment, and adds
 // the walkID to the WalkSet of each node in the new walkSegment.
-func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error {
-
+func (RWS *RandomWalkStore) GraftWalk(ctx context.Context, walkID uint32, walkSegment []uint32) error {
+	_ = ctx
 	if err := RWS.Validate(); err != nil {
 		return err
 	}
@@ -289,16 +295,14 @@ func (RWS *RandomWalkStore) GraftWalk(walkID uint32, walkSegment []uint32) error
 }
 
 // PruneGraftWalk() encapsulates the functions of Pruning and Grafting a walk.
-func (RWS *RandomWalkStore) PruneGraftWalk(walkID uint32, cutIndex int,
+func (RWS *RandomWalkStore) PruneGraftWalk(ctx context.Context, walkID uint32, cutIndex int,
 	walkSegment models.RandomWalk) error {
 
-	// prune the walk
-	if err := RWS.PruneWalk(walkID, cutIndex); err != nil {
+	if err := RWS.PruneWalk(ctx, walkID, cutIndex); err != nil {
 		return err
 	}
 
-	// graft the walk with the new walk segment
-	if err := RWS.GraftWalk(walkID, walkSegment); err != nil {
+	if err := RWS.GraftWalk(ctx, walkID, walkSegment); err != nil {
 		return err
 	}
 

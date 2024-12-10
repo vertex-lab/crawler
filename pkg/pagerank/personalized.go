@@ -1,6 +1,7 @@
 package pagerank
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"time"
@@ -36,33 +37,41 @@ random walks stored in the RandomWalkStore.
 [1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
 URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
-func Personalized(DB models.Database, RWS models.RandomWalkStore,
-	nodeID uint32, topK uint16) (models.PagerankMap, error) {
+func Personalized(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore,
+	nodeID uint32,
+	topK uint16) (models.PagerankMap, error) {
 
 	if err := checkInputs(DB, RWS, nodeID, topK); err != nil {
 		return nil, err
 	}
 
-	// for reproducibility in tests
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return personalized(DB, RWS, nodeID, topK, rng)
+	return personalized(ctx, DB, RWS, nodeID, topK, rng)
 }
 
 // personalized() implements the internal logic of the Personalized Pagerank function
-func personalized(DB models.Database, RWS models.RandomWalkStore,
-	nodeID uint32, topK uint16, rng *rand.Rand) (models.PagerankMap, error) {
+func personalized(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore,
+	nodeID uint32,
+	topK uint16,
+	rng *rand.Rand) (models.PagerankMap, error) {
 
 	succ, err := DB.Follows(nodeID)
 	if err != nil {
 		return nil, err
 	}
 
-	// if it's a dandling node
+	// if it's a dandling node, return this special-case distribution
 	if len(succ) == 0 {
 		return models.PagerankMap{nodeID: 1.0}, nil
 	}
 
-	pWalk, err := personalizedWalk(DB, RWS, nodeID, requiredLenght(topK), rng)
+	pWalk, err := personalizedWalk(ctx, DB, RWS, nodeID, requiredLenght(topK), rng)
 	if err != nil {
 		return nil, err
 	}
@@ -147,21 +156,24 @@ This personalized walkSegment is generated using the random walks stored in the 
 To avoid the overhead of continually fetching walks from the RWS, the requests
 are batched and the walks are stored in the WalkCache struct.
 */
-func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
-	nodeID uint32, targetLength int, rng *rand.Rand) (models.RandomWalk, error) {
+func personalizedWalk(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore,
+	nodeID uint32,
+	targetLength int,
+	rng *rand.Rand) (models.RandomWalk, error) {
 
 	WC := NewWalkCache()
 	pWalk := NewPersonalizedWalk(nodeID, targetLength)
-	alpha := RWS.Alpha()
+	alpha := RWS.Alpha(ctx)
 	estimateWalksToBeLoaded := estimateWalksNum(targetLength, alpha)
 
-	// load walks for nodeID
-	if err := WC.Load(RWS, nodeID, estimateWalksToBeLoaded); err != nil {
+	if err := WC.Load(ctx, RWS, nodeID, estimateWalksToBeLoaded); err != nil {
 		return nil, err
 	}
 
 	for {
-		// the exit condition
 		if pWalk.Reached(targetLength) {
 			return pWalk.walk, nil
 		}
@@ -173,7 +185,7 @@ func personalizedWalk(DB models.Database, RWS models.RandomWalkStore,
 
 		// if there are no walks, load them
 		if !WC.ContainsNode(pWalk.currentNodeID) {
-			if err := WC.Load(RWS, pWalk.currentNodeID, 1000); err != nil {
+			if err := WC.Load(ctx, RWS, pWalk.currentNodeID, 1000); err != nil {
 				return nil, err
 			}
 		}

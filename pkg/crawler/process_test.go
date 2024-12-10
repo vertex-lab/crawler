@@ -193,7 +193,7 @@ func TestProcessFollowListEvent(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWSType)
 
-				err := ProcessFollowListEvent(context.Background(), &validEvent, DB, RWM)
+				err := ProcessFollowListEvent(context.Background(), DB, RWM, &validEvent)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowListEvent(): expected %v, got %v", test.expectedError, err)
@@ -203,8 +203,8 @@ func TestProcessFollowListEvent(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
+		ctx := context.Background()
 		maxDist := 0.01
-
 		DB := mockdb.SetupDB("pip")
 		RWS, err := mockstore.NewRWS(0.85, 1000)
 		if err != nil {
@@ -214,7 +214,7 @@ func TestProcessFollowListEvent(t *testing.T) {
 		RWM := &walks.RandomWalkManager{
 			Store: RWS,
 		}
-		if err := RWM.GenerateAll(DB); err != nil {
+		if err := RWM.GenerateAll(ctx, DB); err != nil {
 			t.Fatalf("GenerateAll(): expected nil, got %v", err)
 		}
 
@@ -251,7 +251,7 @@ func TestProcessFollowListEvent(t *testing.T) {
 
 		for i, event := range events {
 
-			err := ProcessFollowListEvent(context.Background(), event, DB, RWM)
+			err := ProcessFollowListEvent(ctx, DB, RWM, event)
 			if err != nil {
 				t.Fatalf("ProcessFollowListEvent(event%d): expected nil, got %v", i, err)
 			}
@@ -319,7 +319,6 @@ func TestArbiterScan(t *testing.T) {
 			err := ArbiterScan(context.Background(), DB, RWM, 1.0, func(pk string) error {
 				return nil
 			})
-
 			if err != nil {
 				t.Fatalf("ArbiterScan(): expected nil, got %v", err)
 			}
@@ -335,7 +334,7 @@ func TestArbiterScan(t *testing.T) {
 			}
 
 			// check the only walk (from calle) has been removed
-			walks, err := RWM.Store.Walks(1, -1)
+			walks, err := RWM.Store.Walks(context.Background(), 1, -1)
 			if err != nil {
 				t.Errorf("Walks(): expected nil, got %v", err)
 			}
@@ -381,7 +380,7 @@ func TestArbiterScan(t *testing.T) {
 
 			// check that walks for pip and odell have been generated.
 			for _, nodeID := range []uint32{0, 2} {
-				walkMap, err := RWM.Store.Walks(nodeID, -1)
+				walkMap, err := RWM.Store.Walks(context.Background(), nodeID, -1)
 				if err != nil {
 					t.Fatalf("Walks(%d): expected nil, got %v", 0, err)
 				}

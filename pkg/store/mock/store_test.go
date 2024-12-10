@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -10,6 +11,7 @@ import (
 )
 
 func TestNewRWS(t *testing.T) {
+	ctx := context.Background()
 	testCases := []struct {
 		name          string
 		alphas        []float32
@@ -41,7 +43,6 @@ func TestNewRWS(t *testing.T) {
 
 			// iterate over the alphas
 			for _, alpha := range test.alphas {
-
 				RWS, err := NewRWS(alpha, test.walksPerNode)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("NewRWS(): expected %v, got %v", test.expectedError, err)
@@ -49,13 +50,12 @@ func TestNewRWS(t *testing.T) {
 
 				// check if the parameters have been added correctly
 				if RWS != nil {
-
-					if RWS.Alpha() != alpha {
-						t.Errorf("NewRWS(): expected %v, got %v", alpha, RWS.Alpha())
+					if RWS.Alpha(ctx) != alpha {
+						t.Errorf("NewRWS(): expected %v, got %v", alpha, RWS.Alpha(ctx))
 					}
 
-					if RWS.WalksPerNode() != test.walksPerNode {
-						t.Errorf("NewRWS(): expected %v, got %v", test.walksPerNode, RWS.WalksPerNode())
+					if RWS.WalksPerNode(ctx) != test.walksPerNode {
+						t.Errorf("NewRWS(): expected %v, got %v", test.walksPerNode, RWS.WalksPerNode(ctx))
 					}
 				}
 			}
@@ -147,7 +147,7 @@ func TestVisitCounts(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
 
-			visits, err := RWS.VisitCounts(test.nodeIDs)
+			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
@@ -223,7 +223,7 @@ func TestWalks(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			walkMap, err := RWS.Walks(test.nodeID, test.limit)
+			walkMap, err := RWS.Walks(context.Background(), test.nodeID, test.limit)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
@@ -284,7 +284,7 @@ func TestAddWalks(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				RWS := SetupRWS(test.RWSType)
 
-				err := RWS.AddWalks(test.walks)
+				err := RWS.AddWalks(context.Background(), test.walks)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("AddWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -296,7 +296,7 @@ func TestAddWalks(t *testing.T) {
 		RWS := SetupRWS("empty")
 		walks := []models.RandomWalk{{1, 2, 3}, {4, 5}}
 
-		if err := RWS.AddWalks(walks); err != nil {
+		if err := RWS.AddWalks(context.Background(), walks); err != nil {
 			t.Fatalf("AddWalk(): expected nil, got %v", err)
 		}
 
@@ -347,7 +347,7 @@ func TestRemoveWalks(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				RWS := SetupRWS(test.RWSType)
 
-				err := RWS.RemoveWalks([]uint32{0, 69})
+				err := RWS.RemoveWalks(context.Background(), []uint32{0, 69})
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("RemoveWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -361,7 +361,7 @@ func TestRemoveWalks(t *testing.T) {
 		walkIDs := []uint32{0, 1}
 		expectedTotalVisits := 3
 
-		if err := RWS.RemoveWalks(walkIDs); err != nil {
+		if err := RWS.RemoveWalks(context.Background(), walkIDs); err != nil {
 			t.Fatalf("RemoveWalks(%d): expected nil, got %v", walkIDs, err)
 		}
 
@@ -427,7 +427,7 @@ func TestPruneWalk(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				RWS := SetupRWS(test.RWSType)
-				err := RWS.PruneWalk(test.walkID, 2)
+				err := RWS.PruneWalk(context.Background(), test.walkID, 2)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("PruneWalk(): expected %v, got %v", test.expectedError, err)
@@ -442,7 +442,7 @@ func TestPruneWalk(t *testing.T) {
 		expectedPrunedWalk := models.RandomWalk{0}
 		expectedTotalVisits := 1
 
-		if err := RWS.PruneWalk(walkID, 1); err != nil {
+		if err := RWS.PruneWalk(context.Background(), walkID, 1); err != nil {
 			t.Fatalf("PruneWalk(): expected nil, got %v", err)
 		}
 
@@ -471,7 +471,6 @@ func TestPruneWalk(t *testing.T) {
 }
 
 func TestGraftWalk(t *testing.T) {
-
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -503,7 +502,7 @@ func TestGraftWalk(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				RWS := SetupRWS(test.RWSType)
-				err := RWS.GraftWalk(test.walkID, []uint32{1})
+				err := RWS.GraftWalk(context.Background(), test.walkID, []uint32{1})
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("GraftWalk(): expected %v, got %v", test.expectedError, err)
@@ -520,7 +519,7 @@ func TestGraftWalk(t *testing.T) {
 		expectedTotalVisits := len(expectedGraftedWalk)
 		expectedWalkSet := mapset.NewSet[uint32](0)
 
-		if err := RWS.GraftWalk(walkID, walkSegment); err != nil {
+		if err := RWS.GraftWalk(context.Background(), walkID, walkSegment); err != nil {
 			t.Fatalf("GraftWalk(): expected nil, got %v", err)
 		}
 

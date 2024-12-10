@@ -58,12 +58,12 @@ func TestNewRWS(t *testing.T) {
 
 				// check if the parameters have been added correctly
 				if RWS != nil {
-					if RWS.Alpha() != alpha {
-						t.Errorf("NewRWS(): expected %v, got %v", alpha, RWS.Alpha())
+					if RWS.Alpha(context.Background()) != alpha {
+						t.Errorf("NewRWS(): expected %v, got %v", alpha, RWS.Alpha(context.Background()))
 					}
 
-					if RWS.WalksPerNode() != test.walksPerNode {
-						t.Errorf("NewRWS(): expected %v, got %v", test.walksPerNode, RWS.WalksPerNode())
+					if RWS.WalksPerNode(context.Background()) != test.walksPerNode {
+						t.Errorf("NewRWS(): expected %v, got %v", test.walksPerNode, RWS.WalksPerNode(context.Background()))
 					}
 				}
 			}
@@ -106,12 +106,12 @@ func TestLoadRWS(t *testing.T) {
 
 			// check if the parameters have been added correctly
 			if RWS != nil {
-				if RWS.Alpha() != float32(0.85) {
-					t.Errorf("LoadRWS(): expected %v, got %v", 0.85, RWS.Alpha())
+				if RWS.Alpha(context.Background()) != float32(0.85) {
+					t.Errorf("LoadRWS(): expected %v, got %v", 0.85, RWS.Alpha(context.Background()))
 				}
 
-				if RWS.WalksPerNode() != uint16(1) {
-					t.Errorf("LoadRWS(): expected %v, got %v", 1, RWS.WalksPerNode())
+				if RWS.WalksPerNode(context.Background()) != uint16(1) {
+					t.Errorf("LoadRWS(): expected %v, got %v", 1, RWS.WalksPerNode(context.Background()))
 				}
 			}
 		})
@@ -152,7 +152,7 @@ func TestTotalVisits(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			visits := RWS.TotalVisits()
+			visits := RWS.TotalVisits(context.Background())
 			if visits != test.expectedTotalVisits {
 				t.Errorf("TotalVisits(): expected %v, got %v", test.expectedTotalVisits, visits)
 			}
@@ -256,7 +256,7 @@ func TestVisitCounts(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			visits, err := RWS.VisitCounts(test.nodeIDs)
+			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
 			}
@@ -318,7 +318,7 @@ func TestWalks(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			walkMap, err := RWS.Walks(test.nodeID, -1)
+			walkMap, err := RWS.Walks(context.Background(), test.nodeID, -1)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
@@ -380,7 +380,7 @@ func TestAddWalks(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.AddWalks(test.walks)
+				err = RWS.AddWalks(context.Background(), test.walks)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("AddWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -407,12 +407,12 @@ func TestAddWalks(t *testing.T) {
 			5: {1},
 		}
 
-		if err := RWS.AddWalks(walks); err != nil {
+		if err := RWS.AddWalks(context.Background(), walks); err != nil {
 			t.Fatalf("AddWalks(): expected nil, got %v", err)
 		}
 
 		// check the last walkID has been incremented
-		strLastWalkID, err := cl.HGet(RWS.ctx, KeyRWS, KeyLastWalkID).Result()
+		strLastWalkID, err := cl.HGet(context.Background(), KeyRWS, KeyLastWalkID).Result()
 		if err != nil {
 			t.Fatalf("HGet(): expected nil, got %v", err)
 		}
@@ -427,7 +427,7 @@ func TestAddWalks(t *testing.T) {
 		// check if the loaded walks match the originals
 		for i, walk := range walks {
 			walkID := redisutils.FormatID(uint32(i))
-			strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, walkID).Result()
+			strWalk, err := RWS.client.HGet(context.Background(), KeyWalks, walkID).Result()
 			if err != nil {
 				t.Fatalf("Get(): expected nil, got %v", err)
 			}
@@ -442,7 +442,7 @@ func TestAddWalks(t *testing.T) {
 
 		// check that each node is associated with the expected walkIDs
 		for _, nodeID := range []uint32{1, 2, 3, 5} {
-			strIDs, err := RWS.client.SMembers(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
+			strIDs, err := RWS.client.SMembers(context.Background(), KeyWalksVisiting(nodeID)).Result()
 			if err != nil {
 				t.Fatalf("SMembers(): expected nil, got %v", err)
 			}
@@ -464,7 +464,7 @@ func TestAddWalks(t *testing.T) {
 		}
 
 		// check the total visits
-		strVisits, err := cl.HGet(RWS.ctx, KeyRWS, KeyTotalVisits).Result()
+		strVisits, err := cl.HGet(context.Background(), KeyRWS, KeyTotalVisits).Result()
 		if err != nil {
 			t.Errorf("TotalVisits(): expected nil, got %v", err)
 		}
@@ -508,7 +508,7 @@ func TestRemoveWalks(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.RemoveWalks([]uint32{0, 69})
+				err = RWS.RemoveWalks(context.Background(), []uint32{0, 69})
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("RemoveWalks(): expected %v, got %v", test.expectedError, err)
 				}
@@ -526,20 +526,20 @@ func TestRemoveWalks(t *testing.T) {
 		walkIDs := []uint32{0, 1}
 		expectedTotalVisits := 3
 
-		if err := RWS.RemoveWalks(walkIDs); err != nil {
+		if err := RWS.RemoveWalks(context.Background(), walkIDs); err != nil {
 			t.Fatalf("RemoveWalks(%d): expected nil, got %v", walkIDs, err)
 		}
 
 		// check the walks have been removed from the WalkIndex
 		for _, walkID := range walkIDs {
-			if walk, err := cl.HGet(RWS.ctx, KeyWalks, redisutils.FormatID(walkID)).Result(); !errors.Is(err, redis.Nil) {
+			if walk, err := cl.HGet(context.Background(), KeyWalks, redisutils.FormatID(walkID)).Result(); !errors.Is(err, redis.Nil) {
 				t.Fatalf("RemoveWalk(%d): expected walk %v to be removed: %v", walkID, walk, err)
 			}
 		}
 
 		// check the walkID has been removed from each node
 		for _, nodeID := range nodeIDs {
-			strIDs, err := cl.SMembers(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
+			strIDs, err := cl.SMembers(context.Background(), KeyWalksVisiting(nodeID)).Result()
 			if err != nil {
 				t.Errorf("SIsMember(): expected nil, got %v", err)
 			}
@@ -550,7 +550,7 @@ func TestRemoveWalks(t *testing.T) {
 		}
 
 		// check that the total visits have been decreased by len(walk)
-		visits := RWS.TotalVisits()
+		visits := RWS.TotalVisits(context.Background())
 		if visits != expectedTotalVisits {
 			t.Errorf("RemoveWalk(): expected totalVisits = %v, got %v", expectedTotalVisits, visits)
 		}
@@ -603,7 +603,7 @@ func TestPruneGraftWalk(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.PruneGraftWalk(test.walkID, test.cutIndex, test.newWalkSegment)
+				err = RWS.PruneGraftWalk(context.Background(), test.walkID, test.cutIndex, test.newWalkSegment)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("PruneGraftWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -661,12 +661,12 @@ func TestPruneGraftWalk(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				if err := RWS.PruneGraftWalk(test.walkID, test.cutIndex, test.newWalkSegment); err != nil {
+				if err := RWS.PruneGraftWalk(context.Background(), test.walkID, test.cutIndex, test.newWalkSegment); err != nil {
 					t.Fatalf("PruneGraftWalk(): expected nil, got %v", err)
 				}
 
 				// check the walk has been changed correctly
-				strWalk, err := RWS.client.HGet(RWS.ctx, KeyWalks, redisutils.FormatID(test.walkID)).Result()
+				strWalk, err := RWS.client.HGet(context.Background(), KeyWalks, redisutils.FormatID(test.walkID)).Result()
 				if err != nil {
 					t.Fatalf("Get(): expected nil, got %v", err)
 				}
@@ -682,7 +682,7 @@ func TestPruneGraftWalk(t *testing.T) {
 				// check that each node in walk contains only walkID
 				expectedWalkIDs := []string{strconv.FormatUint(uint64(test.walkID), 10)}
 				for _, nodeID := range test.expectedWalk {
-					strWalkIDs, err := RWS.client.SMembers(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
+					strWalkIDs, err := RWS.client.SMembers(context.Background(), KeyWalksVisiting(nodeID)).Result()
 					if err != nil {
 						t.Fatalf("SMembers(%d): expected nil, got %v", nodeID, err)
 					}
@@ -694,7 +694,7 @@ func TestPruneGraftWalk(t *testing.T) {
 
 				// check that each pruned node doesn't contain walkID
 				for _, nodeID := range test.oldWalk[test.cutIndex:] {
-					size, err := RWS.client.SCard(RWS.ctx, KeyWalksVisiting(nodeID)).Result()
+					size, err := RWS.client.SCard(context.Background(), KeyWalksVisiting(nodeID)).Result()
 					if err != nil {
 						t.Fatalf("SCard(%d): expected nil, got %v", nodeID, err)
 					}
@@ -705,7 +705,7 @@ func TestPruneGraftWalk(t *testing.T) {
 				}
 
 				// check the total visits
-				strVisits, err := cl.HGet(RWS.ctx, KeyRWS, KeyTotalVisits).Result()
+				strVisits, err := cl.HGet(context.Background(), KeyRWS, KeyTotalVisits).Result()
 				if err != nil {
 					t.Errorf("TotalVisits(): expected nil, got %v", err)
 				}
@@ -750,7 +750,7 @@ func BenchmarkVisitCounts(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if _, err := RWS.VisitCounts(nodeIDs); err != nil {
+					if _, err := RWS.VisitCounts(context.Background(), nodeIDs); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}
@@ -777,7 +777,7 @@ func BenchmarkVisitCounts(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if _, err := RWS.VisitCounts(nodeIDs); err != nil {
+					if _, err := RWS.VisitCounts(context.Background(), nodeIDs); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}
@@ -801,7 +801,7 @@ func BenchmarkWalks(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if _, err := RWS.Walks(0, -1); err != nil {
+					if _, err := RWS.Walks(context.Background(), 0, -1); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}

@@ -1,6 +1,7 @@
 package pagerank
 
 import (
+	"context"
 	"errors"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -90,7 +91,7 @@ Subsequent fetching will result in an error.
 
 If limit is <= 0, all walks will be fetched.
 */
-func (WC *WalkCache) Load(RWS models.RandomWalkStore, nodeID uint32, limit int) error {
+func (WC *WalkCache) Load(ctx context.Context, RWS models.RandomWalkStore, nodeID uint32, limit int) error {
 
 	if WC == nil {
 		return ErrNilWCPointer
@@ -100,7 +101,7 @@ func (WC *WalkCache) Load(RWS models.RandomWalkStore, nodeID uint32, limit int) 
 		return ErrNodeAlreadyLoadedWC
 	}
 
-	walkMap, err := RWS.Walks(nodeID, limit)
+	walkMap, err := RWS.Walks(ctx, nodeID, limit)
 	if err != nil {
 		return err
 	}

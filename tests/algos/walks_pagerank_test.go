@@ -1,6 +1,7 @@
 package stochastictest
 
 import (
+	"context"
 	"testing"
 
 	"github.com/vertex-lab/crawler/pkg/pagerank"
@@ -12,6 +13,7 @@ func TestPagerankStatic(t *testing.T) {
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
 	const walkPerNode = 10000
+	ctx := context.Background()
 
 	tests := []struct {
 		name      string
@@ -58,11 +60,11 @@ func TestPagerankStatic(t *testing.T) {
 			expectedPR := setup.ExpectedPR
 
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			if err := RWM.GenerateAll(DB); err != nil {
+			if err := RWM.GenerateAll(ctx, DB); err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
-			pr, err := pagerank.Pagerank(DB, RWM.Store)
+			pr, err := pagerank.Pagerank(ctx, DB, RWM.Store)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}
@@ -84,10 +86,10 @@ Therefore, test only with acyclic graphs, or graphs large enough that the
 probability of such cycles is very low.
 */
 func TestPagerankDynamic(t *testing.T) {
-
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
 	const walkPerNode = 10000
+	ctx := context.Background()
 
 	tests := []struct {
 		name      string
@@ -132,7 +134,7 @@ func TestPagerankDynamic(t *testing.T) {
 
 			// generate walks
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			err := RWM.GenerateAll(DB)
+			err := RWM.GenerateAll(ctx, DB)
 			if err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
@@ -140,11 +142,12 @@ func TestPagerankDynamic(t *testing.T) {
 			// update the graph to the current state
 			DB.NodeIndex[nodeID].Follows = currentFollows
 			removed, common, added := sliceutils.Partition(oldFollows, currentFollows)
-			if err = RWM.Update(DB, nodeID, removed, common, added); err != nil {
+
+			if err = RWM.Update(ctx, DB, nodeID, removed, common, added); err != nil {
 				t.Fatalf("dynamic Pagerank: expected nil, pr %v", err)
 			}
 
-			pr, err := pagerank.Pagerank(DB, RWM.Store)
+			pr, err := pagerank.Pagerank(ctx, DB, RWM.Store)
 			if err != nil {
 				t.Errorf("Pagerank(): expected nil, pr %v", err)
 			}

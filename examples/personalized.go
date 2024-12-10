@@ -45,14 +45,12 @@ func PersonalizedPagerank(
 	pubkey string, // this is the hex
 	topK uint16) (map[string]float64, error) {
 
-	_ = ctx // we'll use the ctx in the future, after I (pip) will use it more consistently
-
 	// Create new DB and RWS connections; Names are bad, I know... I will change them
-	DB, err := redisdb.NewDatabase(context.Background(), cl)
+	DB, err := redisdb.NewDatabase(ctx, cl)
 	if err != nil {
 		return map[string]float64{}, err
 	}
-	RWS, err := redistore.LoadRWS(context.Background(), cl)
+	RWS, err := redistore.LoadRWS(ctx, cl)
 	if err != nil {
 		return map[string]float64{}, err
 	}
@@ -70,7 +68,7 @@ func PersonalizedPagerank(
 	}
 
 	// pp is a map nodeID --> rank; we need pubkey --> rank.
-	pp, err := pagerank.Personalized(DB, RWS, nodeID, topK)
+	pp, err := pagerank.Personalized(ctx, DB, RWS, nodeID, topK)
 	if err != nil {
 		return map[string]float64{}, err
 	}
