@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"errors"
 	"math"
 	"reflect"
@@ -76,7 +77,7 @@ func TestContainsNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			contains := DB.ContainsNode(1)
+			contains := DB.ContainsNode(context.Background(), 1)
 			if contains != test.expectedContains {
 				t.Errorf("ContainsNode(1): expected %v, got %v", test.expectedContains, contains)
 			}
@@ -123,7 +124,7 @@ func TestAddNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			nodeID, err := DB.AddNode(test.Node)
+			nodeID, err := DB.AddNode(context.Background(), test.Node)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
 			}
@@ -198,7 +199,7 @@ func TestUpdateNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			err := DB.UpdateNode(test.nodeID, test.nodeDiff)
+			err := DB.UpdateNode(context.Background(), test.nodeID, test.nodeDiff)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.nodeDiff, test.expectedError, err)
 			}
@@ -261,7 +262,7 @@ func TestNodeByKey(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			node, err := DB.NodeByKey(test.pubkey)
+			node, err := DB.NodeByKey(context.Background(), test.pubkey)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByKey(1): expected %v, got %v", test.expectedError, err)
@@ -320,7 +321,7 @@ func TestNodeByID(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			node, err := DB.NodeByID(test.nodeID)
+			node, err := DB.NodeByID(context.Background(), test.nodeID)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByID(1): expected %v, got %v", test.expectedError, err)
@@ -366,7 +367,7 @@ func TestFollows(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			succ, err := DB.Follows(1)
+			succ, err := DB.Follows(context.Background(), 1)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Follows(1): expected %v, got %v", test.expectedError, err)
@@ -419,7 +420,7 @@ func TestNodeIDs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			nodeIDs, err := DB.NodeIDs(test.pubkeys)
+			nodeIDs, err := DB.NodeIDs(context.Background(), test.pubkeys)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeIDs(): expected %v, got %v", test.expectedError, err)
 			}
@@ -464,7 +465,7 @@ func TestPubkeys(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
 
-			pubkeys, err := DB.Pubkeys(test.nodeIDs)
+			pubkeys, err := DB.Pubkeys(context.Background(), test.nodeIDs)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Pubkeys(): expected %v, got %v", test.expectedError, err)
 			}
@@ -500,7 +501,7 @@ func TestAllNodes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			DB := SetupDB(test.DBType)
-			nodeIDs, err := DB.AllNodes()
+			nodeIDs, err := DB.AllNodes(context.Background())
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("AllNodes(): expected %v, got %v", test.expectedError, err)
@@ -547,7 +548,7 @@ func TestSize(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			size := DB.Size()
+			size := DB.Size(context.Background())
 
 			if size != test.expectedSize {
 				t.Errorf("Size(): expected %v, got %v", test.expectedSize, size)
@@ -590,7 +591,7 @@ func TestSetPagerank(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 
 				DB := SetupDB(test.DBType)
-				err := DB.SetPagerank(test.pagerank)
+				err := DB.SetPagerank(context.Background(), test.pagerank)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("SetPagerank(): expected %v, got %v", test.expectedError, err)
@@ -612,7 +613,7 @@ func TestSetPagerank(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := SetupDB(test.DBType)
-				err := DB.SetPagerank(test.pagerank)
+				err := DB.SetPagerank(context.Background(), test.pagerank)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("SetPagerank(): expected %v, got %v", test.expectedError, err)
@@ -624,7 +625,6 @@ func TestSetPagerank(t *testing.T) {
 						t.Errorf("Pagerank(%d): expected %v, got %v", nodeID, rank, p)
 					}
 				}
-
 			})
 		}
 	})

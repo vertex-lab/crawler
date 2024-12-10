@@ -412,7 +412,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 	b.Run("Update(), 10% new successors", func(b *testing.B) {
 		// prepare the graph changes
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
-			oldFollows, _ := DB.Follows(nodeID)
+			oldFollows, _ := DB.Follows(ctx, nodeID)
 			currentFollows := make([]uint32, len(oldFollows))
 			copy(currentFollows, oldFollows)
 
@@ -460,7 +460,7 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		commonMap := make(map[uint32][]uint32, nodesSize)
 
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
-			oldFollows, _ := DB.Follows(nodeID)
+			oldFollows, _ := DB.Follows(ctx, nodeID)
 
 			// remove 10% of the nodes
 			removedMap[nodeID] = oldFollows[edgesPerNode/10:]

@@ -3,6 +3,7 @@
 package mock
 
 import (
+	"context"
 	"math"
 	"math/rand"
 	"slices"
@@ -43,8 +44,8 @@ func (DB *Database) Validate() error {
 
 // AddNode() adds a node to the database and returns its assigned nodeID.
 // In case of errors, it returns MaxUint32 as the nodeID.
-func (DB *Database) AddNode(node *models.Node) (uint32, error) {
-
+func (DB *Database) AddNode(ctx context.Context, node *models.Node) (uint32, error) {
+	_ = ctx
 	if DB == nil {
 		return math.MaxUint32, models.ErrNilDBPointer
 	}
@@ -65,8 +66,8 @@ func (DB *Database) AddNode(node *models.Node) (uint32, error) {
 }
 
 // UpdateNode() updates the nodeID using the new values inside node.
-func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
-
+func (DB *Database) UpdateNode(ctx context.Context, nodeID uint32, nodeDiff *models.NodeDiff) error {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return err
 	}
@@ -75,13 +76,14 @@ func (DB *Database) UpdateNode(nodeID uint32, nodeDiff *models.NodeDiff) error {
 		return models.ErrNodeNotFoundDB
 	}
 
-	DB.updateNodeMeta(nodeID, nodeDiff)
-	DB.updateNodeFollows(nodeID, nodeDiff)
+	DB.updateNodeMeta(ctx, nodeID, nodeDiff)
+	DB.updateNodeFollows(ctx, nodeID, nodeDiff)
 	return nil
 }
 
 // updateNodeMeta() updates the node metadata using the nodeDiff
-func (DB *Database) updateNodeMeta(nodeID uint32, nodeDiff *models.NodeDiff) {
+func (DB *Database) updateNodeMeta(ctx context.Context, nodeID uint32, nodeDiff *models.NodeDiff) {
+	_ = ctx
 
 	// update the fields only if not empty
 	if nodeDiff.Metadata.Pubkey != "" {
@@ -103,8 +105,8 @@ func (DB *Database) updateNodeMeta(nodeID uint32, nodeDiff *models.NodeDiff) {
 
 // updateNodeFollows() updates the successors of nodeID by adding nodeDiff.AddedFollows
 // and removing nodeDiff.RemovedFollows.
-func (DB *Database) updateNodeFollows(nodeID uint32, nodeDiff *models.NodeDiff) {
-
+func (DB *Database) updateNodeFollows(ctx context.Context, nodeID uint32, nodeDiff *models.NodeDiff) {
+	_ = ctx
 	oldFollows := DB.NodeIndex[nodeID].Follows
 
 	// adding new successors
@@ -127,8 +129,8 @@ func (DB *Database) updateNodeFollows(nodeID uint32, nodeDiff *models.NodeDiff) 
 }
 
 // ContainsNode() returns whether nodeID is found in the DB
-func (DB *Database) ContainsNode(nodeID uint32) bool {
-
+func (DB *Database) ContainsNode(ctx context.Context, nodeID uint32) bool {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return false
 	}
@@ -138,8 +140,8 @@ func (DB *Database) ContainsNode(nodeID uint32) bool {
 }
 
 // NodeByKey() retrieves a node (NodeMeta) by its pubkey.
-func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
-
+func (DB *Database) NodeByKey(ctx context.Context, pubkey string) (*models.NodeMeta, error) {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return &models.NodeMeta{}, err
 	}
@@ -153,8 +155,8 @@ func (DB *Database) NodeByKey(pubkey string) (*models.NodeMeta, error) {
 }
 
 // NodeByID() retrieves a node (NodeMeta) by its nodeID.
-func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
-
+func (DB *Database) NodeByID(ctx context.Context, nodeID uint32) (*models.NodeMeta, error) {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return &models.NodeMeta{}, err
 	}
@@ -168,8 +170,8 @@ func (DB *Database) NodeByID(nodeID uint32) (*models.NodeMeta, error) {
 }
 
 // Follows() returns the slice of successors of nodeID.
-func (DB *Database) Follows(nodeID uint32) ([]uint32, error) {
-
+func (DB *Database) Follows(ctx context.Context, nodeID uint32) ([]uint32, error) {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
@@ -183,8 +185,8 @@ func (DB *Database) Follows(nodeID uint32) ([]uint32, error) {
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 // If a pubkey is not found, nil is returned.
-func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
-
+func (DB *Database) Pubkeys(ctx context.Context, nodeIDs []uint32) ([]interface{}, error) {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
@@ -210,8 +212,8 @@ func (DB *Database) Pubkeys(nodeIDs []uint32) ([]interface{}, error) {
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 // If a pubkey is not found, nil is returned
-func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
-
+func (DB *Database) NodeIDs(ctx context.Context, pubkeys []string) ([]interface{}, error) {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
@@ -232,8 +234,8 @@ func (DB *Database) NodeIDs(pubkeys []string) ([]interface{}, error) {
 }
 
 // All returns a slice with the IDs of all nodes in the mock GraphDB
-func (DB *Database) AllNodes() ([]uint32, error) {
-
+func (DB *Database) AllNodes(ctx context.Context) ([]uint32, error) {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
@@ -247,8 +249,8 @@ func (DB *Database) AllNodes() ([]uint32, error) {
 }
 
 // Size() returns the number of nodes in the DB (ignores errors).
-func (DB *Database) Size() int {
-
+func (DB *Database) Size(ctx context.Context) int {
+	_ = ctx
 	if DB == nil {
 		return 0
 	}
@@ -256,13 +258,13 @@ func (DB *Database) Size() int {
 }
 
 // SetPagerank() set the pagerank in the database according to the pagerankMap
-func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
-
+func (DB *Database) SetPagerank(ctx context.Context, p models.PagerankMap) error {
+	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return err
 	}
 
-	for nodeID, rank := range pagerankMap {
+	for nodeID, rank := range p {
 		// if nodeID doesn't exists, skip
 		if _, exists := DB.NodeIndex[nodeID]; !exists {
 			return models.ErrNodeNotFoundDB
@@ -275,12 +277,12 @@ func (DB *Database) SetPagerank(pagerankMap models.PagerankMap) error {
 }
 
 // ScanNodes() scans over the nodes and returns all of the nodeIDs, ignoring the limit.
-func (DB *Database) ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error) {
-
+func (DB *Database) ScanNodes(ctx context.Context, cursor uint64, limit int) ([]uint32, uint64, error) {
+	_ = ctx
 	_ = limit
 
 	// Cursor simulation: returning 0 as the cursor for simplicity
-	nodeIDs, err := DB.AllNodes()
+	nodeIDs, err := DB.AllNodes(ctx)
 	return nodeIDs, 0, err
 }
 

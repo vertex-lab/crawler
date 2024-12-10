@@ -43,9 +43,7 @@ there should always be random walks, so we should not re-do them from scratch,
 but just update them when necessary (e.g. when there is a graph update), using
 the Update() method.
 */
-func (RWM *RandomWalkManager) GenerateAll(
-	ctx context.Context,
-	DB models.Database) error {
+func (RWM *RandomWalkManager) GenerateAll(ctx context.Context, DB models.Database) error {
 
 	if err := DB.Validate(); err != nil {
 		return err
@@ -55,7 +53,7 @@ func (RWM *RandomWalkManager) GenerateAll(
 		return err
 	}
 
-	nodeIDs, err := DB.AllNodes()
+	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
 		return err
 	}
@@ -123,10 +121,14 @@ URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 
 [2] Pippellia; To-be-written-paper on acyclic Monte-Carlo Pagerank
 */
-func generateWalk(ctx context.Context, DB models.Database, startingNodeID uint32,
-	alpha float32, rng *rand.Rand) (models.RandomWalk, error) {
-	_ = ctx
-	if !DB.ContainsNode(startingNodeID) {
+func generateWalk(
+	ctx context.Context,
+	DB models.Database,
+	startingNodeID uint32,
+	alpha float32,
+	rng *rand.Rand) (models.RandomWalk, error) {
+
+	if !DB.ContainsNode(ctx, startingNodeID) {
 		return nil, models.ErrNodeNotFoundDB
 	}
 
@@ -141,7 +143,7 @@ func generateWalk(ctx context.Context, DB models.Database, startingNodeID uint32
 		}
 
 		// get the successorIDs of the current node. This can be improved by checking a successor cache first.
-		successorIDs, err := DB.Follows(currentNodeID)
+		successorIDs, err := DB.Follows(ctx, currentNodeID)
 		if err != nil {
 			return nil, err
 		}

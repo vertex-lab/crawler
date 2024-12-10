@@ -82,10 +82,9 @@ func Firehose(
 			continue
 		}
 
-		// If the node is not found (err != nil), skip
-		node, err := DB.NodeByKey(event.PubKey)
+		node, err := DB.NodeByKey(ctx, event.PubKey)
 		if err != nil {
-			continue
+			continue // If the node is not found (err != nil), skip
 		}
 
 		if event.CreatedAt.Time().Unix() < node.EventTS {
@@ -93,7 +92,7 @@ func Firehose(
 		}
 
 		// if the author has low pagerank, skip.
-		if node.Pagerank < pagerankThreshold(DB.Size(), bottom) {
+		if node.Pagerank < pagerankThreshold(DB.Size(ctx), bottom) {
 			continue
 		}
 

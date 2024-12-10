@@ -33,7 +33,7 @@ func (RWM *RandomWalkManager) Update(
 		return err
 	}
 
-	if !DB.ContainsNode(nodeID) {
+	if !DB.ContainsNode(ctx, nodeID) {
 		return models.ErrNodeNotFoundDB
 	}
 

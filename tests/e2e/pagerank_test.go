@@ -21,7 +21,7 @@ func TestPagerankSum(t *testing.T) {
 		t.Fatalf("NewDatabase(): expected nil, got %v", err)
 	}
 
-	nodeIDs, err := DB.AllNodes()
+	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}
@@ -75,7 +75,7 @@ func TestTotalVisits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDatabase(): expected nil, got %v", err)
 	}
-	nodeIDs, err := DB.AllNodes()
+	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}

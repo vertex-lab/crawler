@@ -138,7 +138,7 @@ func DisplayStats(
 			clearStats()
 
 			fmt.Printf("\n--- System Stats ---\n")
-			fmt.Printf("Database Size: %d nodes\n", DB.Size())
+			fmt.Printf("Database Size: %d nodes\n", DB.Size(ctx))
 			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
 			fmt.Printf("Pubkey Channel: %d/%d\n", pubkeyChanLen, pubkeyChanCap)
 			fmt.Printf("Processed Events: %d\n", eventCounter.Value())

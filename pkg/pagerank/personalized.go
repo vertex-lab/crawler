@@ -61,7 +61,7 @@ func personalized(
 	topK uint16,
 	rng *rand.Rand) (models.PagerankMap, error) {
 
-	succ, err := DB.Follows(nodeID)
+	succ, err := DB.Follows(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func personalizedWalk(
 		// if all walks have been used, do a walk step
 		if WC.FullyUsed(pWalk.currentNodeID) {
 
-			successorIDs, err := DB.Follows(pWalk.currentNodeID)
+			successorIDs, err := DB.Follows(ctx, pWalk.currentNodeID)
 			if err != nil {
 				return nil, err
 			}
@@ -262,7 +262,7 @@ func checkInputs(DB models.Database, RWS models.RandomWalkStore,
 		return err
 	}
 
-	if !DB.ContainsNode(nodeID) {
+	if !DB.ContainsNode(context.Background(), nodeID) { // ARE U SURE? THINK
 		return models.ErrNodeNotFoundDB
 	}
 

@@ -31,7 +31,7 @@ func Pagerank(
 		return nil, err
 	}
 
-	nodeIDs, err := DB.AllNodes()
+	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
 		return nil, err
 	}

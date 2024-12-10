@@ -13,6 +13,7 @@ remove RandomWalks. These walks are then utilized in the pagerank package.
 package models
 
 import (
+	"context"
 	"errors"
 )
 
@@ -61,46 +62,46 @@ type NodeDiff struct {
 type Database interface {
 
 	// Size() returns the number of nodes in the DB (ignores errors).
-	Size() int
+	Size(ctx context.Context) int
 
 	// ContainsNode() returns wheter a specified nodeID is found in the DB
-	ContainsNode(nodeID uint32) bool
+	ContainsNode(ctx context.Context, nodeID uint32) bool
 
 	// Validate() returns the appropriate error if the DB is nil or empty
 	Validate() error
 
 	// NodeByID() retrieves a node by its nodeID.
-	NodeByID(nodeID uint32) (*NodeMeta, error)
+	NodeByID(ctx context.Context, nodeID uint32) (*NodeMeta, error)
 
 	// NodeByKey() retrieves a node by its pubkey.
-	NodeByKey(pubkey string) (*NodeMeta, error)
+	NodeByKey(ctx context.Context, pubkey string) (*NodeMeta, error)
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
-	AddNode(node *Node) (uint32, error)
+	AddNode(ctx context.Context, node *Node) (uint32, error)
 
 	// UpdateNode() updates the nodeID using the new values inside node.
-	UpdateNode(nodeID uint32, nodeDiff *NodeDiff) error
+	UpdateNode(ctx context.Context, nodeID uint32, nodeDiff *NodeDiff) error
 
 	// Follows() returns a slice that contains the IDs of all successors of a node
-	Follows(nodeID uint32) ([]uint32, error)
+	Follows(ctx context.Context, nodeID uint32) ([]uint32, error)
 
 	// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 	// If a pubkey is not found, nil is returned
-	NodeIDs(pubkeys []string) ([]interface{}, error)
+	NodeIDs(ctx context.Context, pubkeys []string) ([]interface{}, error)
 
 	// Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 	// If a nodeID is not found, nil is returned
-	Pubkeys(nodeIDs []uint32) ([]interface{}, error)
+	Pubkeys(ctx context.Context, nodeIDs []uint32) ([]interface{}, error)
 
 	// ScanNodes() scans over the nodes and returns a batch of nodeIDs of size roughly equal to limit.
 	// Limit controls how much "work" is invested in fetching the batch, hence it is not precise.
-	ScanNodes(cursor uint64, limit int) ([]uint32, uint64, error)
+	ScanNodes(ctx context.Context, cursor uint64, limit int) ([]uint32, uint64, error)
 
 	// AllNodes() returns a slice with the IDs of all nodes in the DB
-	AllNodes() ([]uint32, error)
+	AllNodes(ctx context.Context) ([]uint32, error)
 
 	// SetPagerank() set the pagerank in the database according to the pagerankMap
-	SetPagerank(PagerankMap) error
+	SetPagerank(ctx context.Context, p PagerankMap) error
 }
 
 // a map that associates each nodeID with its corrisponding pagerank value

@@ -269,13 +269,12 @@ func TestNodeByID(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeByID(test.nodeID)
+			nodeMeta, err := DB.NodeByID(context.Background(), test.nodeID)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedError, err)
 			}
@@ -336,13 +335,12 @@ func TestNodeByKey(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeByKey(test.pubkey)
+			nodeMeta, err := DB.NodeByKey(context.Background(), test.pubkey)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
 			}
@@ -355,8 +353,6 @@ func TestNodeByKey(t *testing.T) {
 }
 
 func TestAddNode(t *testing.T) {
-	cl := redisutils.SetupClient()
-
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name           string
@@ -383,14 +379,15 @@ func TestAddNode(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				DB, err := SetupDB(cl, test.DBType)
+				cl := redisutils.SetupClient()
 				defer redisutils.CleanupRedis(cl)
 
+				DB, err := SetupDB(cl, test.DBType)
 				if err != nil {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				nodeID, err := DB.AddNode(test.Node)
+				nodeID, err := DB.AddNode(context.Background(), test.Node)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
 				}
@@ -438,6 +435,7 @@ func TestAddNode(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				ctx := context.Background()
+				cl := redisutils.SetupClient()
 				defer redisutils.CleanupRedis(cl)
 
 				DB, err := SetupDB(cl, test.DBType)
@@ -445,7 +443,7 @@ func TestAddNode(t *testing.T) {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				nodeID, err := DB.AddNode(test.Node)
+				nodeID, err := DB.AddNode(ctx, test.Node)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
 				}
@@ -539,19 +537,20 @@ func TestUpdateNode(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			err = DB.UpdateNode(test.nodeID, test.nodeDiff)
+			err = DB.UpdateNode(ctx, test.nodeID, test.nodeDiff)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.nodeDiff, test.expectedError, err)
 			}
 
 			// check if node was updated correctly
 			if err == nil {
-				cmdReturn := cl.HGetAll(DB.ctx, KeyNode(test.nodeID))
+				cmdReturn := cl.HGetAll(ctx, KeyNode(test.nodeID))
 				if cmdReturn.Err() != nil {
 					t.Errorf("HGetAll(): expected nil, got %v", err)
 				}
@@ -612,7 +611,7 @@ func TestContainsNode(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			contains := DB.ContainsNode(test.nodeID)
+			contains := DB.ContainsNode(context.Background(), test.nodeID)
 			if contains != test.expectedContains {
 				t.Errorf("ContainsNode(%d): expected %v, got %v", test.nodeID, test.expectedContains, contains)
 			}
@@ -669,7 +668,7 @@ func TestFollows(t *testing.T) {
 				t.Fatalf("SetupDb(): expected nil, got %v", err)
 			}
 
-			succ, err := DB.Follows(test.nodeID)
+			succ, err := DB.Follows(context.Background(), test.nodeID)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Follows(%d): expected %v, got %v", test.nodeID, test.expectedError, err)
 			}
@@ -720,7 +719,7 @@ func TestNodeIDs(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeIDs, err := DB.NodeIDs(test.pubkeys)
+			nodeIDs, err := DB.NodeIDs(context.Background(), test.pubkeys)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeIDs(): expected %v, got %v", test.expectedError, err)
 			}
@@ -771,7 +770,7 @@ func TestPubkeys(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			pubkeys, err := DB.Pubkeys(test.nodeIDs)
+			pubkeys, err := DB.Pubkeys(context.Background(), test.nodeIDs)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Pubkeys(): expected %v, got %v", test.expectedError, err)
 			}
@@ -818,7 +817,7 @@ func TestAllNodes(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeIDs, err := DB.AllNodes()
+			nodeIDs, err := DB.AllNodes(context.Background())
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("AllNodes(): expected %v, got %v", test.expectedError, err)
 			}
@@ -859,7 +858,7 @@ func TestScanNodes(t *testing.T) {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				_, _, err = DB.ScanNodes(0, test.limit)
+				_, _, err = DB.ScanNodes(context.Background(), 0, test.limit)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ScanNodes(): expected %v, got %v", test.expectedError, err)
 				}
@@ -889,7 +888,7 @@ func TestScanNodes(t *testing.T) {
 				nodeIDs := []uint32{}
 				for {
 
-					res, cursor, err := DB.ScanNodes(cursor, test.limit)
+					res, cursor, err := DB.ScanNodes(context.Background(), cursor, test.limit)
 					if err != nil {
 						t.Fatalf("ScanNodes(): expected nil, got %v", err)
 					}
@@ -941,7 +940,7 @@ func TestSize(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			size := DB.Size()
+			size := DB.Size(context.Background())
 			if size != test.expectedSize {
 				t.Errorf("Size(): expected %v, got %v", test.expectedSize, size)
 			}
@@ -984,13 +983,12 @@ func TestSetPagerank(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-
 				DB, err := SetupDB(cl, test.DBType)
 				if err != nil {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				err = DB.SetPagerank(test.pagerank)
+				err = DB.SetPagerank(context.Background(), test.pagerank)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("SetPagerank(): expected %v, got %v", test.expectedError, err)
@@ -1011,12 +1009,13 @@ func TestSetPagerank(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
+				ctx := context.Background()
 				DB, err := SetupDB(cl, test.DBType)
 				if err != nil {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				err = DB.SetPagerank(test.pagerank)
+				err = DB.SetPagerank(ctx, test.pagerank)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("SetPagerank(): expected %v, got %v", test.expectedError, err)
@@ -1024,7 +1023,7 @@ func TestSetPagerank(t *testing.T) {
 
 				for nodeID, rank := range test.pagerank {
 
-					strP, err := DB.client.HGet(DB.ctx, KeyNode(nodeID), "pagerank").Result()
+					strP, err := DB.client.HGet(ctx, KeyNode(nodeID), "pagerank").Result()
 					if err != nil {
 						t.Errorf("HGet(): expected nil, got %v", err)
 					}
@@ -1051,6 +1050,7 @@ func TestInterface(t *testing.T) {
 // ------------------------------------BENCHMARKS------------------------------
 
 func BenchmarkNodeByKey(b *testing.B) {
+	ctx := context.Background()
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -1062,7 +1062,7 @@ func BenchmarkNodeByKey(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := DB.NodeByKey("zero")
+		_, err := DB.NodeByKey(ctx, "zero")
 		if err != nil {
 			b.Fatalf("benchmark failed: %v", err)
 		}
@@ -1070,6 +1070,7 @@ func BenchmarkNodeByKey(b *testing.B) {
 }
 
 func BenchmarkNodeByID(b *testing.B) {
+	ctx := context.Background()
 	cl := redisutils.SetupClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -1081,7 +1082,7 @@ func BenchmarkNodeByID(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := DB.NodeByID(0)
+		_, err := DB.NodeByID(ctx, 0)
 		if err != nil {
 			b.Fatalf("benchmark failed: %v", err)
 		}
@@ -1089,6 +1090,7 @@ func BenchmarkNodeByID(b *testing.B) {
 }
 
 func BenchmarkSetPagerank(b *testing.B) {
+	ctx := context.Background()
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 
@@ -1111,7 +1113,7 @@ func BenchmarkSetPagerank(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 
-				if err := DB.SetPagerank(pagerank); err != nil {
+				if err := DB.SetPagerank(ctx, pagerank); err != nil {
 					b.Fatalf("benchmark failed: %v", err)
 				}
 			}
@@ -1120,6 +1122,7 @@ func BenchmarkSetPagerank(b *testing.B) {
 }
 
 func BenchmarkAllNodes(b *testing.B) {
+	ctx := context.Background()
 	edgesPerNode := 100
 	rng := rand.New(rand.NewSource(69))
 
@@ -1136,7 +1139,7 @@ func BenchmarkAllNodes(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := DB.AllNodes(); err != nil {
+				if _, err := DB.AllNodes(ctx); err != nil {
 					b.Fatalf("benchmark failed: %v", err)
 				}
 			}

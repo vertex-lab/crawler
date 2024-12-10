@@ -56,7 +56,7 @@ func PersonalizedPagerank(
 	}
 
 	// the result is a slice of empty interfaces, which is an uint32 (nodeID) if the pubkey was found in the DB, nil otherwise
-	node, err := DB.NodeIDs([]string{pubkey})
+	node, err := DB.NodeIDs(ctx, []string{pubkey})
 	if err != nil {
 		return map[string]float64{}, err
 	}
@@ -82,7 +82,7 @@ func PersonalizedPagerank(
 	}
 
 	// get the pubkeys that correspond to the nodeIDs. This operation preserve order
-	pubkeys, err := DB.Pubkeys(nodeIDs)
+	pubkeys, err := DB.Pubkeys(ctx, nodeIDs)
 	if err != nil {
 		return map[string]float64{}, err
 	}

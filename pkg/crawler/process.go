@@ -81,7 +81,10 @@ func ProcessFollowListEvent(
 	RWM *walks.RandomWalkManager,
 	event *nostr.Event) error {
 
-	author, err := DB.NodeByKey(event.PubKey)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	author, err := DB.NodeByKey(ctx, event.PubKey)
 	if err != nil {
 		return err
 	}
@@ -97,7 +100,7 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	oldFollows, err := DB.Follows(author.ID)
+	oldFollows, err := DB.Follows(ctx, author.ID)
 	if err != nil {
 		return err
 	}
@@ -111,7 +114,7 @@ func ProcessFollowListEvent(
 		AddedFollows:   added,
 		RemovedFollows: removed,
 	}
-	if err := DB.UpdateNode(author.ID, &authorNodeDiff); err != nil {
+	if err := DB.UpdateNode(ctx, author.ID, &authorNodeDiff); err != nil {
 		return err
 	}
 
@@ -139,7 +142,7 @@ func ProcessFollowListEvent(
 		}
 	}
 
-	if err := DB.SetPagerank(pagerankMap); err != nil {
+	if err := DB.SetPagerank(ctx, pagerankMap); err != nil {
 		return err
 	}
 
@@ -153,7 +156,7 @@ func AssignNodeIDs(
 	DB models.Database,
 	pubkeys []string) ([]uint32, error) {
 
-	IDs, err := DB.NodeIDs(pubkeys)
+	IDs, err := DB.NodeIDs(ctx, pubkeys)
 	if err != nil {
 		return []uint32{}, err
 	}
@@ -162,7 +165,7 @@ func AssignNodeIDs(
 	for i, ID := range IDs {
 
 		nodeID, ok := ID.(uint32)
-		// if it's not uin32, it means the pubkey wasn't found in the database
+		// if it's not uint32, it means the pubkey wasn't found in the database
 		if !ok {
 
 			// add a new node to the database, and assign it an ID
@@ -174,7 +177,7 @@ func AssignNodeIDs(
 					Pagerank: 0.0,
 				},
 			}
-			nodeID, err = DB.AddNode(&node)
+			nodeID, err = DB.AddNode(ctx, &node)
 			if err != nil {
 				return []uint32{}, err
 			}
@@ -249,7 +252,7 @@ func NodeArbiter(
 			fmt.Printf("\n  > Stopping the Node Arbiter... ")
 			return
 		default:
-			// delay before the next complete scan
+			// If the node is not found (err != nil), skip
 			time.Sleep(time.Duration(sleepTime) * time.Second)
 
 			//threshold := pagerankThreshold(DB.Size(), bottom)
@@ -273,6 +276,9 @@ func ArbiterScan(
 	threshold float64,
 	queueHandler func(pk string) error) error {
 
+	ctx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
 	var cursor uint64 = 0
 	var nodeIDs []uint32
 	var err error
@@ -284,13 +290,13 @@ func ArbiterScan(
 		default:
 		}
 
-		nodeIDs, cursor, err = DB.ScanNodes(cursor, 1000)
+		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 1000)
 		if err != nil {
 			return fmt.Errorf("error scanning: %w", err)
 		}
 
 		for _, nodeID := range nodeIDs {
-			node, err := DB.NodeByID(nodeID)
+			node, err := DB.NodeByID(ctx, nodeID)
 			if err != nil {
 				continue
 			}
@@ -340,7 +346,7 @@ func PromoteNode(
 		},
 	}
 
-	if err := DB.UpdateNode(nodeID, &nodeDiff); err != nil {
+	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
 		return err
 	}
 
@@ -365,7 +371,7 @@ func DemoteNode(
 		},
 	}
 
-	if err := DB.UpdateNode(nodeID, &nodeDiff); err != nil {
+	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
 		return err
 	}
 
