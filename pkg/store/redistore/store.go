@@ -197,90 +197,83 @@ func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) (
 	return visitMap, nil
 }
 
-// AllWalks() returns a map of walks by walksID that visit nodeID.
-func (RWS *RandomWalkStore) AllWalks(ctx context.Context, nodeID uint32) (map[uint32]models.RandomWalk, error) {
-
+// WalksUnion() returns a map of walks by walksID that visit at least one of the specified nodeIDs.
+func (RWS *RandomWalkStore) WalksUnion(ctx context.Context, nodeIDs []uint32) (map[uint32]models.RandomWalk, error) {
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
-	strIDs, err := RWS.client.SMembers(ctx, KeyWalksVisiting(nodeID)).Result()
+	keys := make([]string, 0, len(nodeIDs))
+	for _, ID := range nodeIDs {
+		keys = append(keys, KeyWalksVisiting(ID))
+	}
+
+	strIDs, err := RWS.client.SUnion(ctx, keys...).Result()
 	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
+		return nil, err
 	}
 
 	if len(strIDs) == 0 {
-		return map[uint32]models.RandomWalk{}, models.ErrNodeNotFoundRWS
+		return nil, models.ErrNodeNotFoundRWS
 	}
 
-	walkIDs, err := redisutils.ParseIDs(strIDs)
-	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
-	}
-
-	res, err := RWS.client.HMGet(ctx, KeyWalks, strIDs...).Result()
-	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
-	}
-
-	strWalks := make([]string, 0, len(res))
-	for _, r := range res {
-		strWalk, ok := r.(string)
-		if !ok {
-			return map[uint32]models.RandomWalk{}, fmt.Errorf("unexpected type: %v", res)
-		}
-
-		strWalks = append(strWalks, strWalk)
-	}
-
-	walks, err := redisutils.ParseWalks(strWalks)
-	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
-	}
-
-	walkMap := make(map[uint32]models.RandomWalk, len(walkIDs))
-	for i, walkID := range walkIDs {
-		walkMap[walkID] = walks[i]
-	}
-
-	return walkMap, nil
+	return RWS.walksByStrID(ctx, strIDs...)
 }
 
 // Walks() returns a map of walks by walksID that visit nodeID.
 func (RWS *RandomWalkStore) Walks(ctx context.Context, nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
-
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
+	var strIDs []string
+	var err error
+	key := KeyWalksVisiting(nodeID)
+
 	if limit <= 0 {
-		limit = 1000000000 // a very large number, such that SRANDMEMBER returns everything
+		// fetch all the walks
+		strIDs, err = RWS.client.SMembers(ctx, key).Result()
+	} else {
+		// randomly fetch up to limit
+		strIDs, err = RWS.client.SRandMemberN(ctx, key, int64(limit)).Result()
 	}
 
-	strIDs, err := RWS.client.SRandMemberN(ctx, KeyWalksVisiting(nodeID), int64(limit)).Result()
 	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
+		return nil, err
 	}
 
 	if len(strIDs) == 0 {
-		return map[uint32]models.RandomWalk{}, models.ErrNodeNotFoundRWS
+		return nil, models.ErrNodeNotFoundRWS
+	}
+
+	return RWS.walksByStrID(ctx, strIDs...)
+}
+
+// The method walksByStrID() returns a map walkID --> walk, given a slice of strIDs.
+func (RWS *RandomWalkStore) walksByStrID(ctx context.Context, strIDs ...string) (map[uint32]models.RandomWalk, error) {
+	if err := RWS.Validate(); err != nil {
+		return nil, err
+	}
+
+	if len(strIDs) == 0 {
+		return nil, nil
 	}
 
 	walkIDs, err := redisutils.ParseIDs(strIDs)
 	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
+		return nil, err
 	}
 
 	res, err := RWS.client.HMGet(ctx, KeyWalks, strIDs...).Result()
 	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
+		return nil, err
 	}
 
 	strWalks := make([]string, 0, len(res))
 	for _, r := range res {
 		strWalk, ok := r.(string)
 		if !ok {
-			return map[uint32]models.RandomWalk{}, fmt.Errorf("unexpected type: %v", res)
+			return nil, fmt.Errorf("unexpected type: %v", res)
 		}
 
 		strWalks = append(strWalks, strWalk)
@@ -288,7 +281,7 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, nodeID uint32, limit int)
 
 	walks, err := redisutils.ParseWalks(strWalks)
 	if err != nil {
-		return map[uint32]models.RandomWalk{}, err
+		return nil, err
 	}
 
 	walkMap := make(map[uint32]models.RandomWalk, len(walkIDs))

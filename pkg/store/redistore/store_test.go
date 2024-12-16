@@ -286,18 +286,16 @@ func TestWalks(t *testing.T) {
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
-			name:            "empty RWS",
-			RWSType:         "empty",
-			nodeID:          0,
-			expectedWalkMap: map[uint32]models.RandomWalk{},
-			expectedError:   models.ErrNodeNotFoundRWS,
+			name:          "empty RWS",
+			RWSType:       "empty",
+			nodeID:        0,
+			expectedError: models.ErrNodeNotFoundRWS,
 		},
 		{
-			name:            "node not found in RWS",
-			RWSType:         "one-node0",
-			nodeID:          1,
-			expectedWalkMap: map[uint32]models.RandomWalk{},
-			expectedError:   models.ErrNodeNotFoundRWS,
+			name:          "node not found in RWS",
+			RWSType:       "one-node0",
+			nodeID:        1,
+			expectedError: models.ErrNodeNotFoundRWS,
 		},
 		{
 			name:    "normal",
@@ -326,6 +324,66 @@ func TestWalks(t *testing.T) {
 
 			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
 				t.Errorf("Walks(): expected %v, got %v", test.expectedWalkMap, walkMap)
+			}
+		})
+	}
+}
+
+func TestWalksUnion(t *testing.T) {
+	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
+	testCases := []struct {
+		name            string
+		RWSType         string
+		nodeIDs         []uint32
+		expectedWalkMap map[uint32]models.RandomWalk
+		expectedError   error
+	}{
+		{
+			name:          "nil RWS",
+			RWSType:       "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilRWSPointer,
+		},
+		{
+			name:          "empty RWS",
+			RWSType:       "empty",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNodeNotFoundRWS,
+		},
+		{
+			name:          "node not found in RWS",
+			RWSType:       "one-node0",
+			nodeIDs:       []uint32{1},
+			expectedError: models.ErrNodeNotFoundRWS,
+		},
+		{
+			name:    "normal",
+			RWSType: "complex",
+			nodeIDs: []uint32{0, 1},
+			expectedWalkMap: map[uint32]models.RandomWalk{
+				0: {0, 1, 2},
+				1: {0, 3},
+				2: {1, 2},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			RWS, err := SetupRWS(cl, test.RWSType)
+			if err != nil {
+				t.Fatalf("SetupRWS(): expected nil, got %v", err)
+			}
+
+			walkMap, err := RWS.WalksUnion(context.Background(), test.nodeIDs)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("WalksUnion(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
+				t.Errorf("WalksUnion(): expected %v, got %v", test.expectedWalkMap, walkMap)
 			}
 		})
 	}

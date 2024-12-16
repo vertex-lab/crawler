@@ -42,6 +42,9 @@ type RandomWalkStore interface {
 	- if limit <= 0, all walks are returned */
 	Walks(ctx context.Context, nodeID uint32, limit int) (map[uint32]RandomWalk, error)
 
+	// WalksUnion() returns a map of walks by walksID that visit at least one of the specified nodeIDs.
+	WalksUnion(ctx context.Context, nodeIDs []uint32) (map[uint32]RandomWalk, error)
+
 	// AddWalks() adds all the walks to the RandomWalkStore.
 	AddWalks(ctx context.Context, walks []RandomWalk) error
 

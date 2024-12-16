@@ -678,23 +678,6 @@ func BenchmarkSUNION2(b *testing.B) {
 	}
 }
 
-func BenchmarkAllWalks(b *testing.B) {
-	cl := redisutils.SetupClient()
-	ctx := context.Background()
-
-	RWS, err := redistore.NewRWSConnection(ctx, cl)
-	if err != nil {
-		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := RWS.AllWalks(ctx, 2); err != nil {
-			b.Fatalf("Personalized(): benchmark failed: %v", err)
-		}
-	}
-}
-
 func BenchmarkSteps(b *testing.B) {
 	cl := redisutils.SetupClient()
 	ctx := context.Background()

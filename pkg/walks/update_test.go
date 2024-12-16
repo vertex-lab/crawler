@@ -237,7 +237,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 			0: {
 				0: {0, 2},
 			},
-			1: {},
+			1: nil,
 			2: {
 				0: {0, 2},
 			},
@@ -248,11 +248,11 @@ func TestUpdateAddedNodes(t *testing.T) {
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
-
 			walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
+
 			if !reflect.DeepEqual(walkMap, expectedWalk) {
 				t.Errorf("updateAddedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walkMap)
 			}

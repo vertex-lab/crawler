@@ -146,7 +146,6 @@ func TestVisitCounts(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-
 			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs)
 
 			if !errors.Is(err, test.expectedError) {
@@ -237,6 +236,70 @@ func TestWalks(t *testing.T) {
 				if !reflect.DeepEqual(test.WalkMap[walkID], walk) {
 					t.Fatalf("expected walks in %v, got %v", test.WalkMap, walkMap)
 				}
+			}
+		})
+	}
+}
+
+func TestWalksUnion(t *testing.T) {
+	testCases := []struct {
+		name            string
+		RWSType         string
+		nodeIDs         []uint32
+		expectedWalkMap map[uint32]models.RandomWalk
+		expectedError   error
+	}{
+		{
+			name:          "nil RWS",
+			RWSType:       "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilRWSPointer,
+		},
+		{
+			name:          "empty RWS",
+			RWSType:       "empty",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNodeNotFoundRWS,
+		},
+		{
+			name:          "node not found in RWS",
+			RWSType:       "one-node0",
+			nodeIDs:       []uint32{1},
+			expectedError: models.ErrNodeNotFoundRWS,
+		},
+		{
+			name:    "valid, all",
+			RWSType: "triangle",
+			nodeIDs: []uint32{0},
+			expectedWalkMap: map[uint32]models.RandomWalk{
+				0: {0, 1, 2},
+				1: {1, 2, 0},
+				2: {2, 0, 1},
+			},
+		},
+		{
+			name:    "valid",
+			RWSType: "triangle",
+			nodeIDs: []uint32{0},
+			expectedWalkMap: map[uint32]models.RandomWalk{
+				0: {0, 1, 2},
+				1: {1, 2, 0},
+				2: {2, 0, 1},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			RWS := SetupRWS(test.RWSType)
+			walkMap, err := RWS.WalksUnion(context.Background(), test.nodeIDs)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("WalksUnion(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
+				t.Errorf("WalksUnion(): expected %v, got %v", test.expectedWalkMap, walkMap)
 			}
 		})
 	}
