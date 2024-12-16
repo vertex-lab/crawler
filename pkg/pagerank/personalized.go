@@ -123,7 +123,7 @@ func personalized(
 		return models.PagerankMap{nodeID: 1.0}, nil
 	}
 
-	FC := NewFollowCache(DB, len(follows))
+	FC := NewFollowCache(DB, len(follows)+1)
 	FC.follows[nodeID] = follows
 	if err := FC.Load(ctx, follows...); err != nil {
 		return nil, err

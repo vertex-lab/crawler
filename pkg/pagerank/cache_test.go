@@ -9,6 +9,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
 func TestFollows(t *testing.T) {
@@ -253,7 +254,8 @@ func TestWCLoad(t *testing.T) {
 		}
 
 		expectedwalks := []models.RandomWalk{{0, 1, 2}, {0, 3}}
-		if !reflect.DeepEqual(WC.walks, expectedwalks) {
+		walks := sliceutils.SortWalks(WC.walks)
+		if !reflect.DeepEqual(walks, expectedwalks) {
 			t.Errorf("Load(): expected %v, got %v", expectedwalks, WC.walks)
 		}
 

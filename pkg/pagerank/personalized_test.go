@@ -257,16 +257,25 @@ func TestPersonalizedWalk(t *testing.T) {
 		WCType         string
 		startID        uint32
 		requiredLenght int
-		expectedVisits map[uint32]int
+		expectedWalk   models.RandomWalk
 		expectedError  error
 	}{
 		{
-			name:           "multiple walks added",
+			name:           "empty WC",
 			DBType:         "triangle",
 			WCType:         "triangle",
 			startID:        0,
-			requiredLenght: 11,
-			expectedVisits: map[uint32]int{0: 4, 1: 4, 2: 3},
+			requiredLenght: 10,
+			expectedWalk:   models.RandomWalk{0, 1, 2, 0, 0, 1, 0, 1, 2, 0, 1, 2},
+			expectedError:  nil,
+		},
+		{
+			name:           "non-empty WC",
+			DBType:         "triangle",
+			WCType:         "triangle",
+			startID:        0,
+			requiredLenght: 10,
+			expectedWalk:   models.RandomWalk{0, 1, 2, 0, 0, 1, 0, 1, 2, 0, 1, 2},
 			expectedError:  nil,
 		},
 	}
@@ -281,22 +290,11 @@ func TestPersonalizedWalk(t *testing.T) {
 
 			walk, err := personalizedWalk(ctx, FC, WC, test.startID, test.requiredLenght, 0.85, rng)
 			if !errors.Is(err, test.expectedError) {
-				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
 			}
 
-			// check the visits match the expected ones.
-			// Note: Order of visits cannot be inforced due to walkSet.Iter()
-			if test.expectedVisits != nil {
-				visits := make(map[uint32]int, 3)
-				for _, nodeID := range walk {
-					visits[nodeID]++
-				}
-
-				for _, nodeID := range []uint32{0, 1, 2} {
-					if visits[nodeID] != test.expectedVisits[nodeID] {
-						t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedVisits, walk)
-					}
-				}
+			if !reflect.DeepEqual(walk, test.expectedWalk) {
+				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedWalk, walk)
 			}
 		})
 	}

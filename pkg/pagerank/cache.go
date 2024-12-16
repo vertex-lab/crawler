@@ -101,7 +101,7 @@ func (WC *WalkCache) Next(nodeID uint32) (models.RandomWalk, bool) {
 		}
 
 		walk := WC.walks[pos]
-		WC.walks[nodeID] = nil // zeroing the walk, so it can't be reused by other nodes
+		WC.walks[pos] = nil // zeroing the walk, so it can't be reused by other nodes
 
 		state.lastIndex = i
 		WC.states[nodeID] = state
@@ -206,7 +206,7 @@ func SetupWC(WCType string) *WalkCache {
 		WC := NewWalkCache(3)
 		WC.walks = []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
 		for ID := uint32(0); ID < 3; ID++ {
-			WC.states[0] = &NodeState{
+			WC.states[ID] = &NodeState{
 				positions: []int{0, 1, 2},
 				lastIndex: 0,
 			}
