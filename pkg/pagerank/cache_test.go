@@ -217,7 +217,7 @@ func TestWCLoad(t *testing.T) {
 			},
 			{
 				name:          "empty RWS",
-				RWSType:       "nil",
+				RWSType:       "empty",
 				nodeIDs:       []uint32{0},
 				expectedError: models.ErrNodeNotFoundRWS,
 			},
@@ -236,7 +236,7 @@ func TestWCLoad(t *testing.T) {
 
 				err := WC.Load(context.Background(), RWS, test.nodeIDs...)
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("Follows(): expected %v, got %v", test.expectedError, err)
+					t.Fatalf("Load(): expected %v, got %v", test.expectedError, err)
 				}
 			})
 		}
@@ -245,24 +245,32 @@ func TestWCLoad(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		RWS := mockstore.SetupRWS("complex")
 		WC := NewWalkCache(2)
-		var nodeID uint32 = 0
+		nodeIDs := []uint32{0, 3}
 
-		err := WC.Load(context.Background(), RWS, nodeID)
+		err := WC.Load(context.Background(), RWS, nodeIDs...)
 		if err != nil {
 			t.Fatalf("Load(): expected nil, got %v", err)
 		}
 
-		expectedwalks := [][]uint32{{0, 1, 2}, {0, 3}}
+		expectedwalks := []models.RandomWalk{{0, 1, 2}, {0, 3}}
 		if !reflect.DeepEqual(WC.walks, expectedwalks) {
 			t.Errorf("Load(): expected %v, got %v", expectedwalks, WC.walks)
 		}
 
-		expectedState := &NodeState{
+		expectedState0 := &NodeState{
 			positions: []int{0, 1},
 			lastIndex: 0,
 		}
-		if !reflect.DeepEqual(WC.states[nodeID], expectedState) {
-			t.Errorf("Load(): expected %v, got %v", expectedState, WC.states[nodeID])
+		if !reflect.DeepEqual(WC.states[0], expectedState0) {
+			t.Errorf("Load(): expected %v, got %v", expectedState0, WC.states[0])
+		}
+
+		expectedState3 := &NodeState{
+			positions: []int{},
+			lastIndex: 0,
+		}
+		if !reflect.DeepEqual(WC.states[3], expectedState3) {
+			t.Errorf("Load(): expected %v, got %v", expectedState3, WC.states[3])
 		}
 	})
 }

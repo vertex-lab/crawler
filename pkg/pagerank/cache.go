@@ -116,6 +116,42 @@ func (WC *WalkCache) Load(ctx context.Context, RWS models.RandomWalkStore, nodeI
 		return ErrNilWCPointer
 	}
 
+	walkMap, err := RWS.WalksUnion(ctx, nodeIDs)
+	if err != nil {
+		return err
+	}
+
+	WC.walks = make([]models.RandomWalk, len(walkMap))
+	for _, ID := range nodeIDs {
+		WC.states[ID] = &NodeState{
+			positions: []int{},
+			lastIndex: 0,
+		}
+	}
+
+	var pos int
+	for _, walk := range walkMap {
+		WC.walks[pos] = walk
+
+		// add the position of the walk in walks to each node visited by it,
+		// excluding the last one (which will be cropped out anyway)
+		for _, ID := range walk[:len(walk)-1] {
+			state, exists := WC.states[ID]
+			if !exists {
+				state = &NodeState{
+					positions: []int{},
+					lastIndex: 0,
+				}
+
+				WC.states[ID] = state
+			}
+
+			WC.states[ID].positions = append(state.positions, pos)
+		}
+
+		pos++
+	}
+
 	return nil
 }
 
