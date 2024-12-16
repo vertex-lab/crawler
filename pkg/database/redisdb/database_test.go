@@ -60,12 +60,12 @@ func TestAddFollows(t *testing.T) {
 	defer redisutils.CleanupRedis(cl)
 
 	nodeID := uint32(0)
-	addedSucc := []uint32{1, 2, 3}
+	addedFollows := []uint32{1, 2, 3}
 
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
 
-	AddFollows(ctx, pipe, nodeID, addedSucc)
+	AddFollows(ctx, pipe, nodeID, addedFollows)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
@@ -85,20 +85,20 @@ func TestAddFollows(t *testing.T) {
 		followIDs = append(followIDs, followID)
 	}
 
-	if !reflect.DeepEqual(followIDs, addedSucc) {
-		t.Fatalf("AddFollows(): expected %v, got %v", addedSucc, followIDs)
+	if !reflect.DeepEqual(followIDs, addedFollows) {
+		t.Fatalf("AddFollows(): expected %v, got %v", addedFollows, followIDs)
 	}
 
-	// check the succ have nodeID as a follower
-	for _, succ := range addedSucc {
+	// check the follows have nodeID as a follower
+	for _, ID := range addedFollows {
 
-		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
+		isMember, err := cl.SIsMember(ctx, KeyFollowers(ID), redisutils.FormatID(nodeID)).Result()
 		if err != nil {
 			t.Errorf("IsMember(): expected nil, got %v", err)
 		}
 
 		if !isMember {
-			t.Fatalf("AddFollows(): expected nodeID = %d part of followers:%d", nodeID, succ)
+			t.Fatalf("AddFollows(): expected nodeID = %d part of followers:%d", nodeID, ID)
 		}
 	}
 }
@@ -177,37 +177,37 @@ func TestAddFollowers(t *testing.T) {
 	defer redisutils.CleanupRedis(cl)
 
 	nodeID := uint32(0)
-	predecessors := []uint32{1, 2, 3}
+	followers := []uint32{1, 2, 3}
 
 	pipe := cl.TxPipeline()
 	ctx := context.Background()
 
-	AddFollowers(ctx, pipe, nodeID, predecessors)
+	AddFollowers(ctx, pipe, nodeID, followers)
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Exec(): expected nil, got %v", err)
 	}
 
 	// check the followers of nodeID are correctly added
-	followers, err := cl.SMembers(ctx, KeyFollowers(nodeID)).Result()
+	strIDs, err := cl.SMembers(ctx, KeyFollowers(nodeID)).Result()
 	if err != nil {
 		t.Errorf("SMembers(): expected nil, got %v", err)
 	}
 	// parse the follows
-	followerIDs := make([]uint32, 0, len(followers))
-	for _, follower := range followers {
-		followerID, err := redisutils.ParseID(follower)
+	f := make([]uint32, 0, len(strIDs))
+	for _, strID := range strIDs {
+		ID, err := redisutils.ParseID(strID)
 		if err != nil {
-			t.Fatalf("ParseID(%v): expected nil, got %v", follower, err)
+			t.Fatalf("ParseID(%v): expected nil, got %v", strID, err)
 		}
-		followerIDs = append(followerIDs, followerID)
+		f = append(f, ID)
 	}
 
-	if !reflect.DeepEqual(followerIDs, predecessors) {
-		t.Fatalf("AddFollows(): expected %v, got %v", predecessors, followerIDs)
+	if !reflect.DeepEqual(f, followers) {
+		t.Fatalf("AddFollows(): expected %v, got %v", followers, f)
 	}
 
 	// check the pred have nodeID as a follows
-	for _, pred := range predecessors {
+	for _, pred := range followers {
 
 		isMember, err := cl.SIsMember(ctx, KeyFollows(pred), redisutils.FormatID(nodeID)).Result()
 		if err != nil {
@@ -620,61 +620,60 @@ func TestContainsNode(t *testing.T) {
 }
 
 func TestFollows(t *testing.T) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
-		name          string
-		DBType        string
-		nodeID        uint32
-		expectedError error
-		expectedSlice []uint32
+		name            string
+		DBType          string
+		nodeIDs         []uint32
+		expectedError   error
+		expectedFollows [][]uint32
 	}{
 		{
-			name:          "nil DB",
-			DBType:        "nil",
-			nodeID:        0,
-			expectedSlice: nil,
-			expectedError: models.ErrNilDBPointer,
+			name:            "nil DB",
+			DBType:          "nil",
+			nodeIDs:         []uint32{0},
+			expectedFollows: nil,
+			expectedError:   models.ErrNilDBPointer,
 		},
 		{
-			name:          "empty DB",
-			DBType:        "empty",
-			nodeID:        0,
-			expectedSlice: []uint32{},
-			expectedError: nil,
+			name:            "empty DB",
+			DBType:          "empty",
+			nodeIDs:         []uint32{0},
+			expectedFollows: nil,
+			expectedError:   models.ErrNodeNotFoundDB,
 		},
 		{
-			name:          "node not found",
-			DBType:        "one-node0",
-			nodeID:        1,
-			expectedSlice: []uint32{},
-			expectedError: nil,
+			name:            "node not found",
+			DBType:          "triangle",
+			nodeIDs:         []uint32{69, 2},
+			expectedFollows: nil,
+			expectedError:   models.ErrNodeNotFoundDB,
 		},
 		{
-			name:          "valid",
-			DBType:        "one-node0",
-			nodeID:        0,
-			expectedSlice: []uint32{0},
-			expectedError: nil,
+			name:            "valid",
+			DBType:          "triangle",
+			nodeIDs:         []uint32{0, 1},
+			expectedFollows: [][]uint32{{1}, {2}},
+			expectedError:   nil,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			cl := redisutils.SetupClient()
+			defer redisutils.CleanupRedis(cl)
 
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
-				t.Fatalf("SetupDb(): expected nil, got %v", err)
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			succ, err := DB.Follows(context.Background(), test.nodeID)
+			follows, err := DB.Follows(context.Background(), test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Follows(%d): expected %v, got %v", test.nodeID, test.expectedError, err)
+				t.Fatalf("Follows(%d): expected %v, got %v", test.nodeIDs, test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(succ, test.expectedSlice) {
-				t.Errorf("Follows(%d): expected %v, got %v", test.nodeID, test.expectedSlice, succ)
+			if !reflect.DeepEqual(follows, test.expectedFollows) {
+				t.Errorf("Follows(%d): expected %v, got %v", test.nodeIDs, test.expectedFollows, follows)
 			}
 		})
 	}

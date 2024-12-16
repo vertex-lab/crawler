@@ -99,19 +99,19 @@ func TestLoadRWS(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			RWS, err := LoadRWS(context.Background(), cl)
+			RWS, err := NewRWSConnection(context.Background(), cl)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("LoadRWS(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("NewRWSConnection(): expected %v, got %v", test.expectedError, err)
 			}
 
 			// check if the parameters have been added correctly
 			if RWS != nil {
 				if RWS.Alpha(context.Background()) != float32(0.85) {
-					t.Errorf("LoadRWS(): expected %v, got %v", 0.85, RWS.Alpha(context.Background()))
+					t.Errorf("NewRWSConnection(): expected %v, got %v", 0.85, RWS.Alpha(context.Background()))
 				}
 
 				if RWS.WalksPerNode(context.Background()) != uint16(1) {
-					t.Errorf("LoadRWS(): expected %v, got %v", 1, RWS.WalksPerNode(context.Background()))
+					t.Errorf("NewRWSConnection(): expected %v, got %v", 1, RWS.WalksPerNode(context.Background()))
 				}
 			}
 		})

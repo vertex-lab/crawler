@@ -9,9 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
+	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/store/redistore"
+	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
@@ -128,8 +132,8 @@ func TestReached(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pWalk := NewPersonalizedWalk(0, test.targetLength)
-			reached := pWalk.Reached(test.targetLength)
+			walk := NewPersonalizedWalk(0, test.targetLength)
+			reached := walk.Reached(test.targetLength)
 
 			if reached != test.expectedReached {
 				t.Errorf("Reached(): expected %v, got %v", test.expectedReached, reached)
@@ -158,19 +162,19 @@ func TestReset(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pWalk := SetupPWalk(test.pWalkType, 10)
-			pWalk.Reset()
+			walk := SetupPWalk(test.pWalkType, 10)
+			walk.Reset()
 
-			if pWalk.currentNodeID != pWalk.startingNodeID {
-				t.Errorf("Reset(): expected %v, got %v", pWalk.startingNodeID, pWalk.currentNodeID)
+			if walk.currentID != walk.startID {
+				t.Errorf("Reset(): expected %v, got %v", walk.startID, walk.currentID)
 			}
 
-			if !reflect.DeepEqual(pWalk.currentWalk, models.RandomWalk{pWalk.startingNodeID}) {
-				t.Errorf("Reset(): expected %v, got %v", models.RandomWalk{pWalk.startingNodeID}, pWalk.currentWalk)
+			if !reflect.DeepEqual(walk.current, models.RandomWalk{walk.startID}) {
+				t.Errorf("Reset(): expected %v, got %v", models.RandomWalk{walk.startID}, walk.current)
 			}
 
-			if !reflect.DeepEqual(pWalk.walk, test.expectedNodeIDs) {
-				t.Errorf("Reset(): expected %v, got %v", test.expectedNodeIDs, pWalk.walk)
+			if !reflect.DeepEqual(walk.all, test.expectedNodeIDs) {
+				t.Errorf("Reset(): expected %v, got %v", test.expectedNodeIDs, walk.all)
 			}
 		})
 	}
@@ -199,15 +203,15 @@ func TestAppendNode(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pWalk := SetupPWalk(test.pWalkType, 10)
-			pWalk.AppendNode(test.nextNodeID)
+			walk := SetupPWalk(test.pWalkType, 10)
+			walk.Move(test.nextNodeID)
 
-			if pWalk.currentNodeID != test.nextNodeID {
-				t.Errorf("AppendNode(): expected %v, got %v", test.nextNodeID, pWalk.currentNodeID)
+			if walk.currentID != test.nextNodeID {
+				t.Errorf("AppendNode(): expected %v, got %v", test.nextNodeID, walk.currentID)
 			}
 
-			if !reflect.DeepEqual(pWalk.currentWalk, test.expectedCurrentWalk) {
-				t.Errorf("AppendNode(): expected %v, got %v", test.expectedCurrentWalk, pWalk.currentWalk)
+			if !reflect.DeepEqual(walk.current, test.expectedCurrentWalk) {
+				t.Errorf("AppendNode(): expected %v, got %v", test.expectedCurrentWalk, walk.current)
 			}
 		})
 	}
@@ -236,11 +240,11 @@ func TestAppendWalk(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pWalk := SetupPWalk(test.pWalkType, 10)
-			pWalk.AppendWalk(test.walkSegment)
+			walk := SetupPWalk(test.pWalkType, 10)
+			walk.Append(test.walkSegment)
 
-			if !reflect.DeepEqual(pWalk.walk, test.expectedNodeIDs) {
-				t.Errorf("AppendNode(): expected %v, got %v", test.expectedNodeIDs, pWalk.currentWalk)
+			if !reflect.DeepEqual(walk.all, test.expectedNodeIDs) {
+				t.Errorf("AppendNode(): expected %v, got %v", test.expectedNodeIDs, walk.current)
 			}
 		})
 	}
@@ -250,50 +254,17 @@ func TestPersonalizedWalk(t *testing.T) {
 	testCases := []struct {
 		name           string
 		DBType         string
-		RWSType        string
-		startingNodeID uint32
+		WCType         string
+		startID        uint32
 		requiredLenght int
 		expectedVisits map[uint32]int
 		expectedError  error
 	}{
 		{
-			name:           "empty RWS",
-			DBType:         "one-node0",
-			RWSType:        "empty",
-			startingNodeID: 0,
-			requiredLenght: 5,
-			expectedError:  models.ErrNodeNotFoundRWS,
-		},
-		{
-			name:           "node not found RWS",
-			DBType:         "one-node0",
-			RWSType:        "one-node1",
-			startingNodeID: 0,
-			requiredLenght: 5,
-			expectedError:  models.ErrNodeNotFoundRWS,
-		},
-		{
-			name:           "required Lenght = 0; empty slice returned",
-			DBType:         "one-node0",
-			RWSType:        "one-node0",
-			startingNodeID: 0,
-			requiredLenght: 0,
-			expectedError:  nil,
-		},
-		{
-			name:           "single walk added",
-			DBType:         "simple",
-			RWSType:        "simple",
-			startingNodeID: 0,
-			requiredLenght: 1,
-			expectedVisits: map[uint32]int{0: 1, 1: 1},
-			expectedError:  nil,
-		},
-		{
 			name:           "multiple walks added",
 			DBType:         "triangle",
-			RWSType:        "triangle",
-			startingNodeID: 0,
+			WCType:         "triangle",
+			startID:        0,
 			requiredLenght: 11,
 			expectedVisits: map[uint32]int{0: 4, 1: 4, 2: 3},
 			expectedError:  nil,
@@ -304,10 +275,11 @@ func TestPersonalizedWalk(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
-			RWS := mockstore.SetupRWS(test.RWSType)
+			FC := SetupFC(DB, "empty")
+			WC := SetupWC(test.WCType)
 			rng := rand.New(rand.NewSource(42))
 
-			pWalk, err := personalizedWalk(ctx, DB, RWS, test.startingNodeID, test.requiredLenght, rng)
+			walk, err := personalizedWalk(ctx, FC, WC, test.startID, test.requiredLenght, 0.85, rng)
 			if !errors.Is(err, test.expectedError) {
 				t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
 			}
@@ -316,13 +288,13 @@ func TestPersonalizedWalk(t *testing.T) {
 			// Note: Order of visits cannot be inforced due to walkSet.Iter()
 			if test.expectedVisits != nil {
 				visits := make(map[uint32]int, 3)
-				for _, nodeID := range pWalk {
+				for _, nodeID := range walk {
 					visits[nodeID]++
 				}
 
 				for _, nodeID := range []uint32{0, 1, 2} {
 					if visits[nodeID] != test.expectedVisits[nodeID] {
-						t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedVisits, pWalk)
+						t.Errorf("personalizedWalk(): expected %v, got %v", test.expectedVisits, walk)
 					}
 				}
 			}
@@ -422,6 +394,320 @@ func TestPersonalizedPagerank(t *testing.T) {
 			t.Errorf("Personalized() expected nil, got %v", err)
 		}
 	})
+}
+
+// ----------------------------------BENCHMARKS--------------------------------
+
+func BenchmarkCountAndNormalize(b *testing.B) {
+	const walkSize = 300000
+
+	walk := make(models.RandomWalk, 0, walkSize)
+	for i := 0; i < walkSize; i++ {
+		nodeID := uint32(rand.Intn(walkSize / 100))
+		walk = append(walk, nodeID)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		countAndNormalize(walk)
+	}
+}
+
+// func BenchmarkWalkCacheLoad(b *testing.B) {
+// 	cl := redisutils.SetupClient()
+// 	ctx := context.Background()
+
+// 	RWS, err := redistore.NewRWSConnection(ctx, cl)
+// 	if err != nil {
+// 		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+// 	}
+
+// 	b.ResetTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		WC := NewWalkCache()
+// 		if err := WC.Load(ctx, RWS, 2, -1); err != nil {
+// 			b.Fatalf("Personalized(): benchmark failed: %v", err)
+// 		}
+// 	}
+// }
+
+func BenchmarkWalks(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := RWS.Walks(ctx, 2, -1); err != nil {
+			b.Fatalf("Personalized(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkSMembersPipe(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	size := 1000
+	keys := make([]string, 0, size)
+	for i := 0; i < size; i++ {
+		//keys = append(keys, redistore.KeyWalksVisiting(uint32(i)))
+		keys = append(keys, redisdb.KeyFollows(uint32(i)))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pipe := cl.Pipeline()
+		strIDsByNode := make([][]string, 0, size)
+		cmds := make([]*redis.StringSliceCmd, 0, size)
+		for _, key := range keys {
+			cmds = append(cmds, pipe.SMembers(ctx, key))
+		}
+
+		if _, err := pipe.Exec(ctx); err != nil {
+			b.Fatalf("pipelin failed: expected nil, got %v", err)
+		}
+
+		for _, cmd := range cmds {
+			strIDs := cmd.Val()
+			strIDsByNode = append(strIDsByNode, strIDs)
+		}
+	}
+}
+
+func BenchmarkFollowUnion(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	size := 34000
+	keys := make([]string, 0, size)
+	for i := 0; i < size; i++ {
+		//keys = append(keys, redistore.KeyWalksVisiting(uint32(i)))
+		keys = append(keys, redisdb.KeyFollows(uint32(i)))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		nodeIDs, err := cl.SUnion(ctx, keys...).Result()
+		if err != nil {
+			b.Fatalf("benchmark failed: %v", err)
+		}
+
+		_ = nodeIDs
+		b.Errorf("nodes: %v", len(nodeIDs))
+	}
+}
+
+func BenchmarkFollowsPipe(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	size := 10000
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pipe := cl.Pipeline()
+		cmds := make([]*redis.StringSliceCmd, 0, size)
+		for i := 0; i < size; i++ {
+			nodeID := uint32(i)
+			cmds = append(cmds, pipe.SMembers(ctx, redisdb.KeyFollows(nodeID)))
+		}
+
+		if _, err := pipe.Exec(ctx); err != nil {
+			b.Fatalf("pipe fialed: %v", err)
+		}
+
+		followByNode := make([][]string, 0, size)
+		for _, cmd := range cmds {
+			followByNode = append(followByNode, cmd.Val())
+		}
+	}
+}
+
+func BenchmarkHMGETPipe(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	keys := make([]string, 0, 10000)
+	for i := 0; i < 10000; i++ {
+		keys = append(keys, redistore.KeyWalksVisiting(uint32(i)))
+	}
+
+	pipe := cl.Pipeline()
+	strIDsByNode := make([][]string, 0, 10000)
+	cmds := make([]*redis.StringSliceCmd, 0, 10000)
+	for _, key := range keys {
+		cmds = append(cmds, pipe.SMembers(ctx, key))
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		b.Fatalf("pipelin failed: expected nil, got %v", err)
+	}
+
+	for _, cmd := range cmds {
+		strIDs := cmd.Val()
+		strIDsByNode = append(strIDsByNode, strIDs)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pipeH := cl.Pipeline()
+		walksByNode := make([][]interface{}, 0, 10000)
+		cmdsH := make([]*redis.SliceCmd, 0, 10000)
+		for _, strIDs := range strIDsByNode {
+			cmdsH = append(cmdsH, pipe.HMGet(ctx, redistore.KeyWalks, strIDs...))
+		}
+
+		if _, err := pipeH.Exec(ctx); err != nil {
+			b.Fatalf("second pipeline failed: expected nil, got %v", err)
+		}
+
+		for _, cmd := range cmdsH {
+			walks := cmd.Val()
+			walksByNode = append(walksByNode, walks)
+		}
+	}
+}
+
+func BenchmarkCompletePipe(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	keys := make([]string, 0, 100)
+	for i := 0; i < 100; i++ {
+		keys = append(keys, redistore.KeyWalksVisiting(uint32(i)))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pipe := cl.Pipeline()
+		strIDsByNode := make([][]string, 0, 100)
+		cmds := make([]*redis.StringSliceCmd, 0, 100)
+		for _, key := range keys {
+			cmds = append(cmds, pipe.SMembers(ctx, key))
+		}
+
+		if _, err := pipe.Exec(ctx); err != nil {
+			b.Fatalf("pipelin failed: expected nil, got %v", err)
+		}
+
+		for _, cmd := range cmds {
+			strIDs := cmd.Val()
+			strIDsByNode = append(strIDsByNode, strIDs)
+		}
+
+		pipeH := cl.Pipeline()
+		walksByNode := make([][]interface{}, 0, 100)
+		cmdsH := make([]*redis.SliceCmd, 0, 100)
+		for _, strIDs := range strIDsByNode {
+			cmdsH = append(cmdsH, pipe.HMGet(ctx, redistore.KeyWalks, strIDs...))
+		}
+
+		if _, err := pipeH.Exec(ctx); err != nil {
+			b.Fatalf("second pipeline failed: expected nil, got %v", err)
+		}
+
+		for _, cmd := range cmdsH {
+			walks := cmd.Val()
+			walksByNode = append(walksByNode, walks)
+		}
+	}
+}
+
+func BenchmarkHMGET(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	keys := make([]string, 0, 100)
+	for i := 0; i < 100; i++ {
+		keys = append(keys, redistore.KeyWalksVisiting(uint32(i)))
+	}
+
+	strIDs, err := cl.SUnion(ctx, keys...).Result()
+	if err != nil {
+		b.Fatalf("SMembers failed: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := cl.HMGet(ctx, redistore.KeyWalks, strIDs...).Result(); err != nil {
+			b.Fatalf("HMGET(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkSUNION(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	keys := make([]string, 0, 100)
+	for i := 0; i < 100; i++ {
+		keys = append(keys, redistore.KeyWalksVisiting(uint32(i)))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := cl.SUnion(ctx, keys...).Result(); err != nil {
+			b.Fatalf("SUnion(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkSUNION2(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	follows, err := cl.SMembers(ctx, redisdb.KeyFollows(0)).Result()
+	if err != nil {
+		b.Fatalf("SMembers() benchmark failed: %v", err)
+	}
+
+	keys := make([]string, 0, len(follows))
+	for _, ID := range follows {
+		keys = append(keys, fmt.Sprintf("walksVisiting:%v", ID))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := cl.SUnion(ctx, keys...).Result(); err != nil {
+			b.Fatalf("SUnion(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkAllWalks(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := RWS.AllWalks(ctx, 2); err != nil {
+			b.Fatalf("Personalized(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkSteps(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+	DB, err := redisdb.NewDatabase(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		if _, err := DB.Follows(ctx, 0); err != nil {
+			b.Fatalf("Follows(): benchmark failed: %v", err)
+		}
+	}
 }
 
 func BenchmarkPersonalized(b *testing.B) {

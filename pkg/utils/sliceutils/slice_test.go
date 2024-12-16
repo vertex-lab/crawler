@@ -287,48 +287,40 @@ func TestSortWalks(t *testing.T) {
 // ---------------------------------BENCHMARKS---------------------------------
 
 func BenchmarkDifference(b *testing.B) {
-
-	size := int32(1000)
-	slice1 := make([]uint32, size)
-	slice2 := make([]uint32, size)
+	const size int32 = 1000000
+	slice1 := make([]uint32, 0, size)
+	slice2 := make([]uint32, 0, size)
 
 	// setup up the two slices
 	for i := int32(0); i < size; i++ {
-
 		element1 := uint32(rand.Int31n(size * 2))
 		element2 := uint32(rand.Int31n(size * 2))
-
 		slice1 = append(slice1, element1)
 		slice2 = append(slice2, element2)
 	}
 
 	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
 		Difference(slice1, slice2)
 	}
 }
 
 func BenchmarkPartition(b *testing.B) {
+	const size int32 = 1000000
+	slice1 := make([]uint32, 0, size)
+	slice2 := make([]uint32, 0, size)
 
-	size := int32(1000)
-	oldSlice := make([]uint32, size)
-	newSlice := make([]uint32, size)
-
-	// setup old and current IDs
+	// setup up the two slices
 	for i := int32(0); i < size; i++ {
-
-		old := uint32(rand.Int31n(size * 2))
-		new := uint32(rand.Int31n(size * 2))
-
-		oldSlice = append(oldSlice, old)
-		newSlice = append(newSlice, new)
+		element1 := uint32(rand.Int31n(size * 2))
+		element2 := uint32(rand.Int31n(size * 2))
+		slice1 = append(slice1, element1)
+		slice2 = append(slice2, element2)
 	}
 
 	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
-		Partition(oldSlice, newSlice)
+		Partition(slice1, slice2)
 	}
 }
 

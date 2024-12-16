@@ -336,52 +336,50 @@ func TestNodeByID(t *testing.T) {
 
 func TestFollows(t *testing.T) {
 	testCases := []struct {
-		name          string
-		DBType        string
-		expectedError error
-		expectedSlice []uint32
+		name            string
+		DBType          string
+		nodeIDs         []uint32
+		expectedError   error
+		expectedFollows [][]uint32
 	}{
 		{
 			name:          "nil DB",
 			DBType:        "nil",
+			nodeIDs:       []uint32{0},
 			expectedError: models.ErrNilDBPointer,
 		},
 		{
 			name:          "empty DB",
 			DBType:        "empty",
+			nodeIDs:       []uint32{0},
 			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
-			name:          "DB with node 0",
+			name:          "node not found",
 			DBType:        "one-node0",
+			nodeIDs:       []uint32{1},
 			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
-			name:          "DB with node 1",
-			DBType:        "one-node1",
-			expectedError: nil,
-			expectedSlice: []uint32{1},
+			name:            "valid",
+			DBType:          "triangle",
+			nodeIDs:         []uint32{0, 1},
+			expectedError:   nil,
+			expectedFollows: [][]uint32{{1}, {2}},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			DB := SetupDB(test.DBType)
-			succ, err := DB.Follows(context.Background(), 1)
+			follows, err := DB.Follows(context.Background(), test.nodeIDs...)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Follows(1): expected %v, got %v", test.expectedError, err)
 			}
 
-			// if provided, check that the expected result is equal to the result
-			if test.expectedSlice != nil {
-				if succ == nil {
-					t.Errorf("Follows(1): expected %v, got nil", test.expectedSlice)
-				}
-
-				if !reflect.DeepEqual(succ, test.expectedSlice) {
-					t.Errorf("Follows(1): expected %v, got %v", test.expectedSlice, succ)
-				}
+			if !reflect.DeepEqual(follows, test.expectedFollows) {
+				t.Errorf("Follows(1): expected %v, got %v", test.expectedFollows, follows)
 			}
 		})
 	}

@@ -29,13 +29,11 @@ func main() {
 	defer cancel()
 
 	cl := redisutils.SetupClient()
-	//defer redisutils.CleanupRedis(cl)
-
-	DB, err := redisdb.SetupDB(cl, "fran-pip")
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		panic(err)
 	}
-	RWS, err := redistore.NewRWS(context.Background(), cl, 0.85, 1)
+	RWS, err := redistore.NewRWSConnection(context.Background(), cl)
 	if err != nil {
 		panic(err)
 	}

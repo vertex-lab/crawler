@@ -45,12 +45,11 @@ func PersonalizedPagerank(
 	pubkey string, // this is the hex
 	topK uint16) (map[string]float64, error) {
 
-	// Create new DB and RWS connections; Names are bad, I know... I will change them
-	DB, err := redisdb.NewDatabase(ctx, cl)
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		return map[string]float64{}, err
 	}
-	RWS, err := redistore.LoadRWS(ctx, cl)
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
 	if err != nil {
 		return map[string]float64{}, err
 	}

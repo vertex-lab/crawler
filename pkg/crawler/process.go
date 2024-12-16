@@ -105,7 +105,7 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	removed, common, added := sliceutils.Partition(oldFollows, newFollows)
+	removed, common, added := sliceutils.Partition(oldFollows[0], newFollows)
 
 	authorNodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
@@ -276,7 +276,7 @@ func ArbiterScan(
 	threshold float64,
 	queueHandler func(pk string) error) error {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*60)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*100)
 	defer cancel()
 
 	var cursor uint64 = 0
@@ -337,7 +337,7 @@ func PromoteNode(
 	nodeID uint32) error {
 
 	if err := RWM.Generate(ctx, DB, nodeID); err != nil {
-		return err
+		return fmt.Errorf("Generate(): %v", err)
 	}
 
 	nodeDiff := models.NodeDiff{
@@ -347,7 +347,7 @@ func PromoteNode(
 	}
 
 	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
-		return err
+		return fmt.Errorf("UpdateNode(): %v", err)
 	}
 
 	return nil

@@ -169,18 +169,24 @@ func (DB *Database) NodeByID(ctx context.Context, nodeID uint32) (*models.NodeMe
 	return &node.Metadata, nil
 }
 
-// Follows() returns the slice of successors of nodeID.
-func (DB *Database) Follows(ctx context.Context, nodeID uint32) ([]uint32, error) {
+// Follows() returns the slice of successors of all nodeIDs
+func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
 	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
-	node, exists := DB.NodeIndex[nodeID]
-	if !exists {
-		return nil, models.ErrNodeNotFoundDB
+	followSlice := make([][]uint32, 0, len(nodeIDs))
+	for _, ID := range nodeIDs {
+		node, exists := DB.NodeIndex[ID]
+		if !exists {
+			return nil, models.ErrNodeNotFoundDB
+		}
+
+		followSlice = append(followSlice, node.Follows)
 	}
-	return node.Follows, nil
+
+	return followSlice, nil
 }
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.

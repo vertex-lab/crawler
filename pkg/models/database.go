@@ -82,8 +82,8 @@ type Database interface {
 	// UpdateNode() updates the nodeID using the new values inside node.
 	UpdateNode(ctx context.Context, nodeID uint32, nodeDiff *NodeDiff) error
 
-	// Follows() returns a slice that contains the IDs of all successors of a node
-	Follows(ctx context.Context, nodeID uint32) ([]uint32, error)
+	// Follows() returns a slice that contains the follows each of the nodeIDs.
+	Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error)
 
 	// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 	// If a pubkey is not found, nil is returned

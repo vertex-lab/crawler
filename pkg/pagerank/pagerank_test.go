@@ -275,3 +275,30 @@ func BenchmarkPagerankRedis(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkPagerank(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+	pipe := cl.Pipeline()
+
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		nodeIDs, err := DB.AllNodes(ctx)
+		if err != nil {
+			b.Fatalf("AllNodes(): expected nil, got %v", err)
+		}
+
+		for _, nodeID := range nodeIDs[:1000] {
+			pipe.HGet(ctx, redisdb.KeyNode(nodeID), models.KeyPagerank)
+		}
+
+		if _, err := pipe.Exec(ctx); err != nil {
+			b.Fatalf("Pipeline failed: %v", err)
+		}
+	}
+}

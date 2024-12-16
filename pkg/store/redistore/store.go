@@ -73,8 +73,8 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 	return RWS, nil
 }
 
-// LoadRWS() loads the instance of RandomWalkStore using the provided Redis client
-func LoadRWS(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
+// NewRWSConnection() loads the instance of RandomWalkStore using the provided Redis client
+func NewRWSConnection(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 
 	if cl == nil {
 		return nil, models.ErrNilClientPointer
@@ -195,6 +195,55 @@ func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) (
 	}
 
 	return visitMap, nil
+}
+
+// AllWalks() returns a map of walks by walksID that visit nodeID.
+func (RWS *RandomWalkStore) AllWalks(ctx context.Context, nodeID uint32) (map[uint32]models.RandomWalk, error) {
+
+	if err := RWS.Validate(); err != nil {
+		return nil, err
+	}
+
+	strIDs, err := RWS.client.SMembers(ctx, KeyWalksVisiting(nodeID)).Result()
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	if len(strIDs) == 0 {
+		return map[uint32]models.RandomWalk{}, models.ErrNodeNotFoundRWS
+	}
+
+	walkIDs, err := redisutils.ParseIDs(strIDs)
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	res, err := RWS.client.HMGet(ctx, KeyWalks, strIDs...).Result()
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	strWalks := make([]string, 0, len(res))
+	for _, r := range res {
+		strWalk, ok := r.(string)
+		if !ok {
+			return map[uint32]models.RandomWalk{}, fmt.Errorf("unexpected type: %v", res)
+		}
+
+		strWalks = append(strWalks, strWalk)
+	}
+
+	walks, err := redisutils.ParseWalks(strWalks)
+	if err != nil {
+		return map[uint32]models.RandomWalk{}, err
+	}
+
+	walkMap := make(map[uint32]models.RandomWalk, len(walkIDs))
+	for i, walkID := range walkIDs {
+		walkMap[walkID] = walks[i]
+	}
+
+	return walkMap, nil
 }
 
 // Walks() returns a map of walks by walksID that visit nodeID.

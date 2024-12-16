@@ -148,7 +148,7 @@ func generateWalk(
 			return nil, err
 		}
 
-		currentNodeID, shouldBreak = WalkStep(successorIDs, walk, rng)
+		currentNodeID, shouldBreak = WalkStep(successorIDs[0], walk, rng)
 		if shouldBreak {
 			break
 		}

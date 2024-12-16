@@ -7,6 +7,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
+	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
@@ -138,6 +139,31 @@ func TestWalks(t *testing.T) {
 	for key, cmd := range cmds {
 		if !cmd.Val() {
 			t.Errorf("expected true, got %v: %v", cmd.Val(), key)
+		}
+	}
+}
+
+// ------------------------------------BENCHMARKS-------------------------------
+
+func BenchmarkPersonalizedPagerank(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	// Create new DB and RWS connections; Names are bad, I know... I will change them
+	DB, err := redisdb.NewDatabase(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
+	}
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := pagerank.Personalized(ctx, DB, RWS, 0, 100)
+		if err != nil {
+			b.Fatalf("Personalized(): benchmark failed: %v", err)
 		}
 	}
 }

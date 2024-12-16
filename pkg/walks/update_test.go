@@ -414,7 +414,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
 			oldFollows, _ := DB.Follows(ctx, nodeID)
 			currentFollows := make([]uint32, len(oldFollows))
-			copy(currentFollows, oldFollows)
+			copy(currentFollows, oldFollows[0])
 
 			// add 10% new nodes
 			for i := 0; i < edgesPerNode/10; i++ {
@@ -463,7 +463,7 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 			oldFollows, _ := DB.Follows(ctx, nodeID)
 
 			// remove 10% of the nodes
-			removedMap[nodeID] = oldFollows[edgesPerNode/10:]
+			removedMap[nodeID] = oldFollows[0][edgesPerNode/10:]
 		}
 
 		b.ResetTimer()

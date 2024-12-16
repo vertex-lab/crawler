@@ -11,10 +11,61 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
+// PersonalizedWalk struct encapsulates data around the personalized walk, which is
+// a type of random walk that resets to a specified node.
+type PersonalizedWalk struct {
+	// The ID of the node where the personalized walk starts and resets to
+	startID uint32
+
+	// The ID of the node that was last visited by the walk
+	currentID uint32
+
+	// The slice of nodeIDs that have been visited in the current walk, needed for cycle checks.
+	current models.RandomWalk
+
+	// The slice containing all node IDs of the personalized walk. It's the sum of all current walks.
+	all models.RandomWalk
+}
+
+// initialize a new personalized walk with a specified targetLenght
+func NewPersonalizedWalk(nodeID uint32, targetLength int) *PersonalizedWalk {
+	return &PersonalizedWalk{
+		startID:   nodeID,
+		currentID: nodeID,
+		current:   models.RandomWalk{nodeID},
+		all:       make(models.RandomWalk, 0, targetLength),
+	}
+}
+
+// Reached() returns whether the personalized walk is long enough
+func (p *PersonalizedWalk) Reached(targetLength int) bool {
+	return len(p.all) >= targetLength
+}
+
+// Reset() appends the current walk and goes back to the starting node
+func (p *PersonalizedWalk) Reset() {
+	p.all = append(p.all, p.current...)
+	p.currentID = p.startID
+	p.current = models.RandomWalk{p.startID}
+}
+
+// Move() appends nextID and moves there
+func (p *PersonalizedWalk) Move(nextID uint32) {
+	p.current = append(p.current, nextID)
+	p.currentID = nextID
+}
+
+// Append() removed potential cycles from the walk, appends it to the personalized walks and resets
+func (p *PersonalizedWalk) Append(walk models.RandomWalk) {
+	walk = sliceutils.TrimCycles(p.current, walk)
+	p.current = append(p.current, walk...)
+	p.Reset()
+}
+
 /*
-computes the personalized pagerank of nodeID by simulating a long random walk starting at
-and resetting to itself. This long walk is generated from the
-random walks stored in the RandomWalkStore.
+Personalized() computes the personalized pagerank of nodeID by simulating a
+long random walk starting at and resetting to itself. This long walk is generated
+from the random walks stored in the RandomWalkStore.
 
 # INPUTS
 
@@ -22,7 +73,7 @@ random walks stored in the RandomWalkStore.
 	The interface of the graph database
 
 	> RWS models.RandomWalkStore
-	The interface of the store.
+	The interface of the store where random walks are stored.
 
 	> nodeID uint32
 	The ID of the node we are going to compute the personalized pagerank
@@ -52,7 +103,7 @@ func Personalized(
 	return personalized(ctx, DB, RWS, nodeID, topK, rng)
 }
 
-// personalized() implements the internal logic of the Personalized Pagerank function
+// The personalized() function implements the internal logic of the Personalized Pagerank algorithm
 func personalized(
 	ctx context.Context,
 	DB models.Database,
@@ -61,190 +112,125 @@ func personalized(
 	topK uint16,
 	rng *rand.Rand) (models.PagerankMap, error) {
 
-	succ, err := DB.Follows(ctx, nodeID)
+	followSlice, err := DB.Follows(ctx, nodeID)
+	follows := followSlice[0]
 	if err != nil {
 		return nil, err
 	}
 
-	// if it's a dandling node, return this special-case distribution
-	if len(succ) == 0 {
+	// if it's a dandling node, return this special case distribution
+	if len(follows) == 0 {
 		return models.PagerankMap{nodeID: 1.0}, nil
 	}
 
-	pWalk, err := personalizedWalk(ctx, DB, RWS, nodeID, requiredLenght(topK), rng)
+	FC := NewFollowCache(DB, len(follows))
+	FC.follows[nodeID] = follows
+	if err := FC.Load(ctx, follows...); err != nil {
+		return nil, err
+	}
+
+	lenght := requiredLenght(topK)
+	alpha := RWS.Alpha(ctx)
+	WC := NewWalkCache(walksNeeded(lenght, alpha))
+	if err := WC.Load(ctx, RWS, follows...); err != nil {
+		return nil, err
+	}
+
+	walk, err := personalizedWalk(ctx, FC, WC, nodeID, lenght, alpha, rng)
 	if err != nil {
 		return nil, err
 	}
 
-	return countAndNormalize(pWalk), nil
-	// TODO: SEND ONLY TARGET NODES
+	return countAndNormalize(walk), nil
 }
 
-/*
-encapsulates the data around the personalized walk.
-
-# FIELDS
-
-	> startingNodeID: uint32
-	The ID of the node where the personalized walk starts and resets to
-
-	> currentNodeID: uint32
-	The ID of the node that was last visited by the walk
-
-	> currentWalk: []uint32
-	The slice of node IDs that have been visited in the current walk. The current walk
-	is needed to check for cycles.
-
-	> walk: []uint32
-	The slice containing all node IDs of the personalized walk.
-	It's the sum of all current walks.
-*/
-type PersonalizedWalk struct {
-	startingNodeID uint32
-	currentNodeID  uint32
-	currentWalk    models.RandomWalk
-	walk           models.RandomWalk
-}
-
-// initialize a new personalized walk with a specified targetLenght
-func NewPersonalizedWalk(nodeID uint32, targetLength int) *PersonalizedWalk {
-	return &PersonalizedWalk{
-		startingNodeID: nodeID,
-		currentNodeID:  nodeID,
-		currentWalk:    models.RandomWalk{nodeID},
-		walk:           make(models.RandomWalk, 0, targetLength),
-	}
-}
-
-// returns whether the personalized walk is long enough
-func (p *PersonalizedWalk) Reached(targetLength int) bool {
-	return len(p.walk) >= targetLength
-}
-
-// appends the current walk and goes back to the starting node
-func (p *PersonalizedWalk) Reset() {
-	p.walk = append(p.walk, p.currentWalk...)
-	p.currentNodeID = p.startingNodeID
-	p.currentWalk = models.RandomWalk{p.startingNodeID}
-}
-
-// appends nextNodeID and moves there
-func (p *PersonalizedWalk) AppendNode(nextNodeID uint32) {
-	p.currentWalk = append(p.currentWalk, nextNodeID)
-	p.currentNodeID = nextNodeID
-}
-
-// removed potential cycles from the walkSegment, appends it to the personalized walks and resets
-func (p *PersonalizedWalk) AppendWalk(walkSegment models.RandomWalk) {
-
-	// remove potential cycles
-	walkSegment = sliceutils.TrimCycles(p.currentWalk, walkSegment)
-
-	// append
-	p.currentWalk = append(p.currentWalk, walkSegment...)
-	p.walk = append(p.walk, p.currentWalk...)
-
-	// reset
-	p.currentNodeID = p.startingNodeID
-	p.currentWalk = models.RandomWalk{p.startingNodeID}
-}
-
-/*
-simulates a long personalized random walkSegment starting from nodeID with reset to itself.
-This personalized walkSegment is generated using the random walks stored in the in the RandomWalkManager.
-
-To avoid the overhead of continually fetching walks from the RWS, the requests
-are batched and the walks are stored in the WalkCache struct.
-*/
+// The personalizedWalk() function simulates a long personalized random walk
+// starting from nodeID with reset to itself. Whenever possible, walks from the
+// WalkCache are used to speed up the computation.
 func personalizedWalk(
 	ctx context.Context,
-	DB models.Database,
-	RWS models.RandomWalkStore,
+	FC *FollowCache,
+	WC *WalkCache,
 	nodeID uint32,
 	targetLength int,
+	alpha float32,
 	rng *rand.Rand) (models.RandomWalk, error) {
 
-	WC := NewWalkCache()
-	pWalk := NewPersonalizedWalk(nodeID, targetLength)
-	alpha := RWS.Alpha(ctx)
-	estimateWalksToBeLoaded := estimateWalksNum(targetLength, alpha)
-
-	if err := WC.Load(ctx, RWS, nodeID, estimateWalksToBeLoaded); err != nil {
-		return nil, err
-	}
+	walk := NewPersonalizedWalk(nodeID, targetLength)
 
 	for {
-		if pWalk.Reached(targetLength) {
-			return pWalk.walk, nil
+		if walk.Reached(targetLength) {
+			break
 		}
 
 		if rng.Float32() > alpha {
-			pWalk.Reset()
+			walk.Reset()
 			continue
 		}
 
-		// if there are no walks, load them
-		if !WC.ContainsNode(pWalk.currentNodeID) {
-			if err := WC.Load(ctx, RWS, pWalk.currentNodeID, 1000); err != nil {
-				return nil, err
-			}
-		}
-
-		// if all walks have been used, do a walk step
-		if WC.FullyUsed(pWalk.currentNodeID) {
-
-			successorIDs, err := DB.Follows(ctx, pWalk.currentNodeID)
+		nextWalk, exists := WC.Next(walk.currentID)
+		if !exists {
+			// perform a walk step
+			follows, err := FC.Follows(ctx, walk.currentID)
 			if err != nil {
 				return nil, err
 			}
 
-			// perform a walk step
-			nextNodeID, shouldStop := walks.WalkStep(successorIDs, pWalk.currentWalk, rng)
+			nextID, shouldStop := walks.WalkStep(follows, walk.current, rng)
 			if shouldStop {
-				pWalk.Reset()
+				walk.Reset()
 				continue
 			}
 
-			pWalk.AppendNode(nextNodeID)
+			walk.Move(nextID)
 			continue
 		}
 
-		// else, get the next walk
-		walkSegment, err := WC.NextWalk(pWalk.currentNodeID)
+		nextWalk, err := CropWalk(nextWalk, walk.currentID)
 		if err != nil {
 			return nil, err
 		}
-
-		pWalk.AppendWalk(walkSegment)
-		continue
+		walk.Append(nextWalk)
 	}
+
+	return walk.all, nil
 }
 
-// count the number of times each node is visited in the pWalk and computes their frequencies.
-// Returns an empty map if pWalk is nil or empty.
-func countAndNormalize(pWalk models.RandomWalk) models.PagerankMap {
-
-	// count the frequency of each nodeID
-	pp := make(models.PagerankMap, (len(pWalk)))
-	for _, node := range pWalk {
-		pp[node]++
+// count the number of times each node is visited in the walk and computes their frequencies.
+// Returns an empty map if walk is nil or empty.
+func countAndNormalize(walk models.RandomWalk) models.PagerankMap {
+	lenght := len(walk)
+	if lenght == 0 {
+		return models.PagerankMap{}
 	}
 
-	// normalize
-	totalVisits := float64(len(pWalk))
-	for node, visits := range pp {
-		pp[node] = visits / totalVisits
+	freq := 1.0 / float64(lenght)
+	pp := make(models.PagerankMap, lenght/100)
+	for _, node := range walk {
+		pp[node] += freq
 	}
 
 	return pp
 }
 
-func estimateWalksNum(lenght int, alpha float32) int {
+// returns the walk from nodeID onward (excluded). If nodeID is not found, returns an error
+func CropWalk(walk models.RandomWalk, nodeID uint32) (models.RandomWalk, error) {
+	for i, ID := range walk {
+		if ID == nodeID {
+			return walk[i+1:], nil
+		}
+	}
+	return nil, ErrNodeNotInWalk
+}
+
+// The function walksNeeded() estimates the number of walks needed to reach the
+// target lenght. It uses the fact that, on average, walks are 1/(1-alpha) long.
+func walksNeeded(lenght int, alpha float32) int {
 	return int(float32(lenght) / (1 - alpha))
 }
 
-// returns the required lenght of the walkSegment for the Personalized pagerank.
-// the result has to be strictly positive
+// The function requiredLenght() returns the lenght that the personalized walk
+// has to reach for the Personalized Pagerank to achieve the specified precision.
 func requiredLenght(topK uint16) int {
 	_ = topK
 	return 300000
@@ -275,17 +261,16 @@ func checkInputs(DB models.Database, RWS models.RandomWalkStore,
 
 // function that set up a PersonalizedWalk based on the provided type and required lenght
 func SetupPWalk(pWalkType string, targetLenght int) *PersonalizedWalk {
-
 	switch pWalkType {
 
 	case "one-node0":
 		return NewPersonalizedWalk(0, targetLenght)
 
 	case "triangle":
-		pWalk := NewPersonalizedWalk(0, targetLenght)
-		pWalk.currentNodeID = 2
-		pWalk.currentWalk = []uint32{0, 1, 2}
-		return pWalk
+		walk := NewPersonalizedWalk(0, targetLenght)
+		walk.currentID = 2
+		walk.current = []uint32{0, 1, 2}
+		return walk
 
 	default:
 		return NewPersonalizedWalk(0, targetLenght)

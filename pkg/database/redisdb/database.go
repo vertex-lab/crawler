@@ -34,6 +34,10 @@ type DatabaseFields struct {
 	// more fields coming in the future
 }
 
+func NewDatabaseConnection(ctx context.Context, cl *redis.Client) (*Database, error) {
+	return &Database{client: cl}, nil
+}
+
 // NewDatabase() creates and returns a new Database instance.
 func NewDatabase(ctx context.Context, cl *redis.Client) (*Database, error) {
 	if cl == nil {
@@ -250,28 +254,58 @@ func (DB *Database) ContainsNode(ctx context.Context, nodeID uint32) bool {
 	return exists == 1
 }
 
-// Follows() returns a slice that contains the IDs of all successors of a node
-func (DB *Database) Follows(ctx context.Context, nodeID uint32) ([]uint32, error) {
+// Follows() returns a slice containing the follows of each of the specified nodeIDs.
+func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
-	strFollows, err := DB.client.SMembers(ctx, KeyFollows(nodeID)).Result()
-	if err != nil {
+	pipe := DB.client.Pipeline()
+	cmds := make([]*redis.StringSliceCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = DB.client.SMembers(ctx, KeyFollows(ID))
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
 		return nil, err
 	}
 
-	successors := make([]uint32, 0, len(strFollows))
-	for _, ID := range strFollows {
-		succ, err := redisutils.ParseID(ID)
+	var keys []string
+	followSlice := make([][]uint32, 0, len(nodeIDs))
+	for i, cmd := range cmds {
+
+		strFollows := cmd.Val()
+		if len(strFollows) == 0 { // empty slice might mean node not found.
+			keys = append(keys, KeyFollows(nodeIDs[i]))
+			continue
+		}
+
+		follows := make([]uint32, 0, len(strFollows))
+		for _, strID := range strFollows {
+			ID, err := redisutils.ParseID(strID)
+			if err != nil {
+				return nil, err
+			}
+
+			follows = append(follows, ID)
+		}
+		followSlice = append(followSlice, follows)
+	}
+
+	// check if some of the dandling nodes where in reality not found in the DB
+	if len(keys) > 0 {
+		countExists, err := DB.client.Exists(ctx, keys...).Result()
 		if err != nil {
 			return nil, err
 		}
 
-		successors = append(successors, succ)
+		if int(countExists) < len(keys) {
+			return nil, fmt.Errorf("%w: some of these nodeIDs :%v", models.ErrNodeNotFoundDB, keys)
+		}
 	}
-	return successors, nil
+
+	return followSlice, nil
 }
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
@@ -642,18 +676,21 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 		nodes := []*models.Node{
 			{
 				Metadata: models.NodeMeta{
+					ID:     0,
 					Pubkey: "zero",
 				},
 				Follows: []uint32{1},
 			},
 			{
 				Metadata: models.NodeMeta{
+					ID:     1,
 					Pubkey: "one",
 				},
 				Follows: []uint32{2},
 			},
 			{
 				Metadata: models.NodeMeta{
+					ID:     2,
 					Pubkey: "two",
 				},
 				Follows: []uint32{0},
