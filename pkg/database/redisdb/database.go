@@ -271,13 +271,13 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 		return nil, err
 	}
 
-	var keys []string
+	var potentialMissingKeys []string
 	followSlice := make([][]uint32, 0, len(nodeIDs))
 	for i, cmd := range cmds {
 
 		strFollows := cmd.Val()
 		if len(strFollows) == 0 { // empty slice might mean node not found.
-			keys = append(keys, KeyFollows(nodeIDs[i]))
+			potentialMissingKeys = append(potentialMissingKeys, KeyNode(nodeIDs[i]))
 			continue
 		}
 
@@ -294,14 +294,14 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 	}
 
 	// check if some of the dandling nodes where in reality not found in the DB
-	if len(keys) > 0 {
-		countExists, err := DB.client.Exists(ctx, keys...).Result()
+	if len(potentialMissingKeys) > 0 {
+		countExists, err := DB.client.Exists(ctx, potentialMissingKeys...).Result()
 		if err != nil {
 			return nil, err
 		}
 
-		if int(countExists) < len(keys) {
-			return nil, fmt.Errorf("%w: some of these nodeIDs :%v", models.ErrNodeNotFoundDB, keys)
+		if int(countExists) < len(potentialMissingKeys) {
+			return nil, fmt.Errorf("%w: some of these nodeIDs :%v", models.ErrNodeNotFoundDB, potentialMissingKeys)
 		}
 	}
 

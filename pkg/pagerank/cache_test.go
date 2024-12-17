@@ -323,21 +323,16 @@ func TestCropWalk(t *testing.T) {
 
 // ---------------------------------BENCHMARKS---------------------------------
 
-// func BenchmarkNextWalk(b *testing.B) {
-// 	ctx := context.Background()
-// 	RWS := mockstore.SetupRWS("triangle")
-// 	WC := NewWalkCache()
-// 	WC.Load(ctx, RWS, 0, 10)
+func BenchmarkWCLoad(b *testing.B) {
+	ctx := context.Background()
+	RWS := mockstore.SetupRWS("triangle")
 
-// 	b.ResetTimer()
-// 	for i := 0; i < b.N; i++ {
-// 		if _, err := WC.NextWalk(0); err != nil {
-// 			b.Fatalf("Benchmark NextWalk(0) failed: %v", err)
-// 		}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		WC := NewWalkCache(1)
 
-// 		// reset the index to avoid the error
-// 		if (i+1)%2 == 0 {
-// 			WC.NodeWalkIndex[0] = 0
-// 		}
-// 	}
-// }
+		if err := WC.Load(ctx, RWS, 0, 1, 2); err != nil {
+			b.Fatalf("Benchmark NextWalk(0) failed: %v", err)
+		}
+	}
+}

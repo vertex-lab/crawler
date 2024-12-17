@@ -678,8 +678,10 @@ func BenchmarkSUNION2(b *testing.B) {
 
 func BenchmarkSteps(b *testing.B) {
 	cl := redisutils.SetupClient()
+	defer redisutils.CleanupRedis(cl)
+
 	ctx := context.Background()
-	DB, err := redisdb.NewDatabase(ctx, cl)
+	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
 		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
 	}
