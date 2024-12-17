@@ -61,26 +61,20 @@ func (FC *FollowCache) Load(ctx context.Context, nodeIDs ...uint32) error {
 	return nil
 }
 
-// The NodeState contains:
-// - positions: for each pos in positions, walks[pos] is a walk that visited nodeID
-// - lastIndex: the index of the last position used. When lastIndex >= len(positions)
-// all walks have been used for nodeID.
-type NodeState struct {
-	positions []int
-	lastIndex int
-}
-
-// The WalkCache contains a slice of walks, and keeps track of which node was
-// visited by which walks.
+// The WalkCache stores a slice of walks and keeps track of which node was
+// visited by which walk.
 type WalkCache struct {
-	walks  []models.RandomWalk
-	states map[uint32]*NodeState
+	// a slice of random walks
+	walks []models.RandomWalk
+
+	// a map nodeID --> positions; for each pos in positions, walks[pos] visits nodeID
+	positions map[uint32][]int
 }
 
 func NewWalkCache(size int) *WalkCache {
 	return &WalkCache{
-		walks:  make([]models.RandomWalk, 0, size),
-		states: make(map[uint32]*NodeState, size),
+		walks:     make([]models.RandomWalk, 0, size),
+		positions: make(map[uint32][]int),
 	}
 }
 
@@ -90,24 +84,28 @@ func (WC *WalkCache) Next(nodeID uint32) (models.RandomWalk, bool) {
 		return nil, false
 	}
 
-	state, exists := WC.states[nodeID]
+	positions, exists := WC.positions[nodeID]
 	if !exists {
 		return nil, false
 	}
 
-	for i, pos := range state.positions[state.lastIndex:] {
+	if len(positions) == 0 {
+		return nil, false
+	}
+
+	for i, pos := range positions {
 		if len(WC.walks[pos]) == 0 {
 			continue
 		}
 
 		walk := WC.walks[pos]
 		WC.walks[pos] = nil // zeroing the walk, so it can't be reused by other nodes
-
-		state.lastIndex = i
-		WC.states[nodeID] = state
+		WC.positions[nodeID] = positions[i+1:]
 		return walk, true
 	}
 
+	// all walks where nil, hence zero the positions
+	WC.positions[nodeID] = []int{}
 	return nil, false
 }
 
@@ -123,10 +121,7 @@ func (WC *WalkCache) Load(ctx context.Context, RWS models.RandomWalkStore, nodeI
 
 	WC.walks = make([]models.RandomWalk, len(walkMap))
 	for _, ID := range nodeIDs {
-		WC.states[ID] = &NodeState{
-			positions: []int{},
-			lastIndex: 0,
-		}
+		WC.positions[ID] = make([]int, 0, RWS.WalksPerNode(ctx))
 	}
 
 	var pos int
@@ -136,17 +131,12 @@ func (WC *WalkCache) Load(ctx context.Context, RWS models.RandomWalkStore, nodeI
 		// add the position of the walk in walks to each node visited by it,
 		// excluding the last one (which will be cropped out anyway)
 		for _, ID := range walk[:len(walk)-1] {
-			state, exists := WC.states[ID]
+			positions, exists := WC.positions[ID]
 			if !exists {
-				state = &NodeState{
-					positions: []int{},
-					lastIndex: 0,
-				}
-
-				WC.states[ID] = state
+				WC.positions[ID] = []int{}
 			}
 
-			WC.states[ID].positions = append(state.positions, pos)
+			WC.positions[ID] = append(positions, pos)
 		}
 
 		pos++
@@ -187,29 +177,20 @@ func SetupWC(WCType string) *WalkCache {
 	case "one-node0":
 		WC := NewWalkCache(1)
 		WC.walks = []models.RandomWalk{{0}}
-		WC.states[0] = &NodeState{
-			positions: []int{0},
-			lastIndex: 0,
-		}
+		WC.positions[0] = []int{0}
 		return WC
 
 	case "all-used":
 		WC := NewWalkCache(1)
 		WC.walks = []models.RandomWalk{nil}
-		WC.states[0] = &NodeState{
-			positions: []int{0},
-			lastIndex: 0,
-		}
+		WC.positions[0] = []int{}
 		return WC
 
 	case "triangle":
 		WC := NewWalkCache(3)
 		WC.walks = []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
 		for ID := uint32(0); ID < 3; ID++ {
-			WC.states[ID] = &NodeState{
-				positions: []int{0, 1, 2},
-				lastIndex: 0,
-			}
+			WC.positions[ID] = []int{0, 1, 2}
 		}
 		return WC
 

@@ -28,11 +28,11 @@ type PersonalizedWalk struct {
 }
 
 // initialize a new personalized walk with a specified targetLenght
-func NewPersonalizedWalk(nodeID uint32, targetLength int) *PersonalizedWalk {
+func NewPersonalizedWalk(startID uint32, targetLength int) *PersonalizedWalk {
 	return &PersonalizedWalk{
-		startID:   nodeID,
-		currentID: nodeID,
-		current:   models.RandomWalk{nodeID},
+		startID:   startID,
+		currentID: startID,
+		current:   models.RandomWalk{startID},
 		all:       make(models.RandomWalk, 0, targetLength),
 	}
 }

@@ -846,8 +846,8 @@ func BenchmarkVisitCounts(b *testing.B) {
 
 func BenchmarkWalks(b *testing.B) {
 	b.Run("fixed number of nodes", func(b *testing.B) {
-		nodesNum := 1000
-		for _, walksNum := range []int{1000, 10000, 100000} {
+		nodesNum := 100
+		for _, walksNum := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
 				cl := redisutils.SetupClient()
 				defer redisutils.CleanupRedis(cl)
@@ -860,6 +860,35 @@ func BenchmarkWalks(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					if _, err := RWS.Walks(context.Background(), 0, -1); err != nil {
+						b.Fatalf("benchmark failed: %v", err)
+					}
+				}
+			})
+		}
+	})
+}
+
+func BenchmarkWalksUnion(b *testing.B) {
+	b.Run("fixed number of nodes", func(b *testing.B) {
+		nodesNum := 100
+		for _, walksNum := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
+				cl := redisutils.SetupClient()
+				defer redisutils.CleanupRedis(cl)
+
+				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
+				if err != nil {
+					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
+				}
+
+				nodeIDs := make([]uint32, 100)
+				for i := 0; i < 100; i++ {
+					nodeIDs[i] = uint32(i)
+				}
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := RWS.WalksUnion(context.Background(), nodeIDs); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}

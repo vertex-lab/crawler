@@ -411,6 +411,14 @@ func BenchmarkCountAndNormalize(b *testing.B) {
 	}
 }
 
+func BenchmarkCropWalk(b *testing.B) {
+	walk := models.RandomWalk{0, 1, 2, 3, 4, 5, 6, 7, 8}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		CropWalk(walk, 5)
+	}
+}
+
 // func BenchmarkWalkCacheLoad(b *testing.B) {
 // 	cl := redisutils.SetupClient()
 // 	ctx := context.Background()
@@ -690,6 +698,152 @@ func BenchmarkSteps(b *testing.B) {
 		if _, err := DB.Follows(ctx, 0); err != nil {
 			b.Fatalf("Follows(): benchmark failed: %v", err)
 		}
+	}
+}
+
+func BenchmarkWCLoad2(b *testing.B) {
+	ctx := context.Background()
+	nodesNum := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+
+	nodeIDs := make([]uint32, 100)
+	for i := 0; i < 100; i++ {
+		nodeIDs[i] = uint32(i)
+	}
+
+	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+		RWM.GenerateAll(ctx, DB)
+
+		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				WC := NewWalkCache(1)
+
+				if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
+					b.Fatalf("Benchmark failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkWalksUnion(b *testing.B) {
+	ctx := context.Background()
+	nodesNum := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+
+	nodeIDs := make([]uint32, 100)
+	for i := 0; i < 100; i++ {
+		nodeIDs[i] = uint32(i)
+	}
+
+	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+		RWM.GenerateAll(ctx, DB)
+
+		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := RWM.Store.WalksUnion(ctx, nodeIDs); err != nil {
+					b.Fatalf("Benchmark failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkWCNext(b *testing.B) {
+	ctx := context.Background()
+	nodesNum := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+
+	nodeIDs := make([]uint32, 100)
+	for i := 0; i < 100; i++ {
+		nodeIDs[i] = uint32(i)
+	}
+
+	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+		RWM.GenerateAll(ctx, DB)
+
+		WC := NewWalkCache(1)
+		if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
+			b.Fatalf("benchmark failed: %v", err)
+		}
+
+		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				nodeID := uint32(rand.Intn(100))
+				WC.Next(nodeID)
+			}
+		})
+	}
+}
+
+func BenchmarkPersonalizedWalk(b *testing.B) {
+	ctx := context.Background()
+	nodesNum := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+
+	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+		RWM.GenerateAll(ctx, DB)
+
+		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				FC := NewFollowCache(DB, 1)
+				WC := NewWalkCache(1)
+
+				if _, err := personalizedWalk(ctx, FC, WC, 0, 300000, 0.85, rng); err != nil {
+					b.Fatalf("Benchmark failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkPersonalizedWalkWithWC(b *testing.B) {
+	ctx := context.Background()
+	nodesNum := 2000
+	edgesPerNode := 100
+	rng := rand.New(rand.NewSource(69))
+	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+
+	nodeIDs := make([]uint32, edgesPerNode)
+	for i := 0; i < edgesPerNode; i++ {
+		nodeIDs[i] = uint32(i)
+	}
+
+	for _, walksPerNode := range []uint16{1, 10, 100, 1000, 10000} {
+		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+		RWM.GenerateAll(ctx, DB)
+
+		WC := NewWalkCache(1)
+		if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
+			b.Fatalf("benchmark failed: %v", err)
+		}
+
+		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				FC := NewFollowCache(DB, 1)
+
+				if _, err := personalizedWalk(ctx, FC, WC, 0, 300000, 0.85, rng); err != nil {
+					b.Fatalf("Benchmark failed: %v", err)
+				}
+			}
+		})
 	}
 }
 
