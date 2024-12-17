@@ -649,6 +649,13 @@ func TestFollows(t *testing.T) {
 			expectedError:   models.ErrNodeNotFoundDB,
 		},
 		{
+			name:            "dandling node",
+			DBType:          "dandling",
+			nodeIDs:         []uint32{0},
+			expectedFollows: [][]uint32{{}},
+			expectedError:   nil,
+		},
+		{
 			name:            "valid",
 			DBType:          "triangle",
 			nodeIDs:         []uint32{0, 1},

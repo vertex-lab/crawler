@@ -278,6 +278,7 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 		strFollows := cmd.Val()
 		if len(strFollows) == 0 { // empty slice might mean node not found.
 			potentialMissingKeys = append(potentialMissingKeys, KeyNode(nodeIDs[i]))
+			followSlice = append(followSlice, []uint32{})
 			continue
 		}
 
