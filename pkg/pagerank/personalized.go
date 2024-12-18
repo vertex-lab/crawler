@@ -113,10 +113,10 @@ func personalized(
 	rng *rand.Rand) (models.PagerankMap, error) {
 
 	followSlice, err := DB.Follows(ctx, nodeID)
-	follows := followSlice[0]
 	if err != nil {
 		return nil, err
 	}
+	follows := followSlice[0]
 
 	// if it's a dandling node, return this special case distribution
 	if len(follows) == 0 {
@@ -125,16 +125,17 @@ func personalized(
 
 	FC := NewFollowCache(DB, len(follows)+1)
 	FC.follows[nodeID] = follows
-	if err := FC.Load(ctx, follows...); err != nil {
-		return nil, err
-	}
+	// if err := FC.Load(ctx, follows...); err != nil {
+	// 	return nil, err
+	// }
 
 	lenght := requiredLenght(topK)
 	alpha := RWS.Alpha(ctx)
-	WC := NewWalkCache(walksNeeded(lenght, alpha))
-	if err := WC.Load(ctx, RWS, follows...); err != nil {
-		return nil, err
-	}
+	// WC := NewWalkCache(walksNeeded(lenght, alpha))
+	// if err := WC.Load(ctx, RWS, follows...); err != nil {
+	// 	return nil, err
+	// }
+	WC := NewWalkCache(1)
 
 	walk, err := personalizedWalk(ctx, FC, WC, nodeID, lenght, alpha, rng)
 	if err != nil {

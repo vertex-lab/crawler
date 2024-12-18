@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
 const (
@@ -251,10 +252,6 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, nodeID uint32, limit int)
 
 // The method walksByStrID() returns a map walkID --> walk, given a slice of strIDs.
 func (RWS *RandomWalkStore) walksByStrID(ctx context.Context, strIDs ...string) (map[uint32]models.RandomWalk, error) {
-	if err := RWS.Validate(); err != nil {
-		return nil, err
-	}
-
 	if len(strIDs) == 0 {
 		return nil, nil
 	}
@@ -264,9 +261,18 @@ func (RWS *RandomWalkStore) walksByStrID(ctx context.Context, strIDs ...string) 
 		return nil, err
 	}
 
-	res, err := RWS.client.HMGet(ctx, KeyWalks, strIDs...).Result()
-	if err != nil {
-		return nil, err
+	// asking for more walks in one go can cause problems with Redis
+	const batchSize int = 500000
+	batchedIDs := sliceutils.SplitSlice(strIDs, batchSize)
+
+	res := make([]interface{}, 0, len(strIDs))
+	for _, IDs := range batchedIDs {
+		cmd := RWS.client.HMGet(ctx, KeyWalks, IDs...)
+		if cmd.Err() != nil {
+			return nil, cmd.Err()
+		}
+
+		res = append(res, cmd.Val()...)
 	}
 
 	strWalks := make([]string, 0, len(res))

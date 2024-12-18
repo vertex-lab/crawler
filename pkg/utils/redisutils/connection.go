@@ -4,6 +4,7 @@ package redisutils
 
 import (
 	"context"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -11,7 +12,10 @@ import (
 // SetupRedis() initializes a new Redis client for testing purposes.
 func SetupClient() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr:         "localhost:6379",
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	})
 }
 

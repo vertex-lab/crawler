@@ -8,6 +8,19 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+// SplitSlice splits a slice into a slice of slices with a maximum size of batchSize
+func SplitSlice(slice []string, batchSize int) [][]string {
+	if len(slice) == 0 {
+		return [][]string{}
+	}
+
+	split := make([][]string, 0, len(slice)/batchSize)
+	for batchSize < len(slice) {
+		split, slice = append(split, slice[:batchSize]), slice[batchSize:]
+	}
+	return append(split, slice)
+}
+
 // EqualElements() returns whether slice1 and slice2 are equal if they have
 // the same elements (possibly in different positions).
 // Empty and nil slices are considered equal.
@@ -31,7 +44,7 @@ func EqualElements(slice1, slice2 []uint32) bool {
 }
 
 /*
-returns the difference between slice1 and slice2; in set notation:
+Difference() returns the difference between slice1 and slice2; in set notation:
 
 - difference = slice1 - slice2
 
@@ -64,7 +77,7 @@ func Difference(slice1, slice2 []uint32) []uint32 {
 }
 
 /*
-returns removed, commond and added elements, using set notation:
+Partition() returns removed, commond and added elements, using set notation:
 
 removed = slice1 - slice2
 common = slice1 ^ slice2
@@ -112,9 +125,7 @@ oldWalk. TrimCycles doesn't change newWalk in the caller. If that's wanted,
 use DeleteCyclesInPlace instead.
 */
 func TrimCycles(oldWalk []uint32, newWalk []uint32) []uint32 {
-
 	for i, newNodeID := range newWalk {
-		// if it was already visited, we've found a cycle
 		if slices.Contains(oldWalk, newNodeID) {
 			return newWalk[:i]
 		}
@@ -128,9 +139,7 @@ cycle by checking against oldWalk. DeleteCyclesInPlace changes newWalk in the
 caller. If that's not wanted, use TrimCycles instead.
 */
 func DeleteCyclesInPlace(oldWalk []uint32, newWalk []uint32) []uint32 {
-
 	for i, newNodeID := range newWalk {
-		// if it was already visited, we've found a cycle
 		if slices.Contains(oldWalk, newNodeID) {
 			return slices.Delete(newWalk, i, len(newWalk))
 		}
@@ -138,11 +147,9 @@ func DeleteCyclesInPlace(oldWalk []uint32, newWalk []uint32) []uint32 {
 	return newWalk
 }
 
+// SortWalks() sorts the walks lexicographically
 func SortWalks(walks []models.RandomWalk) []models.RandomWalk {
-
-	// Sort the walks lexicographically
 	sort.Slice(walks, func(i, j int) bool {
-
 		// Compare slices lexicographically
 		for x := 0; x < len(walks[i]) && x < len(walks[j]); x++ {
 			if walks[i][x] < walks[j][x] {

@@ -9,6 +9,43 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+func TestSplitSlice(t *testing.T) {
+	testCases := []struct {
+		name          string
+		slice         []string
+		batchSize     int
+		expectedSplit [][]string
+	}{
+		{
+			name:          "nil slice",
+			slice:         nil,
+			batchSize:     1,
+			expectedSplit: [][]string{},
+		},
+		{
+			name:          "empty slice",
+			slice:         []string{},
+			batchSize:     1,
+			expectedSplit: [][]string{},
+		},
+		{
+			name:          "valid slice",
+			slice:         []string{"a", "b", "c", "d", "e", "f", "g"},
+			batchSize:     3,
+			expectedSplit: [][]string{{"a", "b", "c"}, {"d", "e", "f"}, {"g"}},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			split := SplitSlice(test.slice, test.batchSize)
+			if !reflect.DeepEqual(split, test.expectedSplit) {
+				t.Fatalf("SplitSlice(): expected %v, got %v", test.expectedSplit, split)
+			}
+		})
+	}
+}
+
 func TestEqualElements(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -285,6 +322,18 @@ func TestSortWalks(t *testing.T) {
 }
 
 // ---------------------------------BENCHMARKS---------------------------------
+
+func BenchmarkSplitSlice(b *testing.B) {
+	size := 1000000
+	slice := make([]string, size)
+	for i := 0; i < size; i++ {
+		slice[i] = "a"
+	}
+
+	for i := 0; i < b.N; i++ {
+		SplitSlice(slice, 50000)
+	}
+}
 
 func BenchmarkDifference(b *testing.B) {
 	const size int32 = 1000000

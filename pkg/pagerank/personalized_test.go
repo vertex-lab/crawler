@@ -419,23 +419,26 @@ func BenchmarkCropWalk(b *testing.B) {
 	}
 }
 
-// func BenchmarkWalkCacheLoad(b *testing.B) {
-// 	cl := redisutils.SetupClient()
-// 	ctx := context.Background()
+func BenchmarkPersonalized(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
 
-// 	RWS, err := redistore.NewRWSConnection(ctx, cl)
-// 	if err != nil {
-// 		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
-// 	}
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewDatabaseConnection(): benchmark failed: %v", err)
+	}
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+	}
 
-// 	b.ResetTimer()
-// 	for i := 0; i < b.N; i++ {
-// 		WC := NewWalkCache()
-// 		if err := WC.Load(ctx, RWS, 2, -1); err != nil {
-// 			b.Fatalf("Personalized(): benchmark failed: %v", err)
-// 		}
-// 	}
-// }
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := Personalized(ctx, DB, RWS, 0, 100); err != nil {
+			b.Fatalf("Personalized(): benchmark failed: %v", err)
+		}
+	}
+}
 
 func BenchmarkWalks(b *testing.B) {
 	cl := redisutils.SetupClient()
@@ -448,8 +451,66 @@ func BenchmarkWalks(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := RWS.Walks(ctx, 2, -1); err != nil {
-			b.Fatalf("Personalized(): benchmark failed: %v", err)
+		if _, err := RWS.Walks(ctx, 1, -1); err != nil {
+			b.Fatalf("Walks(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkSMembers(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := cl.SMembers(ctx, "walksVisiting:1").Err(); err != nil {
+			b.Fatalf("Walks(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkHMGET2(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	keys := make([]string, 1100000)
+	for i := 0; i < 1100000; i++ {
+		keys[i] = redistore.KeyWalksVisiting(uint32(i))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := cl.HMGet(ctx, redistore.KeyWalks, keys...).Err(); err != nil {
+			b.Fatalf("Walks(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkLoad(b *testing.B) {
+	cl := redisutils.SetupClient()
+	ctx := context.Background()
+
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewDatabaseConnection(): benchmark failed: %v", err)
+	}
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+	}
+
+	followSlice, err := DB.Follows(ctx, 0)
+	if err != nil {
+		b.Fatalf("Follows(): benchmark failed: %v", err)
+	}
+	follows := followSlice[0]
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+
+		WC := NewWalkCache(1)
+		if err := WC.Load(ctx, RWS, follows[:2]...); err != nil {
+			b.Fatalf("Load(): benchmark failed: %v", err)
 		}
 	}
 }
@@ -684,187 +745,186 @@ func BenchmarkSUNION2(b *testing.B) {
 	}
 }
 
-func BenchmarkSteps(b *testing.B) {
-	cl := redisutils.SetupClient()
-	defer redisutils.CleanupRedis(cl)
+// func BenchmarkSteps(b *testing.B) {
+// 	cl := redisutils.SetupClient()
 
-	ctx := context.Background()
-	DB, err := redisdb.SetupDB(cl, "pip")
-	if err != nil {
-		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
-	}
+// 	ctx := context.Background()
+// 	DB, err := redisdb.SetupDB(cl, "pip")
+// 	if err != nil {
+// 		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
+// 	}
 
-	for i := 0; i < b.N; i++ {
-		if _, err := DB.Follows(ctx, 0); err != nil {
-			b.Fatalf("Follows(): benchmark failed: %v", err)
-		}
-	}
-}
+// 	for i := 0; i < b.N; i++ {
+// 		if _, err := DB.Follows(ctx, 0); err != nil {
+// 			b.Fatalf("Follows(): benchmark failed: %v", err)
+// 		}
+// 	}
+// }
 
-func BenchmarkWCLoad2(b *testing.B) {
-	ctx := context.Background()
-	nodesNum := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+// func BenchmarkWCLoad2(b *testing.B) {
+// 	ctx := context.Background()
+// 	nodesNum := 2000
+// 	edgesPerNode := 100
+// 	rng := rand.New(rand.NewSource(69))
+// 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
-	nodeIDs := make([]uint32, 100)
-	for i := 0; i < 100; i++ {
-		nodeIDs[i] = uint32(i)
-	}
+// 	nodeIDs := make([]uint32, 100)
+// 	for i := 0; i < 100; i++ {
+// 		nodeIDs[i] = uint32(i)
+// 	}
 
-	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(ctx, DB)
+// 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+// 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+// 		RWM.GenerateAll(ctx, DB)
 
-		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				WC := NewWalkCache(1)
+// 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+// 			b.ResetTimer()
+// 			for i := 0; i < b.N; i++ {
+// 				WC := NewWalkCache(1)
 
-				if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
-					b.Fatalf("Benchmark failed: %v", err)
-				}
-			}
-		})
-	}
-}
+// 				if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
+// 					b.Fatalf("Benchmark failed: %v", err)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
-func BenchmarkWalksUnion(b *testing.B) {
-	ctx := context.Background()
-	nodesNum := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+// func BenchmarkWalksUnion(b *testing.B) {
+// 	ctx := context.Background()
+// 	nodesNum := 2000
+// 	edgesPerNode := 100
+// 	rng := rand.New(rand.NewSource(69))
+// 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
-	nodeIDs := make([]uint32, 100)
-	for i := 0; i < 100; i++ {
-		nodeIDs[i] = uint32(i)
-	}
+// 	nodeIDs := make([]uint32, 100)
+// 	for i := 0; i < 100; i++ {
+// 		nodeIDs[i] = uint32(i)
+// 	}
 
-	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(ctx, DB)
+// 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+// 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+// 		RWM.GenerateAll(ctx, DB)
 
-		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if _, err := RWM.Store.WalksUnion(ctx, nodeIDs); err != nil {
-					b.Fatalf("Benchmark failed: %v", err)
-				}
-			}
-		})
-	}
-}
+// 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+// 			b.ResetTimer()
+// 			for i := 0; i < b.N; i++ {
+// 				if _, err := RWM.Store.WalksUnion(ctx, nodeIDs); err != nil {
+// 					b.Fatalf("Benchmark failed: %v", err)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
-func BenchmarkWCNext(b *testing.B) {
-	ctx := context.Background()
-	nodesNum := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+// func BenchmarkWCNext(b *testing.B) {
+// 	ctx := context.Background()
+// 	nodesNum := 2000
+// 	edgesPerNode := 100
+// 	rng := rand.New(rand.NewSource(69))
+// 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
-	nodeIDs := make([]uint32, 100)
-	for i := 0; i < 100; i++ {
-		nodeIDs[i] = uint32(i)
-	}
+// 	nodeIDs := make([]uint32, 100)
+// 	for i := 0; i < 100; i++ {
+// 		nodeIDs[i] = uint32(i)
+// 	}
 
-	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(ctx, DB)
+// 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+// 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+// 		RWM.GenerateAll(ctx, DB)
 
-		WC := NewWalkCache(1)
-		if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
-			b.Fatalf("benchmark failed: %v", err)
-		}
+// 		WC := NewWalkCache(1)
+// 		if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
+// 			b.Fatalf("benchmark failed: %v", err)
+// 		}
 
-		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				nodeID := uint32(rand.Intn(100))
-				WC.Next(nodeID)
-			}
-		})
-	}
-}
+// 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+// 			b.ResetTimer()
+// 			for i := 0; i < b.N; i++ {
+// 				nodeID := uint32(rand.Intn(100))
+// 				WC.Next(nodeID)
+// 			}
+// 		})
+// 	}
+// }
 
-func BenchmarkPersonalizedWalk(b *testing.B) {
-	ctx := context.Background()
-	nodesNum := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+// func BenchmarkPersonalizedWalk(b *testing.B) {
+// 	ctx := context.Background()
+// 	nodesNum := 2000
+// 	edgesPerNode := 100
+// 	rng := rand.New(rand.NewSource(69))
+// 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
-	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(ctx, DB)
+// 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+// 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+// 		RWM.GenerateAll(ctx, DB)
 
-		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				FC := NewFollowCache(DB, 1)
-				WC := NewWalkCache(1)
+// 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+// 			b.ResetTimer()
+// 			for i := 0; i < b.N; i++ {
+// 				FC := NewFollowCache(DB, 1)
+// 				WC := NewWalkCache(1)
 
-				if _, err := personalizedWalk(ctx, FC, WC, 0, 300000, 0.85, rng); err != nil {
-					b.Fatalf("Benchmark failed: %v", err)
-				}
-			}
-		})
-	}
-}
+// 				if _, err := personalizedWalk(ctx, FC, WC, 0, 300000, 0.85, rng); err != nil {
+// 					b.Fatalf("Benchmark failed: %v", err)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
-func BenchmarkPersonalizedWalkWithWC(b *testing.B) {
-	ctx := context.Background()
-	nodesNum := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+// func BenchmarkPersonalizedWalkWithWC(b *testing.B) {
+// 	ctx := context.Background()
+// 	nodesNum := 2000
+// 	edgesPerNode := 100
+// 	rng := rand.New(rand.NewSource(69))
+// 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
-	nodeIDs := make([]uint32, edgesPerNode)
-	for i := 0; i < edgesPerNode; i++ {
-		nodeIDs[i] = uint32(i)
-	}
+// 	nodeIDs := make([]uint32, edgesPerNode)
+// 	for i := 0; i < edgesPerNode; i++ {
+// 		nodeIDs[i] = uint32(i)
+// 	}
 
-	for _, walksPerNode := range []uint16{1, 10, 100, 1000, 10000} {
-		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(ctx, DB)
+// 	for _, walksPerNode := range []uint16{1, 10, 100, 1000, 10000} {
+// 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+// 		RWM.GenerateAll(ctx, DB)
 
-		WC := NewWalkCache(1)
-		if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
-			b.Fatalf("benchmark failed: %v", err)
-		}
+// 		WC := NewWalkCache(1)
+// 		if err := WC.Load(ctx, RWM.Store, nodeIDs...); err != nil {
+// 			b.Fatalf("benchmark failed: %v", err)
+// 		}
 
-		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				FC := NewFollowCache(DB, 1)
+// 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+// 			b.ResetTimer()
+// 			for i := 0; i < b.N; i++ {
+// 				FC := NewFollowCache(DB, 1)
 
-				if _, err := personalizedWalk(ctx, FC, WC, 0, 300000, 0.85, rng); err != nil {
-					b.Fatalf("Benchmark failed: %v", err)
-				}
-			}
-		})
-	}
-}
+// 				if _, err := personalizedWalk(ctx, FC, WC, 0, 300000, 0.85, rng); err != nil {
+// 					b.Fatalf("Benchmark failed: %v", err)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
-func BenchmarkPersonalized(b *testing.B) {
-	ctx := context.Background()
-	nodesNum := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
+// func BenchmarkPersonalized(b *testing.B) {
+// 	ctx := context.Background()
+// 	nodesNum := 2000
+// 	edgesPerNode := 100
+// 	rng := rand.New(rand.NewSource(69))
+// 	DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
 
-	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
-		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
-		RWM.GenerateAll(ctx, DB)
+// 	for _, walksPerNode := range []uint16{1, 10, 100, 1000} {
+// 		RWM, _ := walks.NewMockRWM(0.85, walksPerNode)
+// 		RWM.GenerateAll(ctx, DB)
 
-		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if _, err := Personalized(ctx, DB, RWM.Store, 0, 100); err != nil {
-					b.Fatalf("Benchmark failed: %v", err)
-				}
-			}
-		})
-	}
-}
+// 		b.Run(fmt.Sprintf("walksPerNode: %d", walksPerNode), func(b *testing.B) {
+// 			b.ResetTimer()
+// 			for i := 0; i < b.N; i++ {
+// 				if _, err := Personalized(ctx, DB, RWM.Store, 0, 100); err != nil {
+// 					b.Fatalf("Benchmark failed: %v", err)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
