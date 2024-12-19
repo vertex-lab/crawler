@@ -313,6 +313,7 @@ func TestArbiterScan(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		t.Run("demotion", func(t *testing.T) {
 			// calle will be demoted to inactive, because the threshold is 1.0
+			ctx := context.Background()
 			DB := mockdb.SetupDB("promotion-demotion")
 			RWM := walks.SetupMockRWM("one-node1")
 
@@ -334,18 +335,19 @@ func TestArbiterScan(t *testing.T) {
 			}
 
 			// check the only walk (from calle) has been removed
-			walks, err := RWM.Store.Walks(context.Background(), 1, -1)
+			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, 1)
 			if err != nil {
-				t.Errorf("Walks(): expected nil, got %v", err)
+				t.Errorf("WalksVisiting(): expected nil, got %v", err)
 			}
 
-			if len(walks) > 0 {
-				t.Errorf("expected no walks, got %v", walks)
+			if len(walkIDs) > 0 {
+				t.Errorf("expected no walks, got %v", walkIDs)
 			}
 
 		})
 		t.Run("promotion", func(t *testing.T) {
 			// pip and odell will be promoted from inactive to active
+			ctx := context.Background()
 			DB := mockdb.SetupDB("promotion-demotion")
 			RWM := walks.SetupMockRWM("one-node1")
 			queue := []string{}
@@ -380,14 +382,14 @@ func TestArbiterScan(t *testing.T) {
 
 			// check that walks for pip and odell have been generated.
 			for _, nodeID := range []uint32{0, 2} {
-				walkMap, err := RWM.Store.Walks(context.Background(), nodeID, -1)
+				walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
 				if err != nil {
 					t.Fatalf("Walks(%d): expected nil, got %v", 0, err)
 				}
 
 				// check it contains exactly one walk (the one generated)
-				if len(walkMap) != 1 {
-					t.Errorf("walkMap: %v", walkMap)
+				if len(walkIDs) != 1 {
+					t.Errorf("walkIDs: %v", walkIDs)
 				}
 			}
 		})

@@ -155,6 +155,7 @@ func TestGenerateWalks(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			RWM, _ := NewMockRWM(0.85, 2)
 			rng := rand.New(rand.NewSource(69))
@@ -164,17 +165,24 @@ func TestGenerateWalks(t *testing.T) {
 				t.Errorf("generateWalks(): expected %v, got %v", test.expectedError, err)
 			}
 
-			// check if the walk was added to each node
-			if err == nil {
-				for _, nodeID := range test.nodeIDs {
-					walkMap, err := RWM.Store.Walks(context.Background(), nodeID, -1)
-					if err != nil {
-						t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
-					}
+			for nodeID, expectedWalk := range test.expectedWalks {
+				walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+				if err != nil {
+					t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
+				}
 
-					// check if the walk is as expected
-					if !reflect.DeepEqual(walkMap, test.expectedWalks[nodeID]) {
-						t.Errorf("generateWalks(): nodeID = %d; expected %v, got %v", nodeID, test.expectedWalks[nodeID], walkMap)
+				walks, err := RWM.Store.Walks(ctx, walkIDs...)
+				if err != nil {
+					t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
+				}
+
+				if len(walkIDs) != len(expectedWalk) {
+					t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+				}
+
+				for i, ID := range walkIDs {
+					if !reflect.DeepEqual(walks[i], expectedWalk[ID]) {
+						t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
 					}
 				}
 			}
@@ -225,6 +233,7 @@ func TestGenerate(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			RWM := SetupMockRWM(test.RWMType)
 
@@ -232,14 +241,25 @@ func TestGenerate(t *testing.T) {
 				t.Errorf("generateWalks(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if test.expectedWalks != nil {
-				walkMap, err := RWM.Store.Walks(context.Background(), 0, -1)
+			for nodeID, expectedWalk := range test.expectedWalks {
+				walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
 				if err != nil {
-					t.Fatalf("WalkSet(0): expected nil, got %v", err)
+					t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
 				}
 
-				if !reflect.DeepEqual(walkMap, test.expectedWalks[0]) {
-					t.Errorf("generateWalks(): nodeID = %d; expected %v, got %v", 0, test.expectedWalks[0], walkMap)
+				walks, err := RWM.Store.Walks(ctx, walkIDs...)
+				if err != nil {
+					t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
+				}
+
+				if len(walkIDs) != len(expectedWalk) {
+					t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+				}
+
+				for i, ID := range walkIDs {
+					if !reflect.DeepEqual(walks[i], expectedWalk[ID]) {
+						t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+					}
 				}
 			}
 		})
@@ -288,6 +308,7 @@ func TestGenerateAll(t *testing.T) {
 	})
 
 	t.Run("fuzzy test", func(t *testing.T) {
+		ctx := context.Background()
 		nodesNum := 200
 		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -297,9 +318,14 @@ func TestGenerateAll(t *testing.T) {
 
 		// check that each walk in the WalkSet of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			walks, err := RWM.Store.Walks(context.Background(), nodeID, -1)
+			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
 			if err != nil {
-				t.Fatalf("WalkSet(%d): expected nil, got %v", nodeID, err)
+				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
+			}
+
+			walks, err := RWM.Store.Walks(ctx, walkIDs...)
+			if err != nil {
+				t.Fatalf("Walks(): expected nil, got %v", err)
 			}
 
 			for _, walk := range walks {

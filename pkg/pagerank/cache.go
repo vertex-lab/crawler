@@ -109,37 +109,38 @@ func (WC *WalkCache) Next(nodeID uint32) (models.RandomWalk, bool) {
 	return nil, false
 }
 
-func (WC *WalkCache) Load(ctx context.Context, RWS models.RandomWalkStore, nodeIDs ...uint32) error {
+// Load() fetches up to `limit` walks from the RWS and adds them to the cache.
+func (WC *WalkCache) Load(
+	ctx context.Context,
+	RWS models.RandomWalkStore,
+	limit int,
+	nodeIDs ...uint32) error {
+
 	if WC == nil {
 		return ErrNilWCPointer
 	}
 
-	walkMap, err := RWS.WalksUnion(ctx, nodeIDs)
+	walkIDs, err := RWS.WalksVisiting(ctx, limit, nodeIDs...)
 	if err != nil {
 		return err
 	}
 
-	WC.walks = make([]models.RandomWalk, len(walkMap))
-	for _, ID := range nodeIDs {
-		WC.positions[ID] = make([]int, 0, RWS.WalksPerNode(ctx))
+	WC.walks, err = RWS.Walks(ctx, walkIDs...)
+	if err != nil {
+		return err
 	}
 
-	var pos int
-	for _, walk := range walkMap {
-		WC.walks[pos] = walk
-
-		// add the position of the walk in walks to each node visited by it,
-		// excluding the last one (which will be cropped out anyway)
+	// add the position of the walk in walks to each node visited by it,
+	// excluding the last one (which will be cropped out anyway)
+	for i, walk := range WC.walks {
 		for _, ID := range walk[:len(walk)-1] {
 			positions, exists := WC.positions[ID]
 			if !exists {
 				WC.positions[ID] = []int{}
 			}
 
-			WC.positions[ID] = append(positions, pos)
+			WC.positions[ID] = append(positions, i)
 		}
-
-		pos++
 	}
 
 	return nil

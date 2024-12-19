@@ -150,14 +150,24 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
+			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+			if err != nil {
+				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
+			}
 
-			walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
+			walks, err := RWM.Store.Walks(ctx, walkIDs...)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
 
-			if !reflect.DeepEqual(walkMap, expectedWalk) {
-				t.Errorf("updateRemovedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walkMap)
+			if len(walkIDs) != len(expectedWalk) {
+				t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+			}
+
+			for i, ID := range walkIDs {
+				if !reflect.DeepEqual(walks[i], expectedWalk[ID]) {
+					t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+				}
 			}
 		}
 	})
@@ -248,13 +258,24 @@ func TestUpdateAddedNodes(t *testing.T) {
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
-			walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
+			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+			if err != nil {
+				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
+			}
+
+			walks, err := RWM.Store.Walks(ctx, walkIDs...)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
 
-			if !reflect.DeepEqual(walkMap, expectedWalk) {
-				t.Errorf("updateAddedNodes() nodeID = %d: expected %v, got %v", nodeID, expectedWalk, walkMap)
+			if len(walkIDs) != len(expectedWalk) {
+				t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+			}
+
+			for i, ID := range walkIDs {
+				if !reflect.DeepEqual(walks[i], expectedWalk[ID]) {
+					t.Fatalf("expected %v, got %v, %v", expectedWalk, walkIDs, walks)
+				}
 			}
 		}
 	})
@@ -381,9 +402,14 @@ func TestUpdate(t *testing.T) {
 
 		// check that each walk in the Walks of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			walks, err := RWM.Store.Walks(ctx, nodeID, -1)
+			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
 			if err != nil {
-				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
+				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
+			}
+
+			walks, err := RWM.Store.Walks(ctx, walkIDs...)
+			if err != nil {
+				t.Fatalf("Walks(): expected nil, got %v", err)
 			}
 
 			for _, walk := range walks {

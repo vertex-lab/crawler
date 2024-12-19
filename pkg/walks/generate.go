@@ -196,18 +196,23 @@ func (RWM *RandomWalkManager) Remove(ctx context.Context, nodeID uint32) error {
 		return err
 	}
 
-	walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
+	walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+	if err != nil {
+		return err
+	}
+
+	walks, err := RWM.Store.Walks(ctx, walkIDs...)
 	if err != nil {
 		return err
 	}
 
 	walksToRemove := make([]uint32, 0, RWM.Store.WalksPerNode(ctx))
-	for walkID, walk := range walkMap {
-		if !startsWith(walk, nodeID) {
+	for i, ID := range walkIDs {
+		if !startsWith(walks[i], nodeID) {
 			continue
 		}
 
-		walksToRemove = append(walksToRemove, walkID)
+		walksToRemove = append(walksToRemove, ID)
 	}
 
 	return RWM.Store.RemoveWalks(ctx, walksToRemove)

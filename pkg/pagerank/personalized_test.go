@@ -440,22 +440,22 @@ func BenchmarkPersonalized(b *testing.B) {
 	}
 }
 
-func BenchmarkWalks(b *testing.B) {
-	cl := redisutils.SetupTestClient()
-	ctx := context.Background()
+// func BenchmarkWalks(b *testing.B) {
+// 	cl := redisutils.SetupTestClient()
+// 	ctx := context.Background()
 
-	RWS, err := redistore.NewRWSConnection(ctx, cl)
-	if err != nil {
-		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
-	}
+// 	RWS, err := redistore.NewRWSConnection(ctx, cl)
+// 	if err != nil {
+// 		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+// 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := RWS.Walks(ctx, 1, -1); err != nil {
-			b.Fatalf("Walks(): benchmark failed: %v", err)
-		}
-	}
-}
+// 	b.ResetTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		if _, err := RWS.Walks(ctx, 1, -1); err != nil {
+// 			b.Fatalf("Walks(): benchmark failed: %v", err)
+// 		}
+// 	}
+// }
 
 func BenchmarkSMembers(b *testing.B) {
 	cl := redisutils.SetupTestClient()
@@ -486,34 +486,34 @@ func BenchmarkHMGET2(b *testing.B) {
 	}
 }
 
-func BenchmarkLoad(b *testing.B) {
-	cl := redisutils.SetupTestClient()
-	ctx := context.Background()
+// func BenchmarkLoad(b *testing.B) {
+// 	cl := redisutils.SetupTestClient()
+// 	ctx := context.Background()
 
-	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
-	if err != nil {
-		b.Fatalf("NewDatabaseConnection(): benchmark failed: %v", err)
-	}
-	RWS, err := redistore.NewRWSConnection(ctx, cl)
-	if err != nil {
-		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
-	}
+// 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+// 	if err != nil {
+// 		b.Fatalf("NewDatabaseConnection(): benchmark failed: %v", err)
+// 	}
+// 	RWS, err := redistore.NewRWSConnection(ctx, cl)
+// 	if err != nil {
+// 		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+// 	}
 
-	followSlice, err := DB.Follows(ctx, 0)
-	if err != nil {
-		b.Fatalf("Follows(): benchmark failed: %v", err)
-	}
-	follows := followSlice[0]
+// 	followSlice, err := DB.Follows(ctx, 0)
+// 	if err != nil {
+// 		b.Fatalf("Follows(): benchmark failed: %v", err)
+// 	}
+// 	follows := followSlice[0]
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+// 	b.ResetTimer()
+// 	for i := 0; i < b.N; i++ {
 
-		WC := NewWalkCache(1)
-		if err := WC.Load(ctx, RWS, follows[:2]...); err != nil {
-			b.Fatalf("Load(): benchmark failed: %v", err)
-		}
-	}
-}
+// 		WC := NewWalkCache(1)
+// 		if err := WC.Load(ctx, RWS, follows[:2]...); err != nil {
+// 			b.Fatalf("Load(): benchmark failed: %v", err)
+// 		}
+// 	}
+// }
 
 func BenchmarkSMembersPipe(b *testing.B) {
 	cl := redisutils.SetupTestClient()

@@ -146,7 +146,7 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]mod
 }
 
 /*
-WalksVisiting() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
+WalksVisiting() returns up to limit UNIQUE walkIDs evenly distributed among the specified nodeIDs.
 In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
 
 Note:
@@ -164,9 +164,10 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 		limitPerNode = 1000000000 // a very big number to return all
 		limit = 100000
 	} else {
-		limitPerNode = int64(limit) / int64(len(nodeIDs))
+
 	}
 
+	limitPerNode = int64(limit) / int64(len(nodeIDs))
 	walkIDs := make([]uint32, 0, limit)
 	for _, ID := range nodeIDs {
 		walkSet, exists := RWS.walksVisiting[ID]
@@ -175,7 +176,11 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 		}
 
 		IDs := walkSet.ToSlice()
-		walkIDs = append(walkIDs, IDs[:limitPerNode]...)
+		if limitPerNode <= 0 || limitPerNode > int64(len(IDs)) {
+			walkIDs = append(walkIDs, IDs...)
+		} else {
+			walkIDs = append(walkIDs, IDs[:limitPerNode]...)
+		}
 	}
 
 	return sliceutils.Unique(walkIDs), nil

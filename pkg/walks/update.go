@@ -68,12 +68,26 @@ func (RWM *RandomWalkManager) updateRemovedNodes(
 		return nil
 	}
 
-	walkMap, err := RWM.Store.Walks(ctx, nodeID, -1)
+	// fetching only the walks that contain nodeID AND at least one of the removed nodes.
+	var walkIDs []uint32
+	for _, r := range removed {
+		IDs, err := RWM.Store.WalksVisitingAll(ctx, nodeID, r)
+		if err != nil {
+			return err
+		}
+
+		walkIDs = append(walkIDs, IDs...)
+	}
+
+	walkIDs = sliceutils.Unique(walkIDs) // removing duplicates
+	walks, err := RWM.Store.Walks(ctx, walkIDs...)
 	if err != nil {
 		return err
 	}
 
-	for walkID, walk := range walkMap {
+	for i, ID := range walkIDs {
+		walk := walks[i]
+
 		cutIndex, contains := containsInvalidStep(walk, nodeID, removed)
 		if !contains {
 			continue
@@ -86,7 +100,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(
 		}
 
 		// prune and graft the walk with the new walk segment
-		if err = RWM.Store.PruneGraftWalk(ctx, walkID, cutIndex, newWalkSegment); err != nil {
+		if err = RWM.Store.PruneGraftWalk(ctx, ID, cutIndex, newWalkSegment); err != nil {
 			return err
 		}
 	}
@@ -115,12 +129,18 @@ func (RWM *RandomWalkManager) updateAddedNodes(
 		return err
 	}
 
-	walkMap, err := RWM.Store.Walks(ctx, nodeID, limit)
+	walkIDs, err := RWM.Store.WalksVisiting(ctx, limit, nodeID)
 	if err != nil {
 		return err
 	}
 
-	for walkID, walk := range walkMap {
+	walks, err := RWM.Store.Walks(ctx, walkIDs...)
+	if err != nil {
+		return err
+	}
+
+	for i, ID := range walkIDs {
+		walk := walks[i]
 
 		// prune the walk AFTER the position of nodeID
 		cutIndex := slices.Index(walk, nodeID) + 1
@@ -136,7 +156,7 @@ func (RWM *RandomWalkManager) updateAddedNodes(
 		}
 
 		// prune and graft the walk with the new walk segment
-		if err := RWM.Store.PruneGraftWalk(ctx, walkID, cutIndex, newWalkSegment); err != nil {
+		if err := RWM.Store.PruneGraftWalk(ctx, ID, cutIndex, newWalkSegment); err != nil {
 			return err
 		}
 	}

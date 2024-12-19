@@ -238,7 +238,7 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]mod
 }
 
 /*
-WalksVisiting() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
+WalksVisiting() returns up to limit UNIQUE walkIDs evenly distributed among the specified nodeIDs.
 In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
 
 Note:
