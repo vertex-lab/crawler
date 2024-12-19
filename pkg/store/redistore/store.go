@@ -238,23 +238,26 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]mod
 }
 
 /*
-WalksVisitingAny() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
+WalksVisiting() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
 In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
 
 Note:
 If limit < nodeIDs, no walk is returned
 */
-func (RWS *RandomWalkStore) WalksVisitingAny(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
+func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
 
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
+	var limitPerNode int64
 	if limit <= 0 {
-		return nil, fmt.Errorf("limit must be > 0")
+		limitPerNode = 1000000000 // a very big number to return all
+		limit = 100000
+	} else {
+		limitPerNode = int64(limit) / int64(len(nodeIDs))
 	}
 
-	limitPerNode := int64(limit) / int64(len(nodeIDs))
 	pipe := RWS.client.Pipeline()
 	cmds := make([]*redis.StringSliceCmd, len(nodeIDs))
 	for i, ID := range nodeIDs {
@@ -275,7 +278,13 @@ func (RWS *RandomWalkStore) WalksVisitingAny(ctx context.Context, limit int, nod
 		strIDs = append(strIDs, IDs...)
 	}
 
-	return redisutils.ParseUniqueIDs(strIDs)
+	if len(nodeIDs) > 1 {
+		// multiple nodes might have walks in common, hence we remove duplicates.
+		return redisutils.ParseUniqueIDs(strIDs)
+	} else {
+		return redisutils.ParseIDs(strIDs)
+	}
+
 }
 
 // WalksVisitingAll() returns all the IDs of the walk that visit ALL specified nodes.

@@ -330,7 +330,7 @@ func TestWalks(t *testing.T) {
 	}
 }
 
-func TestWalksVisitingAny(t *testing.T) {
+func TestWalksVisiting(t *testing.T) {
 	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
@@ -386,7 +386,7 @@ func TestWalksVisitingAny(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			walkIDs, err := RWS.WalksVisitingAny(context.Background(), test.limit, test.nodeIDs...)
+			walkIDs, err := RWS.WalksVisiting(context.Background(), test.limit, test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
 			}
@@ -853,9 +853,9 @@ func TestPruneGraftWalk(t *testing.T) {
 	})
 }
 
-// func TestInterface(t *testing.T) {
-// 	var _ models.RandomWalkStore = &RandomWalkStore{}
-// }
+func TestInterface(t *testing.T) {
+	var _ models.RandomWalkStore = &RandomWalkStore{}
+}
 
 // ------------------------------------BENCHMARKS------------------------------
 

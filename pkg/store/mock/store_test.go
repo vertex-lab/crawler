@@ -264,7 +264,7 @@ func TestWalksVisitingAny(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			walkIDs, err := RWS.WalksVisitingAny(context.Background(), test.limit, test.nodeIDs...)
+			walkIDs, err := RWS.WalksVisiting(context.Background(), test.limit, test.nodeIDs...)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
@@ -402,7 +402,7 @@ func TestAddWalks(t *testing.T) {
 
 			// check that each node is associated with the walkID
 			for _, nodeID := range walk {
-				walkSet := RWS.WalksVisiting[nodeID]
+				walkSet := RWS.walksVisiting[nodeID]
 				if !walkSet.Equal(mapset.NewSet[uint32](walkID)) {
 					t.Errorf("AddWalk(): nodeID = %d; expected {%d}, got %v", nodeID, walkID, walkSet)
 				}
@@ -467,7 +467,7 @@ func TestRemoveWalks(t *testing.T) {
 		// check the walkID has been removed from each node
 		expectedWalkSet := mapset.NewSet[uint32](2)
 		for _, nodeID := range nodeIDs {
-			walkSet := RWS.WalksVisiting[nodeID]
+			walkSet := RWS.walksVisiting[nodeID]
 
 			if !walkSet.Equal(expectedWalkSet) {
 				t.Errorf("Expected walkset %v, got %v", expectedWalkSet, walkSet)
@@ -544,13 +544,13 @@ func TestPruneWalk(t *testing.T) {
 		}
 
 		// check the walk remains
-		walkSet0 := RWS.WalksVisiting[0]
+		walkSet0 := RWS.walksVisiting[0]
 		if !walkSet0.Equal(mapset.NewSet[uint32](0)) {
 			t.Errorf("PruneWalk(): expected {{0}}, got %v", walkSet0)
 		}
 
 		// check the walks was removed
-		walkSet1 := RWS.WalksVisiting[1]
+		walkSet1 := RWS.walksVisiting[1]
 		if !walkSet1.IsEmpty() {
 			t.Errorf("PruneWalk(): expected empty set, got %v", walkSet1)
 		}
@@ -623,7 +623,7 @@ func TestGraftWalk(t *testing.T) {
 		// check if the walk is present in all walkSets
 		for _, nodeID := range expectedGraftedWalk {
 
-			walkSet := RWS.WalksVisiting[nodeID]
+			walkSet := RWS.walksVisiting[nodeID]
 			if !walkSet.Equal(expectedWalkSet) {
 				t.Errorf("GraftWalk(): nodeID = %d; expected %v, got %v", nodeID, expectedWalkSet, walkSet)
 			}
@@ -636,6 +636,6 @@ func TestGraftWalk(t *testing.T) {
 	})
 }
 
-// func TestInterface(t *testing.T) {
-// 	var _ models.RandomWalkStore = &RandomWalkStore{}
-// }
+func TestInterface(t *testing.T) {
+	var _ models.RandomWalkStore = &RandomWalkStore{}
+}

@@ -37,13 +37,20 @@ type RandomWalkStore interface {
 	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
 	VisitCounts(ctx context.Context, nodeIDs []uint32) (map[uint32]int, error)
 
-	/*Walks() returns a map of walks by walksID that visit nodeID.
-	- if limit > 0, the map contains up to that many key-value pairs.
-	- if limit <= 0, all walks are returned */
-	Walks(ctx context.Context, nodeID uint32, limit int) (map[uint32]RandomWalk, error)
+	/*
+		WalksVisiting() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
+		In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
 
-	// WalksUnion() returns a map of walks by walksID that visit at least one of the specified nodeIDs.
-	WalksUnion(ctx context.Context, nodeIDs []uint32) (map[uint32]RandomWalk, error)
+		Note:
+		If limit < nodeIDs, no walk is returned
+	*/
+	WalksVisiting(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error)
+
+	// WalksVisitingAll() returns all the IDs of the walk that visit ALL specified nodes.
+	WalksVisitingAll(ctx context.Context, nodeIDs ...uint32) ([]uint32, error)
+
+	// Walks() returns the walks associated with the walkIDs.
+	Walks(ctx context.Context, walkIDs ...uint32) ([]RandomWalk, error)
 
 	// AddWalks() adds all the walks to the RandomWalkStore.
 	AddWalks(ctx context.Context, walks []RandomWalk) error
