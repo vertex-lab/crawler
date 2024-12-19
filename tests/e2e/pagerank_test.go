@@ -146,8 +146,11 @@ func TestWalks(t *testing.T) {
 // ------------------------------------BENCHMARKS-------------------------------
 
 func BenchmarkPersonalizedPagerank(b *testing.B) {
-	cl := redisutils.SetupTestClient()
+	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
+
+	var nodeID uint32 = 1233
+	var topk uint16 = 50
 
 	// Create new DB and RWS connections; Names are bad, I know... I will change them
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
@@ -161,9 +164,13 @@ func BenchmarkPersonalizedPagerank(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := pagerank.Personalized(ctx, DB, RWS, 0, 100)
+		_, err := pagerank.Personalized(ctx, DB, RWS, nodeID, topk)
 		if err != nil {
 			b.Fatalf("Personalized(): benchmark failed: %v", err)
 		}
 	}
+}
+
+func TestXsss(t *testing.T) {
+
 }

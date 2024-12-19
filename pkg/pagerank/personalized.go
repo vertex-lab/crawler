@@ -3,6 +3,7 @@ package pagerank
 import (
 	"context"
 	"errors"
+	"math"
 	"math/rand"
 	"time"
 
@@ -129,8 +130,8 @@ func personalized(
 		return nil, err
 	}
 
-	lenght := requiredLenght(topK)
 	alpha := RWS.Alpha(ctx)
+	lenght := requiredLenght(topK, alpha)
 	WC := NewWalkCache(1)
 	if err := WC.Load(ctx, RWS, walksNeeded(lenght, alpha), append(follows, nodeID)...); err != nil {
 		return nil, err
@@ -231,9 +232,14 @@ func walksNeeded(lenght int, alpha float32) int {
 
 // The function requiredLenght() returns the lenght that the personalized walk
 // has to reach for the Personalized Pagerank to achieve the specified precision.
-func requiredLenght(topK uint16) int {
-	_ = topK
-	return 300000
+func requiredLenght(topK uint16, alpha float32) int {
+
+	a := float64(alpha)
+	const c float64 = 100
+	const N float64 = 10000000 // upper bound for the size of the graph.
+
+	res := c / (1 - a) * math.Pow(float64(topK), a) * math.Pow(N, 1-a)
+	return int(math.Round(res))
 }
 
 // function that checks the inputs of Personalized Pagerank;
