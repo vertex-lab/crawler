@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
 // FormatWalk() formats a RandomWalk into a string ready to be stored in Redis.
@@ -98,6 +99,17 @@ func ParseIDs(strIDs []string) ([]uint32, error) {
 		IDs = append(IDs, ID)
 	}
 	return IDs, nil
+}
+
+// ParseUniqueIDs() parses a slice of unique IDs (no repetition), from the specified slice of string.
+func ParseUniqueIDs(strIDs []string) ([]uint32, error) {
+
+	IDs, err := ParseIDs(strIDs)
+	if err != nil {
+		return []uint32{}, nil
+	}
+
+	return sliceutils.Unique(IDs), nil
 }
 
 // ParseInt64() parses an int from the specified string

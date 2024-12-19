@@ -237,6 +237,47 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]mod
 	return redisutils.ParseWalks(strWalks)
 }
 
+/*
+WalksVisitingAny() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
+In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
+
+Note:
+If limit < nodeIDs, no walk is returned
+*/
+func (RWS *RandomWalkStore) WalksVisitingAny(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
+
+	if err := RWS.Validate(); err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be > 0")
+	}
+
+	limitPerNode := int64(limit) / int64(len(nodeIDs))
+	pipe := RWS.client.Pipeline()
+	cmds := make([]*redis.StringSliceCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = pipe.SRandMemberN(ctx, KeyWalksVisiting(ID), limitPerNode)
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	strIDs := make([]string, 0, limit)
+	for i, cmd := range cmds {
+		IDs := cmd.Val()
+		if len(IDs) == 0 {
+			return nil, fmt.Errorf("%w: nodeID %v", models.ErrNodeNotFoundRWS, nodeIDs[i])
+		}
+
+		strIDs = append(strIDs, IDs...)
+	}
+
+	return redisutils.ParseUniqueIDs(strIDs)
+}
+
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no walk gets added.
 func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomWalk) error {

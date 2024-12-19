@@ -4,9 +4,11 @@ package mock
 
 import (
 	"context"
+	"fmt"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
 // WalkSet is a set of IDs of RandomWalks. Each node in the RandomWalkStore
@@ -156,6 +158,38 @@ func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]mod
 	}
 
 	return walks, nil
+}
+
+/*
+WalksVisitingAny() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
+In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
+
+Note:
+If limit < nodeIDs, no walk is returned
+*/
+func (RWS *RandomWalkStore) WalksVisitingAny(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
+	_ = ctx
+	if err := RWS.Validate(); err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be > 0")
+	}
+
+	limitPerNode := int64(limit) / int64(len(nodeIDs))
+	walkIDs := make([]uint32, 0, limit)
+	for _, ID := range nodeIDs {
+		walkSet, exists := RWS.WalksVisiting[ID]
+		if !exists {
+			return nil, models.ErrNodeNotFoundRWS
+		}
+
+		IDs := walkSet.ToSlice()
+		walkIDs = append(walkIDs, IDs[:limitPerNode]...)
+	}
+
+	return sliceutils.Unique(walkIDs), nil
 }
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks

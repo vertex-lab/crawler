@@ -9,6 +9,45 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+func TestUnique(t *testing.T) {
+	testCases := []struct {
+		name          string
+		slice         []uint32
+		expectedSlice []uint32
+	}{
+		{
+			name:          "nil slice",
+			slice:         nil,
+			expectedSlice: []uint32{},
+		},
+		{
+			name:          "empty slice",
+			slice:         []uint32{},
+			expectedSlice: []uint32{},
+		},
+		{
+			name:          "already unique",
+			slice:         []uint32{1, 2, 3},
+			expectedSlice: []uint32{1, 2, 3},
+		},
+		{
+			name:          "valid",
+			slice:         []uint32{1, 2, 3, 4, 2, 3, 2},
+			expectedSlice: []uint32{1, 2, 3, 4},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			unique := Unique(test.slice)
+			if !reflect.DeepEqual(unique, test.expectedSlice) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedSlice, unique)
+			}
+		})
+	}
+}
+
 func TestSplitSlice(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -322,6 +361,19 @@ func TestSortWalks(t *testing.T) {
 }
 
 // ---------------------------------BENCHMARKS---------------------------------
+
+func BenchmarkUnique(b *testing.B) {
+	size := 1000000
+	slice := make([]uint32, size)
+	for i := 0; i < size; i++ {
+		slice[i] = uint32(rand.Intn(10000))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Unique(slice)
+	}
+}
 
 func BenchmarkSplitSlice(b *testing.B) {
 	size := 1000000

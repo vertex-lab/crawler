@@ -8,6 +8,25 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
+// Unique() returns a slice of unique elements of the input slice.
+func Unique(slice []uint32) []uint32 {
+	if len(slice) == 0 {
+		return []uint32{}
+	}
+
+	slices.Sort(slice)
+	unique := make([]uint32, 0, len(slice))
+	unique = append(unique, slice[0])
+
+	for i := 1; i < len(slice); i++ {
+		if slice[i] != slice[i-1] {
+			unique = append(unique, slice[i])
+		}
+	}
+
+	return unique
+}
+
 // SplitSlice splits a slice into a slice of slices with a maximum size of batchSize
 func SplitSlice(slice []string, batchSize int) [][]string {
 	if len(slice) == 0 {
@@ -26,7 +45,6 @@ func SplitSlice(slice []string, batchSize int) [][]string {
 // Empty and nil slices are considered equal.
 // Time complexity is O(n * logn + m * logm)  where n and m are the lengths of the slices.
 func EqualElements(slice1, slice2 []uint32) bool {
-
 	if len(slice1) != len(slice2) {
 		return false
 	}
@@ -147,7 +165,7 @@ func DeleteCyclesInPlace(oldWalk []uint32, newWalk []uint32) []uint32 {
 	return newWalk
 }
 
-// SortWalks() sorts the walks lexicographically
+// SortWalks() sorts walks lexicographically.
 func SortWalks(walks []models.RandomWalk) []models.RandomWalk {
 	sort.Slice(walks, func(i, j int) bool {
 		// Compare slices lexicographically
