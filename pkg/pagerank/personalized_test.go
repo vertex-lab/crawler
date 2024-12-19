@@ -420,7 +420,7 @@ func BenchmarkCropWalk(b *testing.B) {
 }
 
 func BenchmarkPersonalized(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
@@ -441,7 +441,7 @@ func BenchmarkPersonalized(b *testing.B) {
 }
 
 func BenchmarkWalks(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	RWS, err := redistore.NewRWSConnection(ctx, cl)
@@ -458,7 +458,7 @@ func BenchmarkWalks(b *testing.B) {
 }
 
 func BenchmarkSMembers(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -470,7 +470,7 @@ func BenchmarkSMembers(b *testing.B) {
 }
 
 func BenchmarkHMGET2(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	keys := make([]string, 1100000)
@@ -487,7 +487,7 @@ func BenchmarkHMGET2(b *testing.B) {
 }
 
 func BenchmarkLoad(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
@@ -516,7 +516,7 @@ func BenchmarkLoad(b *testing.B) {
 }
 
 func BenchmarkSMembersPipe(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	size := 1000
@@ -547,7 +547,7 @@ func BenchmarkSMembersPipe(b *testing.B) {
 }
 
 func BenchmarkFollowUnion(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	size := 34000
@@ -570,7 +570,7 @@ func BenchmarkFollowUnion(b *testing.B) {
 }
 
 func BenchmarkFollowsPipe(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	size := 10000
@@ -595,7 +595,7 @@ func BenchmarkFollowsPipe(b *testing.B) {
 }
 
 func BenchmarkHMGETPipe(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	keys := make([]string, 0, 10000)
@@ -640,7 +640,7 @@ func BenchmarkHMGETPipe(b *testing.B) {
 }
 
 func BenchmarkCompletePipe(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	keys := make([]string, 0, 100)
@@ -685,7 +685,7 @@ func BenchmarkCompletePipe(b *testing.B) {
 }
 
 func BenchmarkHMGET(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	keys := make([]string, 0, 100)
@@ -707,7 +707,7 @@ func BenchmarkHMGET(b *testing.B) {
 }
 
 func BenchmarkSUNION(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	keys := make([]string, 0, 100)
@@ -724,7 +724,7 @@ func BenchmarkSUNION(b *testing.B) {
 }
 
 func BenchmarkSUNION2(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 
 	follows, err := cl.SMembers(ctx, redisdb.KeyFollows(0)).Result()
@@ -746,7 +746,7 @@ func BenchmarkSUNION2(b *testing.B) {
 }
 
 // func BenchmarkSteps(b *testing.B) {
-// 	cl := redisutils.SetupClient()
+// 	cl := redisutils.SetupTestClient()
 
 // 	ctx := context.Background()
 // 	DB, err := redisdb.SetupDB(cl, "pip")

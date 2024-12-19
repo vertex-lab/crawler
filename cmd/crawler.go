@@ -26,9 +26,9 @@ func main() {
 	PrintTitle(logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
+	defer cancel()
 
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupProdClient()
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		panic(err)

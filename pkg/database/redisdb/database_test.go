@@ -15,7 +15,7 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -56,7 +56,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestAddFollows(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	nodeID := uint32(0)
@@ -104,7 +104,7 @@ func TestAddFollows(t *testing.T) {
 }
 
 func TestRemoveFollows(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	nodeID := uint32(0)
@@ -173,7 +173,7 @@ func TestRemoveFollows(t *testing.T) {
 }
 
 func TestAddFollowers(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	nodeID := uint32(0)
@@ -221,7 +221,7 @@ func TestAddFollowers(t *testing.T) {
 }
 
 func TestNodeByID(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -287,7 +287,7 @@ func TestNodeByID(t *testing.T) {
 }
 
 func TestNodeByKey(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -379,7 +379,7 @@ func TestAddNode(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				DB, err := SetupDB(cl, test.DBType)
@@ -435,7 +435,7 @@ func TestAddNode(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				ctx := context.Background()
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				DB, err := SetupDB(cl, test.DBType)
@@ -497,7 +497,7 @@ func TestAddNode(t *testing.T) {
 }
 
 func TestUpdateNode(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -569,7 +569,7 @@ func TestUpdateNode(t *testing.T) {
 }
 
 func TestContainsNode(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -666,7 +666,7 @@ func TestFollows(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			cl := redisutils.SetupClient()
+			cl := redisutils.SetupTestClient()
 			defer redisutils.CleanupRedis(cl)
 
 			DB, err := SetupDB(cl, test.DBType)
@@ -687,7 +687,7 @@ func TestFollows(t *testing.T) {
 }
 
 func TestNodeIDs(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -738,7 +738,7 @@ func TestNodeIDs(t *testing.T) {
 }
 
 func TestPubkeys(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -789,7 +789,7 @@ func TestPubkeys(t *testing.T) {
 }
 
 func TestAllNodes(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -836,7 +836,7 @@ func TestAllNodes(t *testing.T) {
 }
 
 func TestScanNodes(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	type testCase struct {
@@ -914,7 +914,7 @@ func TestScanNodes(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -955,7 +955,7 @@ func TestSize(t *testing.T) {
 }
 
 func TestSetPagerank(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	type testCases struct {
@@ -1057,7 +1057,7 @@ func TestInterface(t *testing.T) {
 
 func BenchmarkNodeByKey(b *testing.B) {
 	ctx := context.Background()
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	DB, err := SetupDB(cl, "one-node0")
@@ -1077,7 +1077,7 @@ func BenchmarkNodeByKey(b *testing.B) {
 
 func BenchmarkNodeByID(b *testing.B) {
 	ctx := context.Background()
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	DB, err := SetupDB(cl, "one-node0")
@@ -1103,7 +1103,7 @@ func BenchmarkSetPagerank(b *testing.B) {
 	// Different DB sizes
 	for _, nodesSize := range []int{100, 1000, 10000} {
 		b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
-			cl := redisutils.SetupClient()
+			cl := redisutils.SetupTestClient()
 			defer redisutils.CleanupRedis(cl)
 
 			DB, err := GenerateDB(cl, nodesSize, edgesPerNode, rng)
@@ -1135,7 +1135,7 @@ func BenchmarkAllNodes(b *testing.B) {
 	// Different DB sizes
 	for _, nodesSize := range []int{100, 1000, 10000} {
 		b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
-			cl := redisutils.SetupClient()
+			cl := redisutils.SetupTestClient()
 			defer redisutils.CleanupRedis(cl)
 
 			DB, err := GenerateDB(cl, nodesSize, edgesPerNode, rng)

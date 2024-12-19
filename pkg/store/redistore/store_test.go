@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewRWS(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -72,7 +72,7 @@ func TestNewRWS(t *testing.T) {
 }
 
 func TestLoadRWS(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -119,7 +119,7 @@ func TestLoadRWS(t *testing.T) {
 }
 
 func TestTotalVisits(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -161,7 +161,7 @@ func TestTotalVisits(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	t.Run("nil RWS", func(t *testing.T) {
@@ -202,7 +202,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestVisitCounts(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -269,7 +269,7 @@ func TestVisitCounts(t *testing.T) {
 }
 
 func TestWalks(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -330,7 +330,7 @@ func TestWalks(t *testing.T) {
 }
 
 func TestWalksUnion(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
@@ -429,7 +429,7 @@ func TestAddWalks(t *testing.T) {
 		}
 
 		for _, test := range testCases {
-			cl := redisutils.SetupClient()
+			cl := redisutils.SetupTestClient()
 			defer redisutils.CleanupRedis(cl)
 
 			t.Run(test.name, func(t *testing.T) {
@@ -447,7 +447,7 @@ func TestAddWalks(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-		cl := redisutils.SetupClient()
+		cl := redisutils.SetupTestClient()
 		defer redisutils.CleanupRedis(cl)
 
 		RWS, err := SetupRWS(cl, "empty")
@@ -538,7 +538,7 @@ func TestAddWalks(t *testing.T) {
 }
 
 func TestRemoveWalks(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	t.Run("simple errors", func(t *testing.T) {
@@ -616,7 +616,7 @@ func TestRemoveWalks(t *testing.T) {
 }
 
 func TestPruneGraftWalk(t *testing.T) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
 
 	t.Run("simple errors", func(t *testing.T) {
@@ -793,7 +793,7 @@ func BenchmarkVisitCounts(b *testing.B) {
 		nodesNum := 100
 		for _, walksNum := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
@@ -820,7 +820,7 @@ func BenchmarkVisitCounts(b *testing.B) {
 		walksNum := 10000
 		for _, nodesNum := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("nodesNum=%d", nodesNum), func(b *testing.B) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
@@ -849,7 +849,7 @@ func BenchmarkWalks(b *testing.B) {
 		nodesNum := 100
 		for _, walksNum := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
@@ -873,7 +873,7 @@ func BenchmarkWalksUnion(b *testing.B) {
 		nodesNum := 100
 		for _, walksNum := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				RWS, err := GenerateRWS(cl, nodesNum, walksNum)

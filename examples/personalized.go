@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 
 	// DO THIS ONLY ONCE, THEN COMMENT OUT.
 	// Setup the DB and RWS with just the pip key (fucking narcissist).

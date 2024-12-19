@@ -368,7 +368,7 @@ func BenchmarkWCLoadRedis(b *testing.B) {
 		nodesNum := 100
 		for _, walksNum := range []int{1000, 10000, 100000} {
 			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				RWS, err := redistore.GenerateRWS(cl, nodesNum, walksNum)

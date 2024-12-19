@@ -245,7 +245,7 @@ func BenchmarkPagerankRedis(b *testing.B) {
 		// Different DB sizes
 		for _, nodesSize := range []int{100, 1000, 10000} {
 			b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
-				cl := redisutils.SetupClient()
+				cl := redisutils.SetupTestClient()
 				defer redisutils.CleanupRedis(cl)
 
 				// Setup DB and RWS
@@ -277,7 +277,7 @@ func BenchmarkPagerankRedis(b *testing.B) {
 }
 
 func BenchmarkPagerank(b *testing.B) {
-	cl := redisutils.SetupClient()
+	cl := redisutils.SetupTestClient()
 	ctx := context.Background()
 	pipe := cl.Pipeline()
 
