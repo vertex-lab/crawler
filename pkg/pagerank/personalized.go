@@ -125,17 +125,16 @@ func personalized(
 
 	FC := NewFollowCache(DB, len(follows)+1)
 	FC.follows[nodeID] = follows
-	// if err := FC.Load(ctx, follows...); err != nil {
-	// 	return nil, err
-	// }
+	if err := FC.Load(ctx, follows...); err != nil {
+		return nil, err
+	}
 
 	lenght := requiredLenght(topK)
 	alpha := RWS.Alpha(ctx)
-	// WC := NewWalkCache(walksNeeded(lenght, alpha))
-	// if err := WC.Load(ctx, RWS, follows...); err != nil {
-	// 	return nil, err
-	// }
 	WC := NewWalkCache(1)
+	if err := WC.Load(ctx, RWS, walksNeeded(lenght, alpha), append(follows, nodeID)...); err != nil {
+		return nil, err
+	}
 
 	walk, err := personalizedWalk(ctx, FC, WC, nodeID, lenght, alpha, rng)
 	if err != nil {
@@ -227,7 +226,7 @@ func CropWalk(walk models.RandomWalk, nodeID uint32) (models.RandomWalk, error) 
 // The function walksNeeded() estimates the number of walks needed to reach the
 // target lenght. It uses the fact that, on average, walks are 1/(1-alpha) long.
 func walksNeeded(lenght int, alpha float32) int {
-	return int(float32(lenght) / (1 - alpha))
+	return int(float32(lenght) * (1 - alpha))
 }
 
 // The function requiredLenght() returns the lenght that the personalized walk

@@ -14,12 +14,12 @@ import (
 
 // TestPagerankSum() tests if the L1 norm of the pagerank vector is equal to 1, as it should be.
 func TestPagerankSum(t *testing.T) {
-	cl := redisutils.SetupTestClient()
+	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
-	DB, err := redisdb.NewDatabase(ctx, cl)
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
-		t.Fatalf("NewDatabase(): expected nil, got %v", err)
+		t.Fatalf("NewDatabaseConnection(): expected nil, got %v", err)
 	}
 
 	nodeIDs, err := DB.AllNodes(ctx)
@@ -58,7 +58,7 @@ func TestPagerankSum(t *testing.T) {
 // TestTotalVisits() tests if the totalVisits field in the RWS is indeed equal to
 // the sum of all the visits for each node.
 func TestTotalVisits(t *testing.T) {
-	cl := redisutils.SetupTestClient()
+	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
 	// get the field totalVisits
@@ -72,7 +72,7 @@ func TestTotalVisits(t *testing.T) {
 	}
 
 	// compute the sum of the visits for each node
-	DB, err := redisdb.NewDatabase(ctx, cl)
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		t.Fatalf("NewDatabase(): expected nil, got %v", err)
 	}
@@ -104,7 +104,7 @@ func TestTotalVisits(t *testing.T) {
 
 // TestWalks() tests for each walk, if its walkID is present in the walksVisiting each of the node it visits.
 func TestWalks(t *testing.T) {
-	cl := redisutils.SetupTestClient()
+	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
 	// get the walkIndex walkID --> random walk
@@ -150,7 +150,7 @@ func BenchmarkPersonalizedPagerank(b *testing.B) {
 	ctx := context.Background()
 
 	// Create new DB and RWS connections; Names are bad, I know... I will change them
-	DB, err := redisdb.NewDatabase(ctx, cl)
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
 	}
