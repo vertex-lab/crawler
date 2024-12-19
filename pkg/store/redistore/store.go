@@ -278,6 +278,34 @@ func (RWS *RandomWalkStore) WalksVisitingAny(ctx context.Context, limit int, nod
 	return redisutils.ParseUniqueIDs(strIDs)
 }
 
+// WalksVisitingAll() returns all the IDs of the walk that visit ALL specified nodes.
+func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uint32) ([]uint32, error) {
+	if err := RWS.Validate(); err != nil {
+		return nil, err
+	}
+
+	keys := make([]string, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		keys[i] = KeyWalksVisiting(ID)
+	}
+
+	// check first if the keys exist
+	exists, err := RWS.client.Exists(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	if int(exists) < len(nodeIDs) {
+		return nil, fmt.Errorf("%w: %v", models.ErrNodeNotFoundRWS, nodeIDs)
+	}
+
+	strIDs, err := RWS.client.SInter(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	return redisutils.ParseIDs(strIDs)
+}
+
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no walk gets added.
 func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomWalk) error {

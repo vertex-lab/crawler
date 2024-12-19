@@ -192,6 +192,30 @@ func (RWS *RandomWalkStore) WalksVisitingAny(ctx context.Context, limit int, nod
 	return sliceutils.Unique(walkIDs), nil
 }
 
+// WalksVisitingAll() returns all the IDs of the walk that visit ALL specified nodes.
+func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uint32) ([]uint32, error) {
+	_ = ctx
+	if err := RWS.Validate(); err != nil {
+		return nil, err
+	}
+
+	intersection, exists := RWS.WalksVisiting[nodeIDs[0]]
+	if !exists {
+		return nil, models.ErrNodeNotFoundRWS
+	}
+
+	for _, ID := range nodeIDs[1:] {
+		walkSet, exists := RWS.WalksVisiting[ID]
+		if !exists {
+			return nil, models.ErrNodeNotFoundRWS
+		}
+
+		intersection = intersection.Intersect(walkSet)
+	}
+
+	return intersection.ToSlice(), nil
+}
+
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no one gets added.
 func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomWalk) error {
