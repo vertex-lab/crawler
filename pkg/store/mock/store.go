@@ -135,62 +135,27 @@ func (RWS *RandomWalkStore) WalkIDs(ctx context.Context, nodeID uint32) (WalkSet
 	return walkIDs, nil
 }
 
-// WalksUnion() returns a map of walks by walksID that visit at least one of the specified nodeIDs.
-func (RWS *RandomWalkStore) WalksUnion(ctx context.Context, nodeIDs []uint32) (map[uint32]models.RandomWalk, error) {
-	if err := RWS.Validate(); err != nil {
-		return nil, err
-	}
-
-	unionSet := mapset.NewSet[uint32]()
-	for _, ID := range nodeIDs {
-		walkSet, exist := RWS.WalksVisiting[ID]
-		if !exist {
-			return nil, models.ErrNodeNotFoundRWS
-		}
-
-		unionSet.Append(walkSet.ToSlice()...)
-	}
-
-	walkIDs := unionSet.ToSlice()
-	return RWS.walksByID(ctx, walkIDs...)
-}
-
 // Walks() returns a map of walks by walkID that visit nodeID.
 // - if limit > 0, the map contains up to that many key-value pairs.
 // - if limit < 0, all walks are returned
 // - if no walks are found for nodeID, an error is returned
-func (RWS *RandomWalkStore) Walks(ctx context.Context, nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
+func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]models.RandomWalk, error) {
+
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
-	walkSet, exist := RWS.WalksVisiting[nodeID]
-	if !exist {
-		return nil, models.ErrNodeNotFoundRWS
-	}
-	walkIDs := walkSet.ToSlice() // we use ToSlice() instead of Iter() to avoid potential deadlocks
+	walks := make([]models.RandomWalk, 0, len(walkIDs))
+	for _, ID := range walkIDs {
+		walk, exist := RWS.WalkIndex[ID]
+		if !exist {
+			return nil, models.ErrWalkNotFound
+		}
 
-	if limit > 0 && limit < len(walkIDs) {
-		walkIDs = walkIDs[:limit]
-	}
-
-	return RWS.walksByID(ctx, walkIDs...)
-}
-
-// The method walksByID returns a map walkID --> walk for the specified IDs.
-func (RWS *RandomWalkStore) walksByID(ctx context.Context, walkIDs ...uint32) (map[uint32]models.RandomWalk, error) {
-	_ = ctx
-
-	if len(walkIDs) == 0 {
-		return nil, nil
+		walks = append(walks, walk)
 	}
 
-	walkMap := make(map[uint32]models.RandomWalk, len(walkIDs))
-	for _, walkID := range walkIDs {
-		walkMap[walkID] = RWS.WalkIndex[walkID]
-	}
-
-	return walkMap, nil
+	return walks, nil
 }
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks

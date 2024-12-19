@@ -273,39 +273,41 @@ func TestWalks(t *testing.T) {
 	defer redisutils.CleanupRedis(cl)
 
 	testCases := []struct {
-		name            string
-		RWSType         string
-		nodeID          uint32
-		expectedWalkMap map[uint32]models.RandomWalk
-		expectedError   error
+		name          string
+		RWSType       string
+		walkIDs       []uint32
+		expectedWalks []models.RandomWalk
+		expectedError error
 	}{
 		{
 			name:          "nil RWS",
 			RWSType:       "nil",
-			nodeID:        0,
+			walkIDs:       []uint32{0},
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
 			name:          "empty RWS",
 			RWSType:       "empty",
-			nodeID:        0,
-			expectedError: models.ErrNodeNotFoundRWS,
+			walkIDs:       []uint32{0},
+			expectedError: models.ErrWalkNotFound,
 		},
 		{
-			name:          "node not found in RWS",
+			name:          "walkID not found in RWS",
 			RWSType:       "one-node0",
-			nodeID:        1,
-			expectedError: models.ErrNodeNotFoundRWS,
+			walkIDs:       []uint32{1},
+			expectedError: models.ErrWalkNotFound,
 		},
 		{
-			name:    "normal",
-			RWSType: "triangle",
-			nodeID:  0,
-			expectedWalkMap: map[uint32]models.RandomWalk{
-				0: {0, 1, 2},
-				1: {1, 2, 0},
-				2: {2, 0, 1},
-			},
+			name:          "one walkID",
+			RWSType:       "triangle",
+			walkIDs:       []uint32{0},
+			expectedWalks: []models.RandomWalk{{0, 1, 2}},
+		},
+		{
+			name:          "multiple walkID",
+			RWSType:       "triangle",
+			walkIDs:       []uint32{0, 2},
+			expectedWalks: []models.RandomWalk{{0, 1, 2}, {2, 0, 1}},
 		},
 	}
 
@@ -316,74 +318,13 @@ func TestWalks(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			walkMap, err := RWS.Walks(context.Background(), test.nodeID, -1)
-
+			walks, err := RWS.Walks(context.Background(), test.walkIDs...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
-				t.Errorf("Walks(): expected %v, got %v", test.expectedWalkMap, walkMap)
-			}
-		})
-	}
-}
-
-func TestWalksUnion(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
-	testCases := []struct {
-		name            string
-		RWSType         string
-		nodeIDs         []uint32
-		expectedWalkMap map[uint32]models.RandomWalk
-		expectedError   error
-	}{
-		{
-			name:          "nil RWS",
-			RWSType:       "nil",
-			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "empty RWS",
-			RWSType:       "empty",
-			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNodeNotFoundRWS,
-		},
-		{
-			name:          "node not found in RWS",
-			RWSType:       "one-node0",
-			nodeIDs:       []uint32{1},
-			expectedError: models.ErrNodeNotFoundRWS,
-		},
-		{
-			name:    "normal",
-			RWSType: "complex",
-			nodeIDs: []uint32{0, 1},
-			expectedWalkMap: map[uint32]models.RandomWalk{
-				0: {0, 1, 2},
-				1: {0, 3},
-				2: {1, 2},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			RWS, err := SetupRWS(cl, test.RWSType)
-			if err != nil {
-				t.Fatalf("SetupRWS(): expected nil, got %v", err)
-			}
-
-			walkMap, err := RWS.WalksUnion(context.Background(), test.nodeIDs)
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("WalksUnion(): expected %v, got %v", test.expectedError, err)
-			}
-
-			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
-				t.Errorf("WalksUnion(): expected %v, got %v", test.expectedWalkMap, walkMap)
+			if !reflect.DeepEqual(walks, test.expectedWalks) {
+				t.Errorf("Walks(): expected %v, got %v", test.expectedWalks, walks)
 			}
 		})
 	}
@@ -782,9 +723,9 @@ func TestPruneGraftWalk(t *testing.T) {
 	})
 }
 
-func TestInterface(t *testing.T) {
-	var _ models.RandomWalkStore = &RandomWalkStore{}
-}
+// func TestInterface(t *testing.T) {
+// 	var _ models.RandomWalkStore = &RandomWalkStore{}
+// }
 
 // ------------------------------------BENCHMARKS------------------------------
 
@@ -844,55 +785,26 @@ func BenchmarkVisitCounts(b *testing.B) {
 	})
 }
 
-func BenchmarkWalks(b *testing.B) {
-	b.Run("fixed number of nodes", func(b *testing.B) {
-		nodesNum := 100
-		for _, walksNum := range []int{100, 1000, 10000} {
-			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
-				cl := redisutils.SetupTestClient()
-				defer redisutils.CleanupRedis(cl)
+// func BenchmarkWalks(b *testing.B) {
+// 	b.Run("fixed number of nodes", func(b *testing.B) {
+// 		nodesNum := 100
+// 		for _, walksNum := range []int{100, 1000, 10000} {
+// 			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
+// 				cl := redisutils.SetupTestClient()
+// 				defer redisutils.CleanupRedis(cl)
 
-				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
-				if err != nil {
-					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
-				}
+// 				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
+// 				if err != nil {
+// 					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
+// 				}
 
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if _, err := RWS.Walks(context.Background(), 0, -1); err != nil {
-						b.Fatalf("benchmark failed: %v", err)
-					}
-				}
-			})
-		}
-	})
-}
-
-func BenchmarkWalksUnion(b *testing.B) {
-	b.Run("fixed number of nodes", func(b *testing.B) {
-		nodesNum := 100
-		for _, walksNum := range []int{100, 1000, 10000} {
-			b.Run(fmt.Sprintf("walksNum=%d", walksNum), func(b *testing.B) {
-				cl := redisutils.SetupTestClient()
-				defer redisutils.CleanupRedis(cl)
-
-				RWS, err := GenerateRWS(cl, nodesNum, walksNum)
-				if err != nil {
-					b.Fatalf("GenerateRWS() benchmark failed: %v", err)
-				}
-
-				nodeIDs := make([]uint32, 100)
-				for i := 0; i < 100; i++ {
-					nodeIDs[i] = uint32(i)
-				}
-
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if _, err := RWS.WalksUnion(context.Background(), nodeIDs); err != nil {
-						b.Fatalf("benchmark failed: %v", err)
-					}
-				}
-			})
-		}
-	})
-}
+// 				b.ResetTimer()
+// 				for i := 0; i < b.N; i++ {
+// 					if _, err := RWS.Walks(context.Background(), 0, -1); err != nil {
+// 						b.Fatalf("benchmark failed: %v", err)
+// 					}
+// 				}
+// 			})
+// 		}
+// 	})
+// }

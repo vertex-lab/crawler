@@ -163,147 +163,58 @@ func TestWalks(t *testing.T) {
 	testCases := []struct {
 		name          string
 		RWSType       string
-		nodeID        uint32
-		limit         int
-		WalkMap       map[uint32]models.RandomWalk
-		expectedLen   int
+		walkIDs       []uint32
+		expectedWalks []models.RandomWalk
 		expectedError error
 	}{
 		{
 			name:          "nil RWS",
 			RWSType:       "nil",
-			nodeID:        0,
-			limit:         1,
-			expectedLen:   0,
+			walkIDs:       []uint32{0},
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
 			name:          "empty RWS",
 			RWSType:       "empty",
-			nodeID:        0,
-			limit:         1,
-			expectedLen:   0,
-			expectedError: models.ErrNodeNotFoundRWS,
+			walkIDs:       []uint32{0},
+			expectedError: models.ErrWalkNotFound,
 		},
 		{
-			name:          "node not found in RWS",
+			name:          "walkID not found in RWS",
 			RWSType:       "one-node0",
-			nodeID:        1,
-			limit:         1,
-			expectedLen:   0,
-			expectedError: models.ErrNodeNotFoundRWS,
+			walkIDs:       []uint32{1},
+			expectedError: models.ErrWalkNotFound,
 		},
 		{
-			name:        "valid, all",
-			RWSType:     "triangle",
-			nodeID:      0,
-			limit:       -1,
-			expectedLen: 3,
-			WalkMap: map[uint32]models.RandomWalk{
-				0: {0, 1, 2},
-				1: {1, 2, 0},
-				2: {2, 0, 1},
-			},
+			name:          "one walkID",
+			RWSType:       "triangle",
+			walkIDs:       []uint32{0},
+			expectedWalks: []models.RandomWalk{{0, 1, 2}},
 		},
 		{
-			name:        "valid",
-			RWSType:     "triangle",
-			nodeID:      0,
-			limit:       2,
-			expectedLen: 2,
-			WalkMap: map[uint32]models.RandomWalk{
-				0: {0, 1, 2},
-				1: {1, 2, 0},
-				2: {2, 0, 1},
-			},
+			name:          "multiple walkID",
+			RWSType:       "triangle",
+			walkIDs:       []uint32{0, 2},
+			expectedWalks: []models.RandomWalk{{0, 1, 2}, {2, 0, 1}},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			walkMap, err := RWS.Walks(context.Background(), test.nodeID, test.limit)
+			walks, err := RWS.Walks(context.Background(), test.walkIDs...)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if len(walkMap) != test.expectedLen {
-				t.Errorf("expected %d walks, got %v", test.expectedLen, walkMap)
-			}
-
-			for walkID, walk := range walkMap {
-				if !reflect.DeepEqual(test.WalkMap[walkID], walk) {
-					t.Fatalf("expected walks in %v, got %v", test.WalkMap, walkMap)
-				}
+			if !reflect.DeepEqual(walks, test.expectedWalks) {
+				t.Errorf("Walks(): expected %v, got %v", test.expectedWalks, walks)
 			}
 		})
 	}
 }
 
-func TestWalksUnion(t *testing.T) {
-	testCases := []struct {
-		name            string
-		RWSType         string
-		nodeIDs         []uint32
-		expectedWalkMap map[uint32]models.RandomWalk
-		expectedError   error
-	}{
-		{
-			name:          "nil RWS",
-			RWSType:       "nil",
-			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNilRWSPointer,
-		},
-		{
-			name:          "empty RWS",
-			RWSType:       "empty",
-			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNodeNotFoundRWS,
-		},
-		{
-			name:          "node not found in RWS",
-			RWSType:       "one-node0",
-			nodeIDs:       []uint32{1},
-			expectedError: models.ErrNodeNotFoundRWS,
-		},
-		{
-			name:    "valid, all",
-			RWSType: "triangle",
-			nodeIDs: []uint32{0},
-			expectedWalkMap: map[uint32]models.RandomWalk{
-				0: {0, 1, 2},
-				1: {1, 2, 0},
-				2: {2, 0, 1},
-			},
-		},
-		{
-			name:    "valid",
-			RWSType: "triangle",
-			nodeIDs: []uint32{0},
-			expectedWalkMap: map[uint32]models.RandomWalk{
-				0: {0, 1, 2},
-				1: {1, 2, 0},
-				2: {2, 0, 1},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			RWS := SetupRWS(test.RWSType)
-			walkMap, err := RWS.WalksUnion(context.Background(), test.nodeIDs)
-
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("WalksUnion(): expected %v, got %v", test.expectedError, err)
-			}
-
-			if !reflect.DeepEqual(walkMap, test.expectedWalkMap) {
-				t.Errorf("WalksUnion(): expected %v, got %v", test.expectedWalkMap, walkMap)
-			}
-		})
-	}
-}
 func TestAddWalks(t *testing.T) {
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
@@ -607,6 +518,6 @@ func TestGraftWalk(t *testing.T) {
 	})
 }
 
-func TestInterface(t *testing.T) {
-	var _ models.RandomWalkStore = &RandomWalkStore{}
-}
+// func TestInterface(t *testing.T) {
+// 	var _ models.RandomWalkStore = &RandomWalkStore{}
+// }

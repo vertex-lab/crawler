@@ -198,71 +198,19 @@ func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) (
 	return visitMap, nil
 }
 
-// WalksUnion() returns a map of walks by walksID that visit at least one of the specified nodeIDs.
-func (RWS *RandomWalkStore) WalksUnion(ctx context.Context, nodeIDs []uint32) (map[uint32]models.RandomWalk, error) {
+// Walks() returns the walks associated with the walkIDs.
+func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]models.RandomWalk, error) {
+
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
 
-	keys := make([]string, 0, len(nodeIDs))
-	for _, ID := range nodeIDs {
-		keys = append(keys, KeyWalksVisiting(ID))
-	}
-
-	strIDs, err := RWS.client.SUnion(ctx, keys...).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(strIDs) == 0 {
-		return nil, models.ErrNodeNotFoundRWS
-	}
-
-	return RWS.walksByStrID(ctx, strIDs...)
-}
-
-// Walks() returns a map of walks by walksID that visit nodeID.
-func (RWS *RandomWalkStore) Walks(ctx context.Context, nodeID uint32, limit int) (map[uint32]models.RandomWalk, error) {
-	if err := RWS.Validate(); err != nil {
-		return nil, err
-	}
-
-	var strIDs []string
-	var err error
-	key := KeyWalksVisiting(nodeID)
-
-	if limit <= 0 {
-		// fetch all the walks
-		strIDs, err = RWS.client.SMembers(ctx, key).Result()
-	} else {
-		// randomly fetch up to limit
-		strIDs, err = RWS.client.SRandMemberN(ctx, key, int64(limit)).Result()
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(strIDs) == 0 {
-		return nil, models.ErrNodeNotFoundRWS
-	}
-
-	return RWS.walksByStrID(ctx, strIDs...)
-}
-
-// The method walksByStrID() returns a map walkID --> walk, given a slice of strIDs.
-func (RWS *RandomWalkStore) walksByStrID(ctx context.Context, strIDs ...string) (map[uint32]models.RandomWalk, error) {
-	if len(strIDs) == 0 {
+	if len(walkIDs) == 0 {
 		return nil, nil
 	}
 
-	walkIDs, err := redisutils.ParseIDs(strIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// asking for more walks in one go can cause problems with Redis
-	const batchSize int = 500000
+	const batchSize int = 500000 // asking for more walks in one go can cause problems with Redis
+	strIDs := redisutils.FormatIDs(walkIDs)
 	batchedIDs := sliceutils.SplitSlice(strIDs, batchSize)
 
 	res := make([]interface{}, 0, len(strIDs))
@@ -276,26 +224,17 @@ func (RWS *RandomWalkStore) walksByStrID(ctx context.Context, strIDs ...string) 
 	}
 
 	strWalks := make([]string, 0, len(res))
-	for _, r := range res {
+	for i, r := range res {
 		strWalk, ok := r.(string)
 		if !ok {
-			return nil, fmt.Errorf("unexpected type: %v", res)
+			// it means r is nil, which happens when the walk was not found
+			return nil, fmt.Errorf("%w: walkID %v", models.ErrWalkNotFound, walkIDs[i])
 		}
 
 		strWalks = append(strWalks, strWalk)
 	}
 
-	walks, err := redisutils.ParseWalks(strWalks)
-	if err != nil {
-		return nil, err
-	}
-
-	walkMap := make(map[uint32]models.RandomWalk, len(walkIDs))
-	for i, walkID := range walkIDs {
-		walkMap[walkID] = walks[i]
-	}
-
-	return walkMap, nil
+	return redisutils.ParseWalks(strWalks)
 }
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
