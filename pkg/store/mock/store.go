@@ -151,7 +151,7 @@ In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the node
 
 Note:
 - If 0 < limit < nodeIDs, no walk is returned
-- If limit <= 0, all walks are returned
+- If limit <= 0, all walks for all nodes are returned (use signalling value limit = -1)
 */
 func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
 	_ = ctx

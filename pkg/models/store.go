@@ -37,12 +37,12 @@ type RandomWalkStore interface {
 	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
 	VisitCounts(ctx context.Context, nodeIDs []uint32) (map[uint32]int, error)
 
-	/*
-		WalksVisiting() returns a total of limit walkIDs evenly distributed among the specified nodeIDs.
-		In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
+	/*WalksVisiting() returns up to limit walkIDs evenly distributed among the specified nodeIDs.
+	In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
 
-		Note:
-		If limit < nodeIDs, no walk is returned
+	Note:
+	- If 0 < limit < nodeIDs, no walk is returned
+	- If limit <= 0, all walks for all nodes are returned (use signalling value limit = -1)
 	*/
 	WalksVisiting(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error)
 
