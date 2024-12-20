@@ -1,7 +1,10 @@
-# Pipeline Scenarios
+# Pipeline
+
+![data_pipeline.png](/home/filippo/Documents/Code/Nostrcrawler/docs/data_pipeline.png)
+
+# Scenarios
 
 **Active node**: A node is said to be active if we generate random walks starting from that node. This implies that such node is contributing to the pagerank distribution with its view of the network. To be active, a node needs to acquire sufficient pagerank mass, higher than the threshold.
-
 
 **Inactive node**: A node is said to be inactive if we DON'T generate random walks starting from that node. This implies that such node is NOT contributing to the pagerank distribution with its view of the network.
 

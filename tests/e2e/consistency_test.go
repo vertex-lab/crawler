@@ -149,10 +149,9 @@ func BenchmarkPersonalizedPagerank(b *testing.B) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
-	var nodeID uint32 = 1233
-	var topk uint16 = 50
+	var nodeID uint32 = 0
+	var topk uint16 = 100
 
-	// Create new DB and RWS connections; Names are bad, I know... I will change them
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
@@ -169,8 +168,4 @@ func BenchmarkPersonalizedPagerank(b *testing.B) {
 			b.Fatalf("Personalized(): benchmark failed: %v", err)
 		}
 	}
-}
-
-func TestXsss(t *testing.T) {
-
 }
