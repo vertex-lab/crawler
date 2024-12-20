@@ -13,6 +13,32 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
+// GetPagerankDB() fetched the pagerank scores from the DB for each of the specified nodes.
+func GetPagerankDB(ctx context.Context, cl *redis.Client, nodeIDs []uint32) ([]float64, error) {
+	pipe := cl.Pipeline()
+	cmds := make([]*redis.StringCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = pipe.HGet(ctx, redisdb.KeyNode(ID), models.KeyPagerank)
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, err
+	}
+
+	pagerank := make([]float64, len(nodeIDs))
+	for i, cmd := range cmds {
+		strRank := cmd.Val()
+		rank, err := redisutils.ParseFloat64(strRank)
+		if err != nil {
+			return nil, err
+		}
+
+		pagerank[i] = rank
+	}
+
+	return pagerank, nil
+}
+
 // TestPagerankSum() tests if the L1 norm of the pagerank vector is equal to 1, as it should be.
 func TestPagerankSum(t *testing.T) {
 	cl := redisutils.SetupProdClient()
@@ -28,30 +54,18 @@ func TestPagerankSum(t *testing.T) {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}
 
-	pipe := cl.Pipeline()
-	cmds := make([]*redis.StringCmd, len(nodeIDs))
-	for i, ID := range nodeIDs {
-		cmds[i] = pipe.HGet(ctx, redisdb.KeyNode(ID), models.KeyPagerank)
+	pagerank, err := GetPagerankDB(ctx, cl, nodeIDs)
+	if err != nil {
+		t.Fatalf("GetPagerank(): expected nil, got %v", err)
 	}
 
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Pipeline failed: %v", err)
+	sum := 0.0
+	for _, rank := range pagerank {
+		sum += rank
 	}
 
-	// now we want to test that the L1 norm of the pagerank vector is 1.
-	sumPagerank := 0.0
-	for _, cmd := range cmds {
-		strRank := cmd.Val()
-		rank, err := redisutils.ParseFloat64(strRank)
-		if err != nil {
-			t.Errorf("unexpected result type: %v", strRank)
-		}
-
-		sumPagerank += rank
-	}
-
-	if math.Abs(sumPagerank-1) > 0.001 {
-		t.Errorf("the L1 norm of the pagerank is: %v", sumPagerank)
+	if math.Abs(sum-1) > 0.001 {
+		t.Errorf("the L1 norm of the pagerank is: %v", sum)
 	}
 }
 
@@ -99,25 +113,9 @@ func TestVisits(t *testing.T) {
 		pagerank[i] = float64(v) / float64(totalVisits)
 	}
 
-	pipe := cl.Pipeline()
-	cmds := make([]*redis.StringCmd, len(nodeIDs))
-	for i, ID := range nodeIDs {
-		cmds[i] = pipe.HGet(ctx, redisdb.KeyNode(ID), models.KeyPagerank)
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Pipeline failed: %v", err)
-	}
-
-	loadedPagerank := make([]float64, len(nodeIDs))
-	for i, cmd := range cmds {
-		strRank := cmd.Val()
-		rank, err := redisutils.ParseFloat64(strRank)
-		if err != nil {
-			t.Errorf("unexpected result type: %v", strRank)
-		}
-
-		loadedPagerank[i] = rank
+	loadedPagerank, err := GetPagerankDB(ctx, cl, nodeIDs)
+	if err != nil {
+		t.Fatalf("GetPagerank(): expected nil, got %v", err)
 	}
 
 	for i, ID := range nodeIDs {
