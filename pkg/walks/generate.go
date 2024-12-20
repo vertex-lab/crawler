@@ -95,7 +95,7 @@ func (RWM *RandomWalkManager) generateWalks(ctx context.Context,
 			walks = append(walks, walk)
 		}
 
-		if err := RWM.Store.AddWalks(ctx, walks); err != nil {
+		if err := RWM.Store.AddWalks(ctx, walks...); err != nil {
 			return err
 		}
 	}
@@ -215,7 +215,7 @@ func (RWM *RandomWalkManager) Remove(ctx context.Context, nodeID uint32) error {
 		walksToRemove = append(walksToRemove, ID)
 	}
 
-	return RWM.Store.RemoveWalks(ctx, walksToRemove)
+	return RWM.Store.RemoveWalks(ctx, walksToRemove...)
 }
 
 // startsWith() returns whether walk starts with nodeID.

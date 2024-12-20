@@ -256,7 +256,7 @@ func TestVisitCounts(t *testing.T) {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
 			}
 
-			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs)
+			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
 			}
@@ -509,7 +509,7 @@ func TestAddWalks(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.AddWalks(context.Background(), test.walks)
+				err = RWS.AddWalks(context.Background(), test.walks...)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("AddWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -536,7 +536,7 @@ func TestAddWalks(t *testing.T) {
 			5: {1},
 		}
 
-		if err := RWS.AddWalks(context.Background(), walks); err != nil {
+		if err := RWS.AddWalks(context.Background(), walks...); err != nil {
 			t.Fatalf("AddWalks(): expected nil, got %v", err)
 		}
 
@@ -637,7 +637,7 @@ func TestRemoveWalks(t *testing.T) {
 					t.Fatalf("SetupRWS(): expected nil, got %v", err)
 				}
 
-				err = RWS.RemoveWalks(context.Background(), []uint32{0, 69})
+				err = RWS.RemoveWalks(context.Background(), 0, 69)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("RemoveWalks(): expected %v, got %v", test.expectedError, err)
 				}
@@ -655,7 +655,7 @@ func TestRemoveWalks(t *testing.T) {
 		walkIDs := []uint32{0, 1}
 		expectedTotalVisits := 3
 
-		if err := RWS.RemoveWalks(context.Background(), walkIDs); err != nil {
+		if err := RWS.RemoveWalks(context.Background(), walkIDs...); err != nil {
 			t.Fatalf("RemoveWalks(%d): expected nil, got %v", walkIDs, err)
 		}
 
@@ -879,7 +879,7 @@ func BenchmarkVisitCounts(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if _, err := RWS.VisitCounts(context.Background(), nodeIDs); err != nil {
+					if _, err := RWS.VisitCounts(context.Background(), nodeIDs...); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}
@@ -906,7 +906,7 @@ func BenchmarkVisitCounts(b *testing.B) {
 
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if _, err := RWS.VisitCounts(context.Background(), nodeIDs); err != nil {
+					if _, err := RWS.VisitCounts(context.Background(), nodeIDs...); err != nil {
 						b.Fatalf("benchmark failed: %v", err)
 					}
 				}

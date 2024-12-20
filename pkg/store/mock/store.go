@@ -97,7 +97,7 @@ func (RWS *RandomWalkStore) Validate() error {
 
 // VisitCounts() returns a map that associates each nodeID with the number of
 // times it was visited by a walk.
-func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) ([]int, error) {
+func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
 	_ = ctx
 	if RWS == nil || RWS.walksVisiting == nil {
 		return []int{}, models.ErrNilRWSPointer
@@ -212,7 +212,7 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no one gets added.
-func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomWalk) error {
+func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.RandomWalk) error {
 	_ = ctx
 	if RWS == nil {
 		return models.ErrNilRWSPointer
@@ -249,7 +249,7 @@ func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomW
 
 // RemoveWalks() removes the all the specified walks from the RWS. If one walkID
 // is not found, no walk gets removed.
-func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs []uint32) error {
+func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs ...uint32) error {
 	_ = ctx
 	if err := RWS.Validate(); err != nil {
 		return err

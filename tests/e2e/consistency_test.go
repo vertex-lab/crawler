@@ -91,7 +91,7 @@ func TestVisits(t *testing.T) {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}
 
-	visits, err := RWS.VisitCounts(ctx, nodeIDs)
+	visits, err := RWS.VisitCounts(ctx, nodeIDs...)
 	if err != nil {
 		t.Fatalf("VisitCounts(): expected nil, got %v", err)
 	}

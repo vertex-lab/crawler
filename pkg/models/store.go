@@ -21,7 +21,6 @@ func Validate(walk RandomWalk) error {
 
 // RandomWalkStore handles atomic operations to create, update, and remove RandomWalks.
 type RandomWalkStore interface {
-
 	// Validate() checks whether RWS is nil, and it's fields.
 	Validate() error
 
@@ -35,7 +34,7 @@ type RandomWalkStore interface {
 	TotalVisits(ctx context.Context) int
 
 	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
-	VisitCounts(ctx context.Context, nodeIDs []uint32) ([]int, error)
+	VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error)
 
 	/*WalksVisiting() returns up to limit UNIQUE walkIDs evenly distributed among the specified nodeIDs.
 	In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
@@ -53,10 +52,10 @@ type RandomWalkStore interface {
 	Walks(ctx context.Context, walkIDs ...uint32) ([]RandomWalk, error)
 
 	// AddWalks() adds all the walks to the RandomWalkStore.
-	AddWalks(ctx context.Context, walks []RandomWalk) error
+	AddWalks(ctx context.Context, walks ...RandomWalk) error
 
 	// RemoveWalks() removes all the walks associated with the walkIDs.
-	RemoveWalks(ctx context.Context, walkIDs []uint32) error
+	RemoveWalks(ctx context.Context, walkIDs ...uint32) error
 
 	/*PruneGraftWalk() encapsulates the functions of pruning and grafting ( = appending to) a walk.
 	These functions need to be coupled together to leverage the atomicity of Redis transactions.

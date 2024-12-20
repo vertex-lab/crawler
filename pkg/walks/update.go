@@ -212,7 +212,7 @@ func estimateWalksToUpdate(
 	nodeID uint32,
 	addedSize, currentSize int) (int, error) {
 
-	walkMap, err := RWM.Store.VisitCounts(ctx, []uint32{nodeID})
+	walkMap, err := RWM.Store.VisitCounts(ctx, nodeID)
 	if err != nil {
 		return 1, err
 	}

@@ -168,7 +168,7 @@ func (RWS *RandomWalkStore) Validate() error {
 }
 
 // VisitCounts() returns a slice containing the number of times each node was visited by a walk.
-func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) ([]int, error) {
+func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
 
 	if err := RWS.Validate(); err != nil {
 		return []int{}, err
@@ -316,7 +316,7 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no walk gets added.
-func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomWalk) error {
+func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.RandomWalk) error {
 
 	if err := RWS.Validate(); err != nil {
 		return err
@@ -364,7 +364,7 @@ func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks []models.RandomW
 
 // RemoveWalks() removes the all the specified walks from the RWS. If one walkID
 // is not found, no walk gets removed.
-func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs []uint32) error {
+func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs ...uint32) error {
 
 	if err := RWS.Validate(); err != nil {
 		return err
@@ -550,7 +550,7 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walks := []models.RandomWalk{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}
-		if err := RWS.AddWalks(context.Background(), walks); err != nil {
+		if err := RWS.AddWalks(context.Background(), walks...); err != nil {
 			return nil, err
 		}
 		return RWS, nil
@@ -565,7 +565,7 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walks := []models.RandomWalk{{0, 1, 2}, {0, 3}, {1, 2}}
-		if err := RWS.AddWalks(context.Background(), walks); err != nil {
+		if err := RWS.AddWalks(context.Background(), walks...); err != nil {
 			return nil, err
 		}
 
@@ -579,7 +579,7 @@ func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 		}
 
 		walk := []models.RandomWalk{{0}}
-		if err := RWS.AddWalks(context.Background(), walk); err != nil {
+		if err := RWS.AddWalks(context.Background(), walk...); err != nil {
 			return nil, err
 		}
 		return RWS, nil
@@ -607,7 +607,7 @@ func GenerateRWS(cl *redis.Client, nodesNum, walksNum int) (*RandomWalkStore, er
 		walks = append(walks, walk)
 	}
 
-	if err := RWS.AddWalks(context.Background(), walks); err != nil {
+	if err := RWS.AddWalks(context.Background(), walks...); err != nil {
 		return nil, err
 	}
 

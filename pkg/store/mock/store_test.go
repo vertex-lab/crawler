@@ -146,7 +146,7 @@ func TestVisitCounts(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			RWS := SetupRWS(test.RWSType)
-			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs)
+			visits, err := RWS.VisitCounts(context.Background(), test.nodeIDs...)
 
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("VisitCounts(): expected %v, got %v", test.expectedError, err)
@@ -376,7 +376,7 @@ func TestAddWalks(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				RWS := SetupRWS(test.RWSType)
 
-				err := RWS.AddWalks(context.Background(), test.walks)
+				err := RWS.AddWalks(context.Background(), test.walks...)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("AddWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -388,7 +388,7 @@ func TestAddWalks(t *testing.T) {
 		RWS := SetupRWS("empty")
 		walks := []models.RandomWalk{{1, 2, 3}, {4, 5}}
 
-		if err := RWS.AddWalks(context.Background(), walks); err != nil {
+		if err := RWS.AddWalks(context.Background(), walks...); err != nil {
 			t.Fatalf("AddWalk(): expected nil, got %v", err)
 		}
 
@@ -439,7 +439,7 @@ func TestRemoveWalks(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				RWS := SetupRWS(test.RWSType)
 
-				err := RWS.RemoveWalks(context.Background(), []uint32{0, 69})
+				err := RWS.RemoveWalks(context.Background(), 0, 69)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("RemoveWalk(): expected %v, got %v", test.expectedError, err)
 				}
@@ -453,7 +453,7 @@ func TestRemoveWalks(t *testing.T) {
 		walkIDs := []uint32{0, 1}
 		expectedTotalVisits := 3
 
-		if err := RWS.RemoveWalks(context.Background(), walkIDs); err != nil {
+		if err := RWS.RemoveWalks(context.Background(), walkIDs...); err != nil {
 			t.Fatalf("RemoveWalks(%d): expected nil, got %v", walkIDs, err)
 		}
 

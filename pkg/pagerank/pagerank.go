@@ -22,7 +22,7 @@ func Global(
 		return nil, nil
 	}
 
-	visits, err := RWS.VisitCounts(ctx, nodeIDs)
+	visits, err := RWS.VisitCounts(ctx, nodeIDs...)
 	if err != nil {
 		return nil, err
 	}
