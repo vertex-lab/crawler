@@ -55,9 +55,10 @@ func TestPagerankSum(t *testing.T) {
 	}
 }
 
-// TestTotalVisits() tests if the totalVisits field in the RWS is indeed equal to
-// the sum of all the visits for each node.
-func TestTotalVisits(t *testing.T) {
+// TestVisits() check if:
+// - the totalVisits = sum of the visits
+// - the ratio visit/totalVisits = pagerank
+func TestVisits(t *testing.T) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
@@ -71,29 +72,60 @@ func TestTotalVisits(t *testing.T) {
 		t.Fatalf("NewRWSConnection(): expected nil, got %v", err)
 	}
 
-	totalVisits := RWS.TotalVisits(ctx)
 	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}
 
+	visits, err := RWS.VisitCounts(ctx, nodeIDs)
+	if err != nil {
+		t.Fatalf("VisitCounts(): expected nil, got %v", err)
+	}
+	totalVisits := RWS.TotalVisits(ctx)
+
+	// check if the sum of the visits is  = totalVisits
+	var sumVisits int
+	for _, v := range visits {
+		sumVisits += v
+	}
+
+	if sumVisits != totalVisits {
+		t.Errorf("totalVisits: expected %v, got %v", totalVisits, sumVisits)
+	}
+
+	// check if the pagerank is indeed visit/totalVisits
+	pagerank := make([]float64, len(nodeIDs))
+	for i, v := range visits {
+		pagerank[i] = float64(v) / float64(totalVisits)
+	}
+
 	pipe := cl.Pipeline()
-	cmds := make([]*redis.IntCmd, len(nodeIDs))
+	cmds := make([]*redis.StringCmd, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		cmds[i] = pipe.SCard(ctx, redistore.KeyWalksVisiting(ID))
+		cmds[i] = pipe.HGet(ctx, redisdb.KeyNode(ID), models.KeyPagerank)
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Pipeline failed: %v", err)
 	}
 
-	var sumVisits int
-	for _, cmd := range cmds {
-		sumVisits += int(cmd.Val())
+	loadedPagerank := make([]float64, len(nodeIDs))
+	for i, cmd := range cmds {
+		strRank := cmd.Val()
+		rank, err := redisutils.ParseFloat64(strRank)
+		if err != nil {
+			t.Errorf("unexpected result type: %v", strRank)
+		}
+
+		loadedPagerank[i] = rank
 	}
 
-	if sumVisits != totalVisits {
-		t.Errorf("totalVisits: expected %v, got %v", sumVisits, totalVisits)
+	for i, ID := range nodeIDs {
+		pr := pagerank[i]
+		expected := loadedPagerank[i]
+		if math.Abs(pr-expected) > 0.000001 {
+			t.Errorf("pagerank of nodeID %d: expected %v, got %v", ID, expected, pr)
+		}
 	}
 }
 
