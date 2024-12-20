@@ -311,7 +311,7 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 // If a pubkey is not found, nil is returned
-func (DB *Database) NodeIDs(ctx context.Context, pubkeys []string) ([]interface{}, error) {
+func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]interface{}, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -342,7 +342,7 @@ func (DB *Database) NodeIDs(ctx context.Context, pubkeys []string) ([]interface{
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 // If a nodeID is not found, nil is returned
-func (DB *Database) Pubkeys(ctx context.Context, nodeIDs []uint32) ([]interface{}, error) {
+func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface{}, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err

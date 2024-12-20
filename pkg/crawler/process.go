@@ -157,7 +157,7 @@ func AssignNodeIDs(
 	DB models.Database,
 	pubkeys []string) ([]uint32, error) {
 
-	IDs, err := DB.NodeIDs(ctx, pubkeys)
+	IDs, err := DB.NodeIDs(ctx, pubkeys...)
 	if err != nil {
 		return []uint32{}, err
 	}

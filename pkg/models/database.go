@@ -60,7 +60,6 @@ type NodeDiff struct {
 
 // The Database interface abstracts the DB basic functions
 type Database interface {
-
 	// Size() returns the number of nodes in the DB (ignores errors).
 	Size(ctx context.Context) int
 
@@ -87,11 +86,11 @@ type Database interface {
 
 	// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 	// If a pubkey is not found, nil is returned
-	NodeIDs(ctx context.Context, pubkeys []string) ([]interface{}, error)
+	NodeIDs(ctx context.Context, pubkeys ...string) ([]interface{}, error)
 
 	// Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 	// If a nodeID is not found, nil is returned
-	Pubkeys(ctx context.Context, nodeIDs []uint32) ([]interface{}, error)
+	Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface{}, error)
 
 	// ScanNodes() scans over the nodes and returns a batch of nodeIDs of size roughly equal to limit.
 	// Limit controls how much "work" is invested in fetching the batch, hence it is not precise.

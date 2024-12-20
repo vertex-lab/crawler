@@ -725,7 +725,7 @@ func TestNodeIDs(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeIDs, err := DB.NodeIDs(context.Background(), test.pubkeys)
+			nodeIDs, err := DB.NodeIDs(context.Background(), test.pubkeys...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeIDs(): expected %v, got %v", test.expectedError, err)
 			}
@@ -776,7 +776,7 @@ func TestPubkeys(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			pubkeys, err := DB.Pubkeys(context.Background(), test.nodeIDs)
+			pubkeys, err := DB.Pubkeys(context.Background(), test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Pubkeys(): expected %v, got %v", test.expectedError, err)
 			}
