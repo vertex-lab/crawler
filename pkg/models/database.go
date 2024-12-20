@@ -81,6 +81,9 @@ type Database interface {
 	// UpdateNode() updates the nodeID using the new values inside node.
 	UpdateNode(ctx context.Context, nodeID uint32, nodeDiff *NodeDiff) error
 
+	// Followers() returns a slice that contains the followers of each nodeID.
+	Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error)
+
 	// Follows() returns a slice that contains the follows of each nodeID.
 	Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error)
 

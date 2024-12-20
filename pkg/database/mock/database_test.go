@@ -375,11 +375,62 @@ func TestFollows(t *testing.T) {
 			follows, err := DB.Follows(context.Background(), test.nodeIDs...)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Follows(1): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("Follows(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(follows, test.expectedFollows) {
-				t.Errorf("Follows(1): expected %v, got %v", test.expectedFollows, follows)
+				t.Errorf("Follows(): expected %v, got %v", test.expectedFollows, follows)
+			}
+		})
+	}
+}
+
+func TestFollowers(t *testing.T) {
+	testCases := []struct {
+		name            string
+		DBType          string
+		nodeIDs         []uint32
+		expectedError   error
+		expectedFollows [][]uint32
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilDBPointer,
+		},
+		{
+			name:          "empty DB",
+			DBType:        "empty",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNodeNotFoundDB,
+		},
+		{
+			name:          "node not found",
+			DBType:        "one-node0",
+			nodeIDs:       []uint32{1},
+			expectedError: models.ErrNodeNotFoundDB,
+		},
+		{
+			name:            "valid",
+			DBType:          "triangle",
+			nodeIDs:         []uint32{0, 1},
+			expectedError:   nil,
+			expectedFollows: [][]uint32{{2}, {0}},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := SetupDB(test.DBType)
+			follows, err := DB.Followers(context.Background(), test.nodeIDs...)
+
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("Followers(): expected %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(follows, test.expectedFollows) {
+				t.Errorf("Followers(): expected %v, got %v", test.expectedFollows, follows)
 			}
 		})
 	}

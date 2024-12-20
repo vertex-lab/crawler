@@ -254,17 +254,36 @@ func (DB *Database) ContainsNode(ctx context.Context, nodeID uint32) bool {
 	return exists == 1
 }
 
-// Follows() returns a slice containing the follows of each of the specified nodeIDs.
-func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
-
+// Followers() returns a slice containing the follows of each of the specified nodeIDs.
+func (DB *Database) Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
+	return DB.pipelineSMembers(ctx, KeyFollowers, nodeIDs...)
+}
+
+// Follows() returns a slice containing the follows of each of the specified nodeIDs.
+func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	return DB.pipelineSMembers(ctx, KeyFollows, nodeIDs...)
+}
+
+// The method pipelineSMembers() fetches the SMembers of the specified keys, which are:
+// KeyFunc(nodeID). If some commands return empty arrays, it checks the existance
+// of node:<nodeID> and returns an error if a node was not found.
+func (DB *Database) pipelineSMembers(
+	ctx context.Context,
+	KeyFunc func(interface{}) string,
+	nodeIDs ...uint32) ([][]uint32, error) {
+
 	pipe := DB.client.Pipeline()
 	cmds := make([]*redis.StringSliceCmd, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		cmds[i] = DB.client.SMembers(ctx, KeyFollows(ID))
+		cmds[i] = DB.client.SMembers(ctx, KeyFunc(ID))
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
@@ -272,26 +291,22 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 	}
 
 	var potentialMissingKeys []string
-	followSlice := make([][]uint32, 0, len(nodeIDs))
+	membersSlice := make([][]uint32, 0, len(nodeIDs))
 	for i, cmd := range cmds {
 
-		strFollows := cmd.Val()
-		if len(strFollows) == 0 { // empty slice might mean node not found.
+		strMembers := cmd.Val()
+		if len(strMembers) == 0 { // empty slice might mean node not found.
 			potentialMissingKeys = append(potentialMissingKeys, KeyNode(nodeIDs[i]))
-			followSlice = append(followSlice, []uint32{})
+			membersSlice = append(membersSlice, []uint32{})
 			continue
 		}
 
-		follows := make([]uint32, 0, len(strFollows))
-		for _, strID := range strFollows {
-			ID, err := redisutils.ParseID(strID)
-			if err != nil {
-				return nil, err
-			}
-
-			follows = append(follows, ID)
+		members, err := redisutils.ParseIDs(strMembers)
+		if err != nil {
+			return nil, err
 		}
-		followSlice = append(followSlice, follows)
+
+		membersSlice = append(membersSlice, members)
 	}
 
 	// check if some of the dandling nodes where in reality not found in the DB
@@ -306,7 +321,7 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 		}
 	}
 
-	return followSlice, nil
+	return membersSlice, nil
 }
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
@@ -366,7 +381,7 @@ func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface
 	pubkeys := make([]interface{}, 0, len(nodeIDs))
 	for _, cmd := range cmds {
 
-		if cmd.Err() == redis.Nil {
+		if cmd.Err() == redis.Nil { // add nil where the key was not found
 			pubkeys = append(pubkeys, nil)
 			continue
 		}

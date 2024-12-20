@@ -686,6 +686,73 @@ func TestFollows(t *testing.T) {
 	}
 }
 
+func TestFollowers(t *testing.T) {
+	testCases := []struct {
+		name              string
+		DBType            string
+		nodeIDs           []uint32
+		expectedError     error
+		expectedFollowers [][]uint32
+	}{
+		{
+			name:              "nil DB",
+			DBType:            "nil",
+			nodeIDs:           []uint32{0},
+			expectedFollowers: nil,
+			expectedError:     models.ErrNilDBPointer,
+		},
+		{
+			name:              "empty DB",
+			DBType:            "empty",
+			nodeIDs:           []uint32{0},
+			expectedFollowers: nil,
+			expectedError:     models.ErrNodeNotFoundDB,
+		},
+		{
+			name:              "node not found",
+			DBType:            "triangle",
+			nodeIDs:           []uint32{69, 2},
+			expectedFollowers: nil,
+			expectedError:     models.ErrNodeNotFoundDB,
+		},
+		{
+			name:              "dandling node",
+			DBType:            "dandling",
+			nodeIDs:           []uint32{0},
+			expectedFollowers: [][]uint32{{}},
+			expectedError:     nil,
+		},
+		{
+			name:              "valid",
+			DBType:            "triangle",
+			nodeIDs:           []uint32{0, 1},
+			expectedFollowers: [][]uint32{{2}, {0}},
+			expectedError:     nil,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			followers, err := DB.Followers(context.Background(), test.nodeIDs...)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("Follows(%d): expected %v, got %v", test.nodeIDs, test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(followers, test.expectedFollowers) {
+				t.Errorf("Follows(%d): expected %v, got %v", test.nodeIDs, test.expectedFollowers, followers)
+			}
+		})
+	}
+}
+
 func TestNodeIDs(t *testing.T) {
 	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)

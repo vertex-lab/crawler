@@ -169,7 +169,7 @@ func (DB *Database) NodeByID(ctx context.Context, nodeID uint32) (*models.NodeMe
 	return &node.Metadata, nil
 }
 
-// Follows() returns the slice of successors of all nodeIDs
+// Follows() returns the slice of follows of each nodeID
 func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
 	_ = ctx
 	if err := DB.Validate(); err != nil {
@@ -187,6 +187,26 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 	}
 
 	return followSlice, nil
+}
+
+// Followers() returns the slice of followers of each nodeID
+func (DB *Database) Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error) {
+	_ = ctx
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	followerSlice := make([][]uint32, 0, len(nodeIDs))
+	for _, ID := range nodeIDs {
+		node, exists := DB.NodeIndex[ID]
+		if !exists {
+			return nil, models.ErrNodeNotFoundDB
+		}
+
+		followerSlice = append(followerSlice, node.Followers)
+	}
+
+	return followerSlice, nil
 }
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
@@ -330,9 +350,9 @@ func SetupDB(DBType string) *Database {
 
 	case "triangle":
 		DB := NewDatabase()
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{2}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{0}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{1}, Followers: []uint32{2}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{2}, Followers: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{EventTS: 0}, Follows: []uint32{0}, Followers: []uint32{1}}
 		DB.LastNodeID = 2
 		return DB
 
