@@ -128,16 +128,16 @@ func ProcessFollowListEvent(
 
 	if mass > 0.001 {
 		// full recomputation of pagerank
-		pagerankMap, err = pagerank.Pagerank(ctx, DB, RWM.Store)
-		if err != nil {
-			return err
-		}
-		mass = 0
+		// pagerankMap, err = pagerank.Global(ctx, DB, RWM.Store)
+		// if err != nil {
+		// 	return err
+		// }
+		// mass = 0
 
 	} else {
 		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
 		impactedNodes := append(added, removed...)
-		pagerankMap, err = pagerank.LazyPagerank(ctx, DB, RWM.Store, impactedNodes)
+		pagerankMap, err = pagerank.Global(ctx, RWM.Store, impactedNodes...)
 		if err != nil {
 			return err
 		}
