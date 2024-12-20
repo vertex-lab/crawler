@@ -170,13 +170,13 @@ func TestLazyPagerank(t *testing.T) {
 			pagerank, err := LazyPagerank(ctx, DB, RWS, test.nodeIDs)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Errorf("Pagerank(): expected %v, got %v", test.expectedError, err)
+				t.Errorf("LazyPagerank(): expected %v, got %v", test.expectedError, err)
 			}
 
 			// if provided, check the pagerank is equal to the expected
 			if test.expectedPagerank != nil {
 				if Distance(pagerank, test.expectedPagerank) > 1e-10 {
-					t.Errorf("Pagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
+					t.Errorf("LazyPagerank(): expected %v, got %v", test.expectedPagerank, pagerank)
 				}
 			}
 		})

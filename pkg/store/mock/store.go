@@ -97,29 +97,29 @@ func (RWS *RandomWalkStore) Validate() error {
 
 // VisitCounts() returns a map that associates each nodeID with the number of
 // times it was visited by a walk.
-func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) (map[uint32]int, error) {
+func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) ([]int, error) {
 	_ = ctx
 	if RWS == nil || RWS.walksVisiting == nil {
-		return map[uint32]int{}, models.ErrNilRWSPointer
+		return []int{}, models.ErrNilRWSPointer
 	}
 
 	if len(nodeIDs) == 0 {
-		return map[uint32]int{}, nil
+		return []int{}, nil
 	}
 
-	visitMap := make(map[uint32]int, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
+	visits := make([]int, len(nodeIDs))
+	for i, ID := range nodeIDs {
 
-		walkSet, exists := RWS.walksVisiting[nodeID]
+		walkSet, exists := RWS.walksVisiting[ID]
 		if !exists {
-			visitMap[nodeID] = 0
+			visits[i] = 0
 			continue
 		}
 
-		visitMap[nodeID] = walkSet.Cardinality()
+		visits[i] = walkSet.Cardinality()
 	}
 
-	return visitMap, nil
+	return visits, nil
 }
 
 // Walks() returns a map of walks by walkID that visit nodeID.

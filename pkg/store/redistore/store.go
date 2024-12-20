@@ -167,35 +167,33 @@ func (RWS *RandomWalkStore) Validate() error {
 	return nil
 }
 
-// VisitCounts() returns a map that associates each nodeID with the number of
-// times it was visited by a walk.
-func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) (map[uint32]int, error) {
+// VisitCounts() returns a slice containing the number of times each node was visited by a walk.
+func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs []uint32) ([]int, error) {
 
 	if err := RWS.Validate(); err != nil {
-		return map[uint32]int{}, err
+		return []int{}, err
 	}
 
 	if len(nodeIDs) == 0 {
-		return map[uint32]int{}, nil
+		return []int{}, nil
 	}
 
 	pipe := RWS.client.Pipeline()
-
-	cmdMap := make(map[uint32]*redis.IntCmd, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-		cmdMap[nodeID] = pipe.SCard(ctx, KeyWalksVisiting(nodeID))
+	cmds := make([]*redis.IntCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = pipe.SCard(ctx, KeyWalksVisiting(ID))
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
-		return map[uint32]int{}, err
+		return []int{}, err
 	}
 
-	visitMap := make(map[uint32]int, len(nodeIDs))
-	for nodeID, cmd := range cmdMap {
-		visitMap[nodeID] = int(cmd.Val())
+	visits := make([]int, len(nodeIDs))
+	for i := range nodeIDs {
+		visits[i] = int(cmds[i].Val())
 	}
 
-	return visitMap, nil
+	return visits, nil
 }
 
 // Walks() returns the walks associated with the walkIDs.

@@ -17,27 +17,14 @@ func Distance(map1, map2 models.PagerankMap) float64 {
 	return distance
 }
 
-// Pagerank() computes the pagerank score for each node in the database.
-func Pagerank(
+// Global() computes the global pagerank score for the specified nodes in the DB.
+func Global(
 	ctx context.Context,
-	DB models.Database,
-	RWS models.RandomWalkStore) (models.PagerankMap, error) {
-
-	if err := DB.Validate(); err != nil {
-		return nil, err
-	}
-
-	if err := RWS.Validate(); err != nil {
-		return nil, err
-	}
-
-	nodeIDs, err := DB.AllNodes(ctx)
-	if err != nil {
-		return nil, err
-	}
+	RWS models.RandomWalkStore,
+	nodeIDs ...uint32) (models.PagerankMap, error) {
 
 	if len(nodeIDs) == 0 {
-		return nil, models.ErrEmptyDB
+		return nil, nil
 	}
 
 	visitMap, err := RWS.VisitCounts(ctx, nodeIDs)
@@ -72,14 +59,6 @@ func LazyPagerank(
 
 	if len(nodeIDs) == 0 {
 		return nil, nil
-	}
-
-	if err := DB.Validate(); err != nil {
-		return nil, err
-	}
-
-	if err := RWS.Validate(); err != nil {
-		return nil, err
 	}
 
 	totalVisits := RWS.TotalVisits(ctx)

@@ -103,42 +103,42 @@ func TestVisitCounts(t *testing.T) {
 		name           string
 		RWSType        string
 		nodeIDs        []uint32
-		expectedVisits map[uint32]int
+		expectedVisits []int
 		expectedError  error
 	}{
 		{
 			name:           "nil RWS",
 			RWSType:        "nil",
 			nodeIDs:        []uint32{0},
-			expectedVisits: map[uint32]int{},
+			expectedVisits: []int{},
 			expectedError:  models.ErrNilRWSPointer,
 		},
 		{
 			name:           "empty RWS",
 			RWSType:        "empty",
 			nodeIDs:        []uint32{0},
-			expectedVisits: map[uint32]int{0: 0},
+			expectedVisits: []int{0},
 			expectedError:  nil,
 		},
 		{
 			name:           "empty nodeIDs",
 			RWSType:        "one-node0",
 			nodeIDs:        []uint32{},
-			expectedVisits: map[uint32]int{},
+			expectedVisits: []int{},
 			expectedError:  nil,
 		},
 		{
 			name:           "one node RWS",
 			RWSType:        "one-node0",
 			nodeIDs:        []uint32{0},
-			expectedVisits: map[uint32]int{0: 1},
+			expectedVisits: []int{1},
 			expectedError:  nil,
 		},
 		{
 			name:           "triangle RWS, one node not in the RWS",
 			RWSType:        "triangle",
 			nodeIDs:        []uint32{0, 1, 2, 99},
-			expectedVisits: map[uint32]int{0: 3, 1: 3, 2: 3, 99: 0},
+			expectedVisits: []int{3, 3, 3, 0},
 			expectedError:  nil,
 		},
 	}

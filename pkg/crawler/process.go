@@ -114,6 +114,7 @@ func ProcessFollowListEvent(
 		AddedFollows:   added,
 		RemovedFollows: removed,
 	}
+
 	if err := DB.UpdateNode(ctx, author.ID, &authorNodeDiff); err != nil {
 		return err
 	}
