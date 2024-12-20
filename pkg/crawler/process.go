@@ -280,7 +280,7 @@ func ArbiterScan(
 	ctx, cancel := context.WithTimeout(ctx, time.Second*100)
 	defer cancel()
 
-	var cursor uint64 = 0
+	var cursor uint64
 	var nodeIDs []uint32
 	var err error
 

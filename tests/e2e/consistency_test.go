@@ -7,6 +7,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
+	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
@@ -28,10 +29,9 @@ func TestPagerankSum(t *testing.T) {
 	}
 
 	pipe := cl.Pipeline()
-	cmds := make([]*redis.StringCmd, 0, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-		cmd := pipe.HGet(ctx, redisdb.KeyNode(nodeID), "pagerank")
-		cmds = append(cmds, cmd)
+	cmds := make([]*redis.StringCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = pipe.HGet(ctx, redisdb.KeyNode(ID), models.KeyPagerank)
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
@@ -61,40 +61,35 @@ func TestTotalVisits(t *testing.T) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
-	// get the field totalVisits
-	strTotalVisits, err := cl.HGet(ctx, redistore.KeyRWS, redistore.KeyTotalVisits).Result()
-	if err != nil {
-		t.Fatalf("error in getting totalVisits: %v", err)
-	}
-	totalVisits, err := redisutils.ParseInt64(strTotalVisits)
-	if err != nil {
-		t.Fatalf("unexpected return type: %v", strTotalVisits)
-	}
-
-	// compute the sum of the visits for each node
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
-		t.Fatalf("NewDatabase(): expected nil, got %v", err)
+		t.Fatalf("NewDatabaseConnection(): expected nil, got %v", err)
 	}
+
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		t.Fatalf("NewRWSConnection(): expected nil, got %v", err)
+	}
+
+	totalVisits := RWS.TotalVisits(ctx)
 	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}
 
 	pipe := cl.Pipeline()
-	cmds := make([]*redis.IntCmd, 0, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-		cmd := pipe.SCard(ctx, redistore.KeyWalksVisiting(nodeID))
-		cmds = append(cmds, cmd)
+	cmds := make([]*redis.IntCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = pipe.SCard(ctx, redistore.KeyWalksVisiting(ID))
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
 		t.Fatalf("Pipeline failed: %v", err)
 	}
 
-	var sumVisits int64 = 0
+	var sumVisits int
 	for _, cmd := range cmds {
-		sumVisits += cmd.Val()
+		sumVisits += int(cmd.Val())
 	}
 
 	if sumVisits != totalVisits {
@@ -102,43 +97,69 @@ func TestTotalVisits(t *testing.T) {
 	}
 }
 
-// TestWalks() tests for each walk, if its walkID is present in the walksVisiting each of the node it visits.
+/*
+TestWalks() will:
+- fetch walk batches of batchSize
+- verify the consistency of walks (meaning each node visited by a walk contains it's walkID)
+- repeate for iterationNum (iterating over the whole DB can take minutes)
+
+Therefore, the number of walks checked is (roughly) iterationNum * batchSize.
+*/
 func TestWalks(t *testing.T) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
-	// get the walkIndex walkID --> random walk
-	strWalkIndex, err := cl.HGetAll(ctx, redistore.KeyWalks).Result()
-	if err != nil {
-		t.Fatalf("HGetAll(): expected nil, got %v", err)
-	}
+	var counter int
+	var iterationNum int = 20
+	var batchSize int64 = 100000
 
-	pipe := cl.Pipeline()
-	cmds := make(map[string]*redis.BoolCmd)
-	for walkID, strWalk := range strWalkIndex {
+	var res []string
+	var cursor uint64
+	var err error
 
-		walk, err := redisutils.ParseWalk(strWalk)
+	for {
+		counter++
+		res, cursor, err = cl.HScan(ctx, redistore.KeyWalks, cursor, "", batchSize).Result()
 		if err != nil {
-			t.Fatalf("unexpected ID type: %v", strWalk)
+			t.Fatalf("HScan(): expected nil, got %v", err)
 		}
 
-		// check that the each nodeID in the walk contains that walkID
-		for _, nodeID := range walk {
-			// the key is the string "<walkID>:<nodeID>". It's unique because a node can be visited by a walk only once
-			key := redisutils.FormatID(nodeID) + ":" + walkID
-			cmd := pipe.SIsMember(ctx, redistore.KeyWalksVisiting(nodeID), walkID)
-			cmds[key] = cmd
+		if counter >= iterationNum || cursor == 0 {
+			break
 		}
-	}
 
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Pipeline failed: %v", err)
-	}
+		strIDs := make([]string, 0, len(res)/2)
+		strWalks := make([]string, 0, len(res)/2)
+		for i := 0; i < len(res); i += 2 {
+			strIDs = append(strIDs, res[i])
+			strWalks = append(strWalks, res[i+1])
+		}
 
-	// check if all are true.
-	for key, cmd := range cmds {
-		if !cmd.Val() {
-			t.Errorf("expected true, got %v: %v", cmd.Val(), key)
+		walks, err := redisutils.ParseWalks(strWalks)
+		if err != nil {
+			t.Fatalf("ParseWalks(): expected nil, got %v", err)
+		}
+
+		pipe := cl.Pipeline()
+		cmds := make(map[string]*redis.BoolCmd)
+		for i, ID := range strIDs {
+			for _, nodeID := range walks[i] {
+				// the key is the string "<nodeID>:<walkID>". It's unique because a node can be visited by a walk only once
+				key := redisutils.FormatID(nodeID) + ":" + ID
+				cmd := pipe.SIsMember(ctx, redistore.KeyWalksVisiting(nodeID), ID)
+				cmds[key] = cmd
+			}
+		}
+
+		if _, err := pipe.Exec(ctx); err != nil {
+			t.Fatalf("Pipeline failed: %v", err)
+		}
+
+		// check if all are true.
+		for key, cmd := range cmds {
+			if !cmd.Val() {
+				t.Errorf("expected true, got %v: %v", cmd.Val(), key)
+			}
 		}
 	}
 }
