@@ -297,13 +297,21 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 		keys[i] = KeyWalksVisiting(ID)
 	}
 
-	// check first if the keys exist
-	exists, err := RWS.client.Exists(ctx, keys...).Result()
-	if err != nil {
-		return nil, err
+	// check first if all the keys exist, otherwise the intersection will be empty
+	pipe := RWS.client.Pipeline()
+	cmds := make([]*redis.IntCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Exists(ctx, key)
 	}
-	if int(exists) < len(nodeIDs) {
-		return nil, fmt.Errorf("%w: %v", models.ErrNodeNotFoundRWS, nodeIDs)
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, fmt.Errorf("pipeline failed: %w", err)
+	}
+
+	for i, cmd := range cmds {
+		if cmd.Val() != 1 {
+			return nil, fmt.Errorf("%w: nodeID %v", models.ErrNodeNotFoundRWS, nodeIDs[i])
+		}
 	}
 
 	strIDs, err := RWS.client.SInter(ctx, keys...).Result()
@@ -362,7 +370,7 @@ func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.Random
 	return nil
 }
 
-// RemoveWalks() removes the all the specified walks from the RWS. If one walkID
+// RemoveWalks() removes all the specified walks from the RWS. If one walkID
 // is not found, no walk gets removed.
 func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs ...uint32) error {
 
