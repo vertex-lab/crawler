@@ -6,6 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
+	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
@@ -60,14 +61,12 @@ func PersonalizedPagerank(
 		return map[string]float64{}, err
 	}
 
-	// type assert
-	nodeID, ok := node[0].(uint32)
-	if !ok {
-		return map[string]float64{}, fmt.Errorf("unexpected format: %v (type %T)", node, node)
+	if node[0] == nil {
+		return nil, fmt.Errorf("%w: pubkey: %v", models.ErrNodeNotFoundDB, pubkey)
 	}
 
 	// pp is a map nodeID --> rank; we need pubkey --> rank.
-	pp, err := pagerank.Personalized(ctx, DB, RWS, nodeID, topK)
+	pp, err := pagerank.Personalized(ctx, DB, RWS, *node[0], topK)
 	if err != nil {
 		return map[string]float64{}, err
 	}
@@ -83,19 +82,17 @@ func PersonalizedPagerank(
 	// get the pubkeys that correspond to the nodeIDs. This operation preserve order
 	pubkeys, err := DB.Pubkeys(ctx, nodeIDs...)
 	if err != nil {
-		return map[string]float64{}, err
+		return nil, err
 	}
 
 	// build the map pubkey --> rank.
 	personalizedPagerank := make(map[string]float64, len(pubkeys))
 	for i, pubkey := range pubkeys {
-
-		pk, ok := pubkey.(string)
-		if !ok {
-			return map[string]float64{}, fmt.Errorf("unexpected format: %v (type %T)", pubkey, pubkey)
+		if pubkey == nil {
+			return nil, fmt.Errorf("%w: pubkey: %v", models.ErrNodeNotFoundDB, pubkey)
 		}
 
-		personalizedPagerank[pk] = ranks[i]
+		personalizedPagerank[*pubkey] = ranks[i]
 	}
 
 	return personalizedPagerank, nil

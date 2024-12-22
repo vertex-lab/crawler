@@ -250,7 +250,6 @@ func TestProcessFollowListEvent(t *testing.T) {
 		}
 
 		for i, event := range events {
-
 			err := ProcessFollowListEvent(ctx, DB, RWM, event)
 			if err != nil {
 				t.Fatalf("ProcessFollowListEvent(event%d): expected nil, got %v", i, err)

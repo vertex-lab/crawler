@@ -128,11 +128,16 @@ func ProcessFollowListEvent(
 
 	if mass > 0.001 {
 		// full recomputation of pagerank
-		// pagerankMap, err = pagerank.Global(ctx, DB, RWM.Store)
-		// if err != nil {
-		// 	return err
-		// }
-		// mass = 0
+		nodeIDs, err := DB.AllNodes(ctx)
+		if err != nil {
+			return err
+		}
+
+		pagerankMap, err = pagerank.Global(ctx, RWM.Store, nodeIDs...)
+		if err != nil {
+			return err
+		}
+		mass = 0
 
 	} else {
 		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
@@ -159,16 +164,13 @@ func AssignNodeIDs(
 
 	IDs, err := DB.NodeIDs(ctx, pubkeys...)
 	if err != nil {
-		return []uint32{}, err
+		return nil, err
 	}
 
 	nodeIDs := make([]uint32, len(IDs))
 	for i, ID := range IDs {
-
-		nodeID, ok := ID.(uint32)
-		// if it's not uint32, it means the pubkey wasn't found in the database
-		if !ok {
-
+		// if it's nil, the pubkey wasn't found in the database
+		if ID == nil {
 			// add a new node to the database, and assign it an ID
 			node := models.Node{
 				Metadata: models.NodeMeta{
@@ -178,12 +180,16 @@ func AssignNodeIDs(
 					Pagerank: 0.0,
 				},
 			}
-			nodeID, err = DB.AddNode(ctx, &node)
+			nodeID, err := DB.AddNode(ctx, &node)
 			if err != nil {
-				return []uint32{}, err
+				return nil, err
 			}
+
+			nodeIDs[i] = nodeID
+			continue
 		}
-		nodeIDs[i] = nodeID
+
+		nodeIDs[i] = *ID
 	}
 
 	return nodeIDs, nil
