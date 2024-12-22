@@ -238,22 +238,21 @@ func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 // If a pubkey is not found, nil is returned
-func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]interface{}, error) {
+func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]*uint32, error) {
 	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
-	nodeIDs := make([]interface{}, 0, len(pubkeys))
-	for _, pubkey := range pubkeys {
-
+	nodeIDs := make([]*uint32, len(pubkeys))
+	for i, pubkey := range pubkeys {
 		nodeID, exist := DB.KeyIndex[pubkey]
 		if !exist {
-			nodeIDs = append(nodeIDs, nil)
+			nodeIDs[i] = nil
 			continue
 		}
 
-		nodeIDs = append(nodeIDs, nodeID)
+		nodeIDs[i] = &nodeID
 	}
 
 	return nodeIDs, nil

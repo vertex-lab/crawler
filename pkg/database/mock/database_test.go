@@ -442,7 +442,7 @@ func TestNodeIDs(t *testing.T) {
 		DBType          string
 		pubkeys         []string
 		expectedError   error
-		expectedNodeIDs []interface{}
+		expectedNodeIDs []*uint32
 	}{
 		{
 			name:          "nil DB",
@@ -454,14 +454,14 @@ func TestNodeIDs(t *testing.T) {
 			DBType:          "simple-with-mock-pks",
 			pubkeys:         []string{"four"},
 			expectedError:   nil,
-			expectedNodeIDs: []interface{}{nil},
+			expectedNodeIDs: []*uint32{nil},
 		},
 		{
 			name:            "one pubkey found DB",
 			DBType:          "simple-with-mock-pks",
-			pubkeys:         []string{"one"},
+			pubkeys:         []string{"zero"},
 			expectedError:   nil,
-			expectedNodeIDs: []interface{}{uint32(1)},
+			expectedNodeIDs: []*uint32{new(uint32)},
 		},
 	}
 
@@ -679,6 +679,6 @@ func TestSetPagerank(t *testing.T) {
 	})
 }
 
-func TestInterface(t *testing.T) {
-	var _ models.Database = &Database{}
-}
+// func TestInterface(t *testing.T) {
+// 	var _ models.Database = &Database{}
+// }

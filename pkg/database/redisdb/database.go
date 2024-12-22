@@ -104,11 +104,11 @@ func (DB *Database) NodeByKey(ctx context.Context, pubkey string) (*models.NodeM
 	}
 
 	// get the nodeID associated with the pubkey
-	strNodeID, err := DB.client.HGet(ctx, KeyKeyIndex, pubkey).Result()
+	strID, err := DB.client.HGet(ctx, KeyKeyIndex, pubkey).Result()
 	if err != nil {
 		return &models.NodeMeta{}, err
 	}
-	nodeID, err := redisutils.ParseID(strNodeID)
+	nodeID, err := redisutils.ParseID(strID)
 	if err != nil {
 		return &models.NodeMeta{}, err
 	}
@@ -326,30 +326,34 @@ func (DB *Database) pipelineSMembers(
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 // If a pubkey is not found, nil is returned
-func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]interface{}, error) {
+func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]*uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
 	if len(pubkeys) == 0 {
-		return []interface{}{}, nil
+		return nil, nil
 	}
 
-	nodeIDs, err := DB.client.HMGet(ctx, KeyKeyIndex, pubkeys...).Result()
+	IDs, err := DB.client.HMGet(ctx, KeyKeyIndex, pubkeys...).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	for i, strNodeID := range nodeIDs {
-		// whatever is not nil, parse it to uint32
-		if strNodeID != nil {
-			nodeID, err := redisutils.ParseID(strNodeID.(string))
-			if err != nil {
-				return nil, err
-			}
-			nodeIDs[i] = nodeID
+	// parse to *uint32, unless it's nil (which means node not found).
+	nodeIDs := make([]*uint32, len(IDs))
+	for i, ID := range IDs {
+		if ID == nil {
+			nodeIDs[i] = nil
+			continue
 		}
+
+		nodeID, err := redisutils.ParseID(ID.(string))
+		if err != nil {
+			return nil, err
+		}
+		nodeIDs[i] = &nodeID
 	}
 
 	return nodeIDs, err
@@ -409,9 +413,9 @@ func (DB *Database) ScanNodes(ctx context.Context, cursor uint64, limit int) ([]
 	}
 
 	nodeIDs := make([]uint32, 0, len(strIDs))
-	for _, strNodeID := range strIDs {
+	for _, ID := range strIDs {
 
-		nodeID, err := redisutils.ParseID(strNodeID[lenPrefix:])
+		nodeID, err := redisutils.ParseID(ID[lenPrefix:])
 		if err != nil {
 			return []uint32{}, 0, err
 		}
