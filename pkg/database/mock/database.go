@@ -211,7 +211,7 @@ func (DB *Database) Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint3
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 // If a pubkey is not found, nil is returned.
-func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface{}, error) {
+func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]*string, error) {
 	_ = ctx
 	if err := DB.Validate(); err != nil {
 		return nil, err
@@ -221,16 +221,15 @@ func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface
 		return nil, nil
 	}
 
-	pubkeys := make([]interface{}, 0, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-
-		node, exist := DB.NodeIndex[nodeID]
+	pubkeys := make([]*string, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		node, exist := DB.NodeIndex[ID]
 		if !exist {
-			pubkeys = append(pubkeys, nil)
+			pubkeys[i] = nil
 			continue
 		}
 
-		pubkeys = append(pubkeys, node.Metadata.Pubkey)
+		pubkeys[i] = &node.Metadata.Pubkey
 	}
 
 	return pubkeys, nil

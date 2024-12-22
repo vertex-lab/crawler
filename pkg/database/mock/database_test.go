@@ -487,7 +487,7 @@ func TestPubkeys(t *testing.T) {
 		DBType          string
 		nodeIDs         []uint32
 		expectedError   error
-		expectedPubkeys []interface{}
+		expectedPubkeys []*string
 	}{
 		{
 			name:          "nil DB",
@@ -499,14 +499,14 @@ func TestPubkeys(t *testing.T) {
 			DBType:          "simple-with-mock-pks",
 			nodeIDs:         []uint32{4},
 			expectedError:   nil,
-			expectedPubkeys: []interface{}{nil},
+			expectedPubkeys: []*string{nil},
 		},
 		{
 			name:            "one pubkey found DB",
 			DBType:          "simple-with-mock-pks",
 			nodeIDs:         []uint32{1},
 			expectedError:   nil,
-			expectedPubkeys: []interface{}{"one"},
+			expectedPubkeys: []*string{&[]string{"one"}[0]}, // did this trick to have a pointer to "one" inline
 		},
 	}
 

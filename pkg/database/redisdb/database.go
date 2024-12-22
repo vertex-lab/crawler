@@ -361,14 +361,14 @@ func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]*uint32, 
 
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 // If a nodeID is not found, nil is returned
-func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface{}, error) {
+func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]*string, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
 
 	if len(nodeIDs) == 0 {
-		return []interface{}{}, nil
+		return nil, nil
 	}
 
 	pipe := DB.client.Pipeline()
@@ -379,17 +379,19 @@ func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]interface
 
 	// if the error is redis.Nil, deal with it later
 	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
-		return []interface{}{}, err
+		return nil, err
 	}
 
-	pubkeys := make([]interface{}, 0, len(nodeIDs))
-	for _, cmd := range cmds {
-
-		if cmd.Err() == redis.Nil { // add nil where the key was not found
-			pubkeys = append(pubkeys, nil)
+	pubkeys := make([]*string, len(nodeIDs))
+	for i, cmd := range cmds {
+		// add nil where the key was not found
+		if cmd.Err() == redis.Nil {
+			pubkeys[i] = nil
 			continue
 		}
-		pubkeys = append(pubkeys, cmd.Val())
+
+		key := cmd.Val()
+		pubkeys[i] = &key
 	}
 
 	return pubkeys, nil

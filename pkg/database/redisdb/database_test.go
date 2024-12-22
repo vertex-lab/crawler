@@ -813,7 +813,7 @@ func TestPubkeys(t *testing.T) {
 		DBType          string
 		nodeIDs         []uint32
 		expectedError   error
-		expectedPubkeys []interface{}
+		expectedPubkeys []*string
 	}{
 		{
 			name:          "nil DB",
@@ -825,14 +825,14 @@ func TestPubkeys(t *testing.T) {
 			DBType:          "one-node0",
 			nodeIDs:         []uint32{4},
 			expectedError:   nil,
-			expectedPubkeys: []interface{}{nil},
+			expectedPubkeys: []*string{nil},
 		},
 		{
 			name:            "one pubkey found DB",
 			DBType:          "one-node0",
 			nodeIDs:         []uint32{0},
 			expectedError:   nil,
-			expectedPubkeys: []interface{}{"zero"},
+			expectedPubkeys: []*string{&[]string{"zero"}[0]}, // a trick to add a pointer to "zero" inline
 		},
 	}
 
