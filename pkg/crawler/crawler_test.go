@@ -8,7 +8,7 @@ import (
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/database/mock"
-	"github.com/vertex-lab/crawler/pkg/logger"
+	"github.com/vertex-lab/crawler/pkg/utils/logger"
 )
 
 func TestFirehose(t *testing.T) {
