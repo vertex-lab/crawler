@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -19,10 +21,43 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-const logFilePath = "crawler.log"
+const configFilePath string = "config.json"
+
+// The configuration parameters for the crawler.
+type Config struct {
+	LogFilePath           string  `json:"log_file_path"`
+	EventChanCapacity     int     `json:"event_chan_capacity"`
+	PubkeyChanCapacity    int     `json:"pubkey_chan_capacity"`
+	FirehoseTimeLimit     int64   `json:"firehose_time_limit"`
+	QueryPubkeysBatchSize int     `json:"query_pubkeys_batch_size"`
+	NodeArbiterThreshold  float64 `json:"node_arbiter_threshold"`
+}
+
+// LoadConfig() returns an initialized config.
+func LoadConfig(filename string) (*Config, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	config := &Config{}
+	if err := decoder.Decode(config); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
 
 func main() {
-	logger, logFile := logger.Init(logFilePath)
+
+	config, err := LoadConfig(configFilePath)
+	if err != nil {
+		panic(err)
+	}
+
+	logger, logFile := logger.Init(config.LogFilePath)
 	defer logFile.Close()
 	PrintTitle(logger)
 
@@ -43,10 +78,10 @@ func main() {
 		panic(err)
 	}
 
-	eventChan := make(chan *nostr.Event, 10000)
-	pubkeyChan := make(chan string, 1000000)
+	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
+	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
 	eventCounter := xsync.NewCounter()
-	pagerankTotal := counter.NewFloatCounter(1000000)
+	pagerankTotal := counter.NewFloatCounter()
 
 	go crawler.HandleSignals(cancel, logger)
 	go DisplayStats(ctx, logger, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
@@ -55,7 +90,7 @@ func main() {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event *nostr.Event) error {
+		crawler.Firehose(ctx, logger, crawler.Relays, DB, config.FirehoseTimeLimit, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -67,7 +102,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event *nostr.Event) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, config.QueryPubkeysBatchSize, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -79,7 +114,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, 0.01, pagerankTotal, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, config.NodeArbiterThreshold, pagerankTotal, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:

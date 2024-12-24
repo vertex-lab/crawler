@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 )
 
+const defaultScale float64 = 1000000
+
 // Float is a struct for a floating point counter. The value of the counter is
 // counter.Load() / scale.
 type Float struct {
@@ -13,13 +15,9 @@ type Float struct {
 }
 
 // NewFloatCounter() returns a new Float counter with the specified scale factor (which controls precision).
-func NewFloatCounter(scale float64) *Float {
-	if scale <= 0 {
-		return nil
-	}
-
+func NewFloatCounter() *Float {
 	return &Float{
-		scale:   scale,
+		scale:   defaultScale,
 		counter: atomic.Int64{},
 	}
 }

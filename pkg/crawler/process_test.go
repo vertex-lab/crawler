@@ -194,7 +194,7 @@ func TestProcessFollowList(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWSType)
-				pagerankTotal := counter.NewFloatCounter(1000000)
+				pagerankTotal := counter.NewFloatCounter()
 
 				err := ProcessFollowList(context.Background(), DB, RWM, &validEvent, pagerankTotal)
 
@@ -258,7 +258,7 @@ func TestProcessFollowList(t *testing.T) {
 			2: 1.74,
 		}
 
-		pagerankTotal := counter.NewFloatCounter(1000000)
+		pagerankTotal := counter.NewFloatCounter()
 		for i, event := range events {
 			err := ProcessFollowList(ctx, DB, RWM, event, pagerankTotal)
 			if err != nil {
@@ -417,7 +417,7 @@ func TestNodeArbiter(t *testing.T) {
 
 	DB := mockdb.SetupDB("one-node0")
 	RWM := walks.SetupMockRWM("one-node0")
-	pagerankTotal := counter.NewFloatCounter(1000000)
+	pagerankTotal := counter.NewFloatCounter()
 	NodeArbiter(ctx, logger, DB, RWM, 0.0, pagerankTotal, func(pk string) error {
 		return nil
 	})
