@@ -1,3 +1,4 @@
+// The package logger defines a simple logger with INFO, WARN and ERROR prints.
 package logger
 
 import (
