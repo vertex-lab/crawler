@@ -44,7 +44,6 @@ but just update them when necessary (e.g. when there is a graph update), using
 the Update() method.
 */
 func (RWM *RandomWalkManager) GenerateAll(ctx context.Context, DB models.Database) error {
-
 	if err := DB.Validate(); err != nil {
 		return err
 	}
@@ -83,16 +82,19 @@ func (RWM *RandomWalkManager) generateWalks(ctx context.Context,
 	walksPerNode := RWM.Store.WalksPerNode(ctx)
 
 	// for each node, perform `walksPerNode` random walks and add them to the RWS
-	for _, nodeID := range nodeIDs {
+	for _, ID := range nodeIDs {
+		if !DB.ContainsNode(ctx, ID) {
+			return models.ErrNodeNotFoundDB
+		}
 
-		walks := make([]models.RandomWalk, 0, walksPerNode)
+		walks := make([]models.RandomWalk, walksPerNode)
 		for i := uint16(0); i < walksPerNode; i++ {
-			walk, err := generateWalk(ctx, DB, nodeID, alpha, rng)
+			walk, err := generateWalk(ctx, DB, ID, alpha, rng)
 			if err != nil {
 				return err
 			}
 
-			walks = append(walks, walk)
+			walks[i] = walk
 		}
 
 		if err := RWM.Store.AddWalks(ctx, walks...); err != nil {
@@ -127,10 +129,6 @@ func generateWalk(
 	startingNodeID uint32,
 	alpha float32,
 	rng *rand.Rand) (models.RandomWalk, error) {
-
-	if !DB.ContainsNode(ctx, startingNodeID) {
-		return nil, models.ErrNodeNotFoundDB
-	}
 
 	var shouldBreak bool
 	currentNodeID := startingNodeID
