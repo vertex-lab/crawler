@@ -2,6 +2,7 @@ package walks
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/rand"
 	"slices"
@@ -20,11 +21,11 @@ func (RWM *RandomWalkManager) Generate(
 	nodeID uint32) error {
 
 	if err := DB.Validate(); err != nil {
-		return err
+		return fmt.Errorf("Generate(): %w", err)
 	}
 
 	if err := RWM.Store.Validate(); err != nil {
-		return err
+		return fmt.Errorf("Generate(): %w", err)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -45,11 +46,11 @@ the Update() method.
 */
 func (RWM *RandomWalkManager) GenerateAll(ctx context.Context, DB models.Database) error {
 	if err := DB.Validate(); err != nil {
-		return err
+		return fmt.Errorf("GenerateAll(): %w", err)
 	}
 
 	if err := RWM.Store.Validate(); err != nil {
-		return err
+		return fmt.Errorf("GenerateAll(): %w", err)
 	}
 
 	nodeIDs, err := DB.AllNodes(ctx)
@@ -81,24 +82,24 @@ func (RWM *RandomWalkManager) generateWalks(ctx context.Context,
 	alpha := RWM.Store.Alpha(ctx)
 	walksPerNode := RWM.Store.WalksPerNode(ctx)
 
-	// for each node, perform `walksPerNode` random walks and add them to the RWS
+	// for each node, perform `walksPerNode` walks and add them to the RWS
 	for _, ID := range nodeIDs {
 		if !DB.ContainsNode(ctx, ID) {
-			return models.ErrNodeNotFoundDB
+			return fmt.Errorf("generateWalks(): %w: %v", models.ErrNodeNotFoundDB, ID)
 		}
 
 		walks := make([]models.RandomWalk, walksPerNode)
 		for i := uint16(0); i < walksPerNode; i++ {
 			walk, err := generateWalk(ctx, DB, ID, alpha, rng)
 			if err != nil {
-				return err
+				return fmt.Errorf("generateWalks(): %w", err)
 			}
 
 			walks[i] = walk
 		}
 
 		if err := RWM.Store.AddWalks(ctx, walks...); err != nil {
-			return err
+			return fmt.Errorf("generateWalks(): %w", err)
 		}
 	}
 
@@ -126,13 +127,13 @@ URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 func generateWalk(
 	ctx context.Context,
 	DB models.Database,
-	startingNodeID uint32,
+	startingID uint32,
 	alpha float32,
 	rng *rand.Rand) (models.RandomWalk, error) {
 
 	var shouldBreak bool
-	currentNodeID := startingNodeID
-	walk := models.RandomWalk{currentNodeID}
+	currentID := startingID
+	walk := models.RandomWalk{currentID}
 
 	for {
 		// stop with probability 1-alpha
@@ -140,25 +141,24 @@ func generateWalk(
 			break
 		}
 
-		// get the successorIDs of the current node. This can be improved by checking a successor cache first.
-		successorIDs, err := DB.Follows(ctx, currentNodeID)
+		follows, err := DB.Follows(ctx, currentID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("generateWalk(): %w", err)
 		}
 
-		currentNodeID, shouldBreak = WalkStep(successorIDs[0], walk, rng)
+		currentID, shouldBreak = WalkStep(follows[0], walk, rng)
 		if shouldBreak {
 			break
 		}
 
-		walk = append(walk, currentNodeID)
+		walk = append(walk, currentID)
 	}
 
 	return walk, nil
 }
 
 /*
-performs a walk step nodeID --> nextNodeID in successorIDs and returns
+performs a walk step nodeID --> nextID in successorIDs and returns
 `nextID` and `stop`.
 
 `stop` is true if and only if:
@@ -168,16 +168,16 @@ performs a walk step nodeID --> nextNodeID in successorIDs and returns
 - nextNodeID was already visited in one of the previous steps (walk). In other
 words, when a cycle is found.
 */
-func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (nextID uint32, stop bool) {
+func WalkStep(follows, walk []uint32, rng *rand.Rand) (nextID uint32, stop bool) {
 
-	// if it is a dandling node, stop
-	succLenght := len(successorIDs)
-	if succLenght == 0 {
+	// if it's a dandling node, stop
+	followSize := len(follows)
+	if followSize == 0 {
 		return math.MaxUint32, true
 	}
 
-	randomIndex := rng.Intn(succLenght)
-	nextID = successorIDs[randomIndex]
+	randomIndex := rng.Intn(followSize)
+	nextID = follows[randomIndex]
 
 	// if there is a cycle, stop
 	if slices.Contains(walk, nextID) {
@@ -191,17 +191,17 @@ func WalkStep(successorIDs, walk []uint32, rng *rand.Rand) (nextID uint32, stop 
 func (RWM *RandomWalkManager) Remove(ctx context.Context, nodeID uint32) error {
 
 	if err := RWM.Store.Validate(); err != nil {
-		return err
+		return fmt.Errorf("Remove(): %w", err)
 	}
 
 	walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
 	if err != nil {
-		return err
+		return fmt.Errorf("Remove(): %w", err)
 	}
 
 	walks, err := RWM.Store.Walks(ctx, walkIDs...)
 	if err != nil {
-		return err
+		return fmt.Errorf("Remove(): %w", err)
 	}
 
 	walksToRemove := make([]uint32, 0, RWM.Store.WalksPerNode(ctx))
