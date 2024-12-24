@@ -8,9 +8,9 @@ import (
 )
 
 type Aggregate struct {
-	infoLogger  *log.Logger
-	warnLogger  *log.Logger
-	errorLogger *log.Logger
+	InfoLogger  *log.Logger
+	WarnLogger  *log.Logger
+	ErrorLogger *log.Logger
 }
 
 // New() returns an initialized Logger
@@ -20,25 +20,25 @@ func New(out io.Writer) *Aggregate {
 	errorLogger := log.New(out, "ERROR: ", log.LstdFlags)
 
 	return &Aggregate{
-		infoLogger:  infoLogger,
-		warnLogger:  warnLogger,
-		errorLogger: errorLogger,
+		InfoLogger:  infoLogger,
+		WarnLogger:  warnLogger,
+		ErrorLogger: errorLogger,
 	}
 }
 
 // Info() prints an INFO log
 func (l *Aggregate) Info(s string, v ...interface{}) {
-	l.infoLogger.Printf(s, v...)
+	l.InfoLogger.Printf(s, v...)
 }
 
 // Warn() prints an WARN log
 func (l *Aggregate) Warn(s string, v ...interface{}) {
-	l.warnLogger.Printf(s, v...)
+	l.WarnLogger.Printf(s, v...)
 }
 
 // Error() prints an ERROR log
 func (l *Aggregate) Error(s string, v ...interface{}) {
-	l.errorLogger.Printf(s, v...)
+	l.ErrorLogger.Printf(s, v...)
 }
 
 // Init() initialise the logger and the file it prints to.

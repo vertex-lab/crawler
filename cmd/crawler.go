@@ -60,6 +60,9 @@ func main() {
 	defer logFile.Close()
 	PrintTitle(logger)
 
+	nostr.InfoLogger = logger.InfoLogger
+	nostr.DebugLogger = logger.WarnLogger
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
