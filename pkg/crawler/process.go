@@ -22,7 +22,7 @@ func ProcessEvents(
 	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	eventChan chan *nostr.Event,
+	eventChan <-chan *nostr.Event,
 	eventCounter *xsync.Counter,
 	pagerankTotal *counter.Float) {
 
@@ -256,8 +256,7 @@ func NodeArbiter(
 	}
 }
 
-// ArbiterScan() performs one entire database scan, promoting or demoting nodes
-// based on their pagerank.
+// ArbiterScan() performs one entire database scan, promoting or demoting nodes based on their pagerank.
 func ArbiterScan(
 	ctx context.Context,
 	DB models.Database,

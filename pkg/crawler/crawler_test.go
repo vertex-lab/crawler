@@ -7,20 +7,21 @@ import (
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/vertex-lab/crawler/pkg/database/mock"
+	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 )
 
+// Manually change pip's follow list and see if the events gets printed. Works only with `go test`
 func TestFirehose(t *testing.T) {
-	// I will manually change the follow list and see if the events gets printed.
-	// Works only with `go test`
-	DB := mock.SetupDB("pip")
+	DB := mockdb.SetupDB("pip")
+	RWS := mockstore.SetupRWS("one-node0")
 	logger := logger.New(os.Stdout)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
 	go HandleSignals(cancel, logger)
-	Firehose(ctx, logger, Relays, DB, 2000, PrintEvent)
+	Firehose(ctx, logger, DB, RWS, Relays, 500, PrintEvent)
 }
 
 func TestQueryPubkeyBatch(t *testing.T) {

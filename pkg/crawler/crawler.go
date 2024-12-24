@@ -3,7 +3,6 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"os/signal"
 	"syscall"
@@ -63,8 +62,9 @@ queue for further processing and/or to be written to the database.
 func Firehose(
 	ctx context.Context,
 	logger *logger.Aggregate,
-	relays []string,
 	DB models.Database,
+	RWS models.RandomWalkStore,
+	relays []string,
 	timeLimit int64, // use a value <= 1000, or you will get rate-limited
 	queueHandler func(event *nostr.Event) error) {
 
@@ -96,7 +96,7 @@ func Firehose(
 		}
 
 		// if the author has low pagerank, skip.
-		if node.Pagerank < pagerankThreshold(DB.Size(ctx), bottom) {
+		if node.Pagerank < pagerankThreshold(ctx, RWS) {
 			continue
 		}
 
@@ -214,33 +214,15 @@ func close(funcName string, pool *nostr.SimplePool) {
 	fmt.Printf("All closed!")
 }
 
-// constants for pagerankThreshold. bottom and top respectively represents
-// the bottom 5%, and top the top 0.1% of the pagerank distribution.
-const (
-	bottom float64 = 0.95
-	top    float64 = 0.001
-)
+// The pagerankThreshold() returns the threshold used for promoting or demoting nodes.
+// Note that multiplier must be > 1, otherwise demotions are impossible (since
+// an active node had at least walksPerNode visits).
+func pagerankThreshold(ctx context.Context, RWS models.RandomWalkStore) float64 {
+	const multiplier float64 = 1.5
+	walksPerNode := float64(RWS.WalksPerNode(ctx))
+	totalVisits := float64(RWS.TotalVisits(ctx))
 
-/*
-PagerankThreshold returns the pagerank satisfied by the `percentageCut` of the nodes
-according to the following (approximated) exponential distribution:
-
-	p_j ~ (1-b) / N^(1-b) * j^(-b)
-
-Where p_j is the j-th highest pagerank, b is the exponent, N is the size of the graph.
-For example, to determine a threshold satisfied by 95% of all the nodes, we do:
-
-	p_(0.95 * N) = (1-b) / N^(1-b) * (0.95 * N)^(-b) = (1-b) * 0.95^(-b) / N
-
-# REFERENCES
-
-[1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
-URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
-*/
-func pagerankThreshold(graphSize int, percentageCut float64) float64 {
-	// the exponent
-	const b float64 = 0.76
-	return (1 - b) * math.Pow(percentageCut, -b) / float64(graphSize)
+	return min(multiplier*walksPerNode/totalVisits, 1.0)
 }
 
 // PrintEvent() is a simple function that prints the event ID, PubKey and Timestamp.

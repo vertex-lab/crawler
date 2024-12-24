@@ -41,9 +41,8 @@ func LoadConfig(filename string) (*Config, error) {
 	}
 	defer file.Close()
 
-	decoder := json.NewDecoder(file)
 	config := &Config{}
-	if err := decoder.Decode(config); err != nil {
+	if err := json.NewDecoder(file).Decode(config); err != nil {
 		return nil, err
 	}
 
@@ -90,7 +89,7 @@ func main() {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, crawler.Relays, DB, config.FirehoseTimeLimit, func(event *nostr.Event) error {
+		crawler.Firehose(ctx, logger, DB, RWS, crawler.Relays, config.FirehoseTimeLimit, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
