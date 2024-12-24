@@ -10,6 +10,7 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
+	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
@@ -19,10 +20,11 @@ import (
 func ProcessEvents(
 	ctx context.Context,
 	logger *logger.Aggregate,
-	eventChan chan nostr.RelayEvent,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	eventCounter *xsync.Counter) {
+	eventChan chan *nostr.Event,
+	eventCounter *xsync.Counter,
+	pagerankTotal *counter.Float) {
 
 	for {
 		select {
@@ -37,49 +39,38 @@ func ProcessEvents(
 				return
 			}
 
-			if event.Event == nil {
-				logger.Warn("event is nil")
+			if event == nil {
+				logger.Warn("ProcessEvents: event is nil")
 				continue
+			}
+
+			switch event.Kind {
+			case nostr.KindFollowList:
+				if err := ProcessFollowList(ctx, DB, RWM, event, pagerankTotal); err != nil {
+					logger.Error("Error processing the eventID %v: %v", event.ID, err)
+				}
+			default:
+				logger.Warn("event of unwanted kind: %v", event.Kind)
 			}
 
 			eventCounter.Inc()
 			if eventCounter.Value()%1000 == 0 {
 				logger.Info("processed %d events", eventCounter.Value())
 			}
-
-			// process event based on its kind
-			switch event.Kind {
-			case nostr.KindFollowList:
-
-				if err := ProcessFollowListEvent(ctx, DB, RWM, event.Event); err != nil {
-					logger.Error("Error processing the eventID %v: %v", event.ID, err)
-
-					// re-add event to the queue
-					select {
-					case eventChan <- event:
-					default:
-						logger.Warn("Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
-					}
-				}
-			default:
-				logger.Warn("event of unwanted kind: %v", event.Kind)
-			}
 		}
 	}
 }
 
-// The accumulated pagerank mass since the last full recomputation of pagerank
-var mass float64
-
 /*
-ProcessFollowListEvent() adds the author and its follows to the database.
+ProcessFollowList() adds the author and its follows to the database.
 It updates the node metadata of the author, and updates the random walks.
 */
-func ProcessFollowListEvent(
+func ProcessFollowList(
 	ctx context.Context,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	event *nostr.Event) error {
+	event *nostr.Event,
+	pagerankTotal *counter.Float) error {
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
@@ -93,9 +84,8 @@ func ProcessFollowListEvent(
 		return nil
 	}
 
-	// parse pubkeys and fetch/assign nodeIDs
-	followPubkeys := ParsePubkeys(event)
-	newFollows, err := AssignNodeIDs(ctx, DB, followPubkeys)
+	pubkeys := ParsePubkeys(event)
+	newFollows, err := AssignNodeIDs(ctx, DB, pubkeys)
 	if err != nil {
 		return err
 	}
@@ -106,6 +96,9 @@ func ProcessFollowListEvent(
 	}
 
 	removed, common, added := sliceutils.Partition(oldFollows[0], newFollows)
+	if len(removed)+len(added) == 0 {
+		return nil
+	}
 
 	authorNodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
@@ -123,36 +116,15 @@ func ProcessFollowListEvent(
 		return err
 	}
 
-	var pagerankMap models.PagerankMap
-	mass += author.Pagerank
-
-	if mass > 0.001 {
-		// full recomputation of pagerank
-		nodeIDs, err := DB.AllNodes(ctx)
-		if err != nil {
-			return err
-		}
-
-		pagerankMap, err = pagerank.Global(ctx, RWM.Store, nodeIDs...)
-		if err != nil {
-			return err
-		}
-		mass = 0
-
-	} else {
-		// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
-		impactedNodes := append(added, removed...)
-		pagerankMap, err = pagerank.Global(ctx, RWM.Store, impactedNodes...)
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := DB.SetPagerank(ctx, pagerankMap); err != nil {
+	// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
+	impacted := append(added, removed...)
+	pagerank, err := pagerank.Global(ctx, RWM.Store, impacted...)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	pagerankTotal.Add(author.Pagerank)
+	return DB.SetPagerank(ctx, pagerank)
 }
 
 // AssignNodeIDs() returns the nodeIDs of the specified pubkeys.
@@ -169,8 +141,8 @@ func AssignNodeIDs(
 
 	nodeIDs := make([]uint32, len(IDs))
 	for i, ID := range IDs {
-		// if it's nil, the pubkey wasn't found in the database
 		if ID == nil {
+			// if it's nil, the pubkey wasn't found in the database
 			// add a new node to the database, and assign it an ID
 			node := models.Node{
 				Metadata: models.NodeMeta{
@@ -242,34 +214,44 @@ func ParsePubkeys(event *nostr.Event) []string {
 	return pubkeys
 }
 
-// NodeArbiter() periodically scans through all the nodes in the database,
-// promoting or demoting them based on their pagerank.
+// NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
+// - scans through all the nodes in the database
+// - promotes or demotes them based on their pagerank
+// - recomputes the pagerank of all nodes
 func NodeArbiter(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	sleepTime int,
+	startThreshold float64,
+	pagerankTotal *counter.Float,
 	queueHandler func(pk string) error) {
 
-	counter := 0
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			fmt.Printf("\n  > Stopping the Node Arbiter... ")
 			return
-		default:
-			// If the node is not found (err != nil), skip
-			time.Sleep(time.Duration(sleepTime) * time.Second)
 
-			//threshold := pagerankThreshold(DB.Size(), bottom)
-			threshold := 0.0
-			if err := ArbiterScan(ctx, DB, RWM, threshold, queueHandler); err != nil {
-				logger.Error("NodeArbiter error: %v", err)
+		case <-ticker.C:
+			if pagerankTotal.Load() >= startThreshold {
+
+				if err := ArbiterScan(ctx, DB, RWM, 0.0, queueHandler); err != nil {
+					logger.Error("Arbiter Scan error: %v", err)
+					continue
+				}
+
+				if err := FullPagerankUpdate(ctx, DB, RWM.Store); err != nil {
+					logger.Error("Full Pagerank Update error: %v", err)
+					continue
+				}
+
+				pagerankTotal.Store(0)
+				logger.Info("NodeArbiter: scan completed")
 			}
-
-			counter++
-			logger.Info("NodeArbiter completed scan: %d", counter)
 		}
 	}
 }
@@ -283,7 +265,7 @@ func ArbiterScan(
 	threshold float64,
 	queueHandler func(pk string) error) error {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*100)
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
 	var cursor uint64
@@ -336,7 +318,8 @@ func ArbiterScan(
 	return nil
 }
 
-// PromoteNode() makes a node active, which means it generates random walks for it and updates the DB.
+// PromoteNode() makes a node active, which means it generates random walks
+// for it and updates the status to active.
 func PromoteNode(
 	ctx context.Context,
 	DB models.Database,
@@ -349,7 +332,7 @@ func PromoteNode(
 
 	nodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
-			Status: "active",
+			Status: models.StatusActive,
 		},
 	}
 
@@ -360,8 +343,8 @@ func PromoteNode(
 	return nil
 }
 
-// DemoteNode() sets a node to "inactive". In the future this function will also
-// remove the walks that starts from that node, thus removing its influence on the pagerank.
+// DemoteNode() makes a node inactive, which means removes random walks that
+// start from it, and updates the status to inactive.
 func DemoteNode(
 	ctx context.Context,
 	DB models.Database,
@@ -369,18 +352,37 @@ func DemoteNode(
 	nodeID uint32) error {
 
 	if err := RWM.Remove(ctx, nodeID); err != nil {
-		return err
+		return fmt.Errorf("Remove(): %v", err)
 	}
 
 	nodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
-			Status: "inactive",
+			Status: models.StatusInactive,
 		},
 	}
 
 	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
-		return err
+		return fmt.Errorf("UpdateNode(): %v", err)
 	}
 
 	return nil
+}
+
+// FullPagerankUpdate() performs a full pagerank recomputation, which is computationally expensive.
+func FullPagerankUpdate(ctx context.Context, DB models.Database, RWS models.RandomWalkStore) error {
+
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	nodeIDs, err := DB.AllNodes(ctx)
+	if err != nil {
+		return err
+	}
+
+	rank, err := pagerank.Global(ctx, RWS, nodeIDs...)
+	if err != nil {
+		return err
+	}
+
+	return DB.SetPagerank(ctx, rank)
 }

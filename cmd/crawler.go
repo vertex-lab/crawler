@@ -13,6 +13,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
+	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
@@ -39,18 +40,19 @@ func main() {
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
 
-	eventChan := make(chan nostr.RelayEvent, 10000)
+	eventChan := make(chan *nostr.Event, 10000)
 	pubkeyChan := make(chan string, 1000000)
 	eventCounter := xsync.NewCounter()
+	pagerankTotal := counter.NewFloatCounter(1000000)
 
 	go crawler.HandleSignals(cancel, logger)
-	go DisplayStats(ctx, logger, DB, RWM, eventCounter, eventChan, pubkeyChan)
+	go DisplayStats(ctx, logger, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
 
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event nostr.RelayEvent) error {
+		crawler.Firehose(ctx, logger, crawler.Relays, DB, 0, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -62,7 +64,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event nostr.RelayEvent) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, 100, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -74,7 +76,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, 30, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, 0.01, pagerankTotal, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:
@@ -84,7 +86,7 @@ func main() {
 		})
 	}()
 
-	crawler.ProcessEvents(ctx, logger, eventChan, DB, RWM, eventCounter)
+	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, pagerankTotal)
 
 	wg.Wait()
 	fmt.Printf("\nExiting\n")
@@ -97,14 +99,15 @@ func DisplayStats(
 	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	eventCounter *xsync.Counter,
-	eventChan <-chan nostr.RelayEvent,
+	eventChan <-chan *nostr.Event,
 	pubkeyChan <-chan string,
-) {
+	eventCounter *xsync.Counter,
+	pagerankTotal *counter.Float) {
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	const statsLines = 9
+	const statsLines = 10
 	firstDisplay := true
 	clearStats := func() {
 		if !firstDisplay {
@@ -121,7 +124,6 @@ func DisplayStats(
 			return
 
 		case <-ticker.C:
-			// Fetch stats
 			eventChanLen := len(eventChan)
 			eventChanCap := cap(eventChan)
 			pubkeyChanLen := len(pubkeyChan)
@@ -131,16 +133,15 @@ func DisplayStats(
 			runtime.ReadMemStats(memStats)
 
 			clearStats()
-
 			fmt.Printf("\n--- System Stats ---\n")
 			fmt.Printf("Database Size: %d nodes\n", DB.Size(ctx))
 			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
 			fmt.Printf("Pubkey Channel: %d/%d\n", pubkeyChanLen, pubkeyChanCap)
 			fmt.Printf("Processed Events: %d\n", eventCounter.Value())
+			fmt.Printf("Pagerank since last recomputation: %v\n", pagerankTotal.Load())
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
 			fmt.Println("---------------------")
-
 			firstDisplay = false
 		}
 	}

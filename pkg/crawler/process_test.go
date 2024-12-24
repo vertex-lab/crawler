@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"errors"
+	"math"
 	"math/rand/v2"
 	"os"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -166,7 +168,7 @@ func TestAssignNodeIDs(t *testing.T) {
 	}
 }
 
-func TestProcessFollowListEvent(t *testing.T) {
+func TestProcessFollowList(t *testing.T) {
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -192,11 +194,12 @@ func TestProcessFollowListEvent(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWSType)
+				pagerankTotal := counter.NewFloatCounter(1000000)
 
-				err := ProcessFollowListEvent(context.Background(), DB, RWM, &validEvent)
+				err := ProcessFollowList(context.Background(), DB, RWM, &validEvent, pagerankTotal)
 
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("ProcessFollowListEvent(): expected %v, got %v", test.expectedError, err)
+					t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
 				}
 			})
 		}
@@ -244,26 +247,38 @@ func TestProcessFollowListEvent(t *testing.T) {
 		}
 
 		expectedPagerank := map[int]models.PagerankMap{
-			0: {0: 0.54, 1: 0.46},
-			1: {0: 0.389, 1: 0.33, 2: 0.2809},
-			2: {0: 0.389, 1: 0.33, 2: 0.2809},
+			0: {1: 0.46},
+			1: {2: 0.2809},
+			2: {0: 0.389},
 		}
 
+		expectedTotal := map[int]float64{
+			0: 1.0,
+			1: 1.46,
+			2: 1.74,
+		}
+
+		pagerankTotal := counter.NewFloatCounter(1000000)
 		for i, event := range events {
-			err := ProcessFollowListEvent(ctx, DB, RWM, event)
+			err := ProcessFollowList(ctx, DB, RWM, event, pagerankTotal)
 			if err != nil {
-				t.Fatalf("ProcessFollowListEvent(event%d): expected nil, got %v", i, err)
+				t.Fatalf("ProcessFollowList(event%d): expected nil, got %v", i, err)
 			}
 
-			pagerankMap := models.PagerankMap{}
-			for nodeID, node := range DB.NodeIndex {
-				pagerankMap[nodeID] = node.Metadata.Pagerank
+			total := pagerankTotal.Load()
+			if math.Abs(expectedTotal[i]-total) > maxDist {
+				t.Errorf("Expected distance %v, got %v", maxDist, math.Abs(expectedTotal[i]-total))
 			}
 
-			distance := pagerank.Distance(pagerankMap, expectedPagerank[i])
+			rank := make(models.PagerankMap, 1)
+			for ID := range expectedPagerank[i] {
+				rank[ID] = DB.NodeIndex[ID].Metadata.Pagerank
+			}
+
+			distance := pagerank.Distance(rank, expectedPagerank[i])
 			if distance > maxDist {
 				t.Errorf("Expected distance %v, got %v", maxDist, distance)
-				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], pagerankMap)
+				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], rank)
 			}
 		}
 	})
@@ -297,7 +312,6 @@ func TestArbiterScan(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWMType)
-
 				err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
 					return nil
 				})
@@ -330,7 +344,7 @@ func TestArbiterScan(t *testing.T) {
 			}
 
 			if node.Metadata.Status != models.StatusInactive {
-				t.Errorf("expected status of nodeID %d %v, got %v", 1, models.StatusActive, node.Metadata.Status)
+				t.Errorf("expected status of nodeID %d %v, got %v", 1, models.StatusInactive, node.Metadata.Status)
 			}
 
 			// check the only walk (from calle) has been removed
@@ -403,7 +417,8 @@ func TestNodeArbiter(t *testing.T) {
 
 	DB := mockdb.SetupDB("one-node0")
 	RWM := walks.SetupMockRWM("one-node0")
-	NodeArbiter(ctx, logger, DB, RWM, 5, func(pk string) error {
+	pagerankTotal := counter.NewFloatCounter(1000000)
+	NodeArbiter(ctx, logger, DB, RWM, 0.0, pagerankTotal, func(pk string) error {
 		return nil
 	})
 }

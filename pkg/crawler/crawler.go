@@ -66,7 +66,7 @@ func Firehose(
 	relays []string,
 	DB models.Database,
 	timeLimit int64, // use a value <= 1000, or you will get rate-limited
-	queueHandler func(event nostr.RelayEvent) error) {
+	queueHandler func(event *nostr.Event) error) {
 
 	pool := nostr.NewSimplePool(ctx)
 	defer close("Firehose", pool)
@@ -78,6 +78,10 @@ func Firehose(
 	}}
 
 	for event := range pool.SubMany(ctx, relays, filters) {
+		if event.Event == nil {
+			continue
+		}
+
 		if match, err := event.CheckSignature(); err != nil || !match {
 			continue
 		}
@@ -96,7 +100,7 @@ func Firehose(
 			continue
 		}
 
-		if err := queueHandler(event); err != nil {
+		if err := queueHandler(event.Event); err != nil {
 			logger.Error("Firehose queue handler: %v", err)
 			return
 		}
@@ -111,7 +115,7 @@ func QueryPubkeys(
 	relays []string,
 	pubkeyChan <-chan string,
 	batchSize int,
-	queueHandler func(event nostr.RelayEvent) error) {
+	queueHandler func(event *nostr.Event) error) {
 
 	batch := make([]string, 0, batchSize)
 	pool := nostr.NewSimplePool(ctx)
@@ -151,7 +155,7 @@ func QueryPubkeyBatch(
 	pool *nostr.SimplePool,
 	relays []string,
 	pubkeys []string,
-	queueHandler func(event nostr.RelayEvent) error) error {
+	queueHandler func(event *nostr.Event) error) error {
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
@@ -162,8 +166,11 @@ func QueryPubkeyBatch(
 	}}
 
 	// a map that associates each pubkey with the newest follow list
-	newestEvents := make(map[string]nostr.RelayEvent, len(pubkeys))
+	newestEvents := make(map[string]*nostr.Event, len(pubkeys))
 	for event := range pool.SubManyEose(ctx, relays, filters) {
+		if event.Event == nil {
+			continue
+		}
 
 		if match, err := event.CheckSignature(); err != nil || !match {
 			continue
@@ -171,12 +178,12 @@ func QueryPubkeyBatch(
 
 		newestEvent, exists := newestEvents[event.PubKey]
 		if !exists {
-			newestEvents[event.PubKey] = event
+			newestEvents[event.PubKey] = event.Event
 			continue
 		}
 
 		if event.CreatedAt.Time().Unix() > newestEvent.CreatedAt.Time().Unix() {
-			newestEvents[event.PubKey] = event
+			newestEvents[event.PubKey] = event.Event
 		}
 	}
 
@@ -230,7 +237,7 @@ func pagerankThreshold(graphSize int, percentageCut float64) float64 {
 }
 
 // PrintEvent() is a simple function that prints the event ID, PubKey and Timestamp.
-func PrintEvent(event nostr.RelayEvent) error {
+func PrintEvent(event *nostr.Event) error {
 	fmt.Printf("\nevent ID: %v", event.ID)
 	fmt.Printf("\nevent pubkey: %v", event.PubKey)
 	fmt.Printf("\nevent timestamp: %d\n", event.CreatedAt.Time().Unix())
