@@ -24,7 +24,6 @@ func TestFirehose(t *testing.T) {
 }
 
 func TestQueryPubkeyBatch(t *testing.T) {
-
 	pool := nostr.NewSimplePool(context.Background())
 	defer close("QueryPubkeyBatch", pool)
 
@@ -35,5 +34,5 @@ func TestQueryPubkeyBatch(t *testing.T) {
 	go HandleSignals(cancel, logger)
 
 	pubkeys := []string{pip, calle, gigi, odell}
-	QueryPubkeyBatch(ctx, pool, Relays, pubkeys, PrintEvent)
+	QueryPubkeyBatch(ctx, logger, pool, Relays, pubkeys, PrintEvent)
 }

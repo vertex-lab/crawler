@@ -30,15 +30,18 @@ func main() {
 	defer cancel()
 
 	cl := redisutils.SetupProdClient()
-	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
 		panic(err)
 	}
-	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	RWS, err := redistore.NewRWS(ctx, cl, 0.85, 100)
 	if err != nil {
 		panic(err)
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
+	if err := RWM.GenerateAll(ctx, DB); err != nil {
+		panic(err)
+	}
 
 	eventChan := make(chan *nostr.Event, 10000)
 	pubkeyChan := make(chan string, 1000000)

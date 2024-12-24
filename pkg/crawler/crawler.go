@@ -136,13 +136,13 @@ func QueryPubkeys(
 			batch = append(batch, pubkey)
 			if len(batch) >= batchSize {
 
-				err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler)
-				if err != nil {
+				if err := QueryPubkeyBatch(ctx, logger, pool, relays, batch, queueHandler); err != nil {
 					logger.Error("QueryPubkeys queue handler: %v", err)
-				} else {
-					// reset the batch only if successful, otherwise retry
-					batch = make([]string, 0, batchSize)
+					continue
 				}
+
+				// reset only if successful
+				batch = make([]string, 0, batchSize)
 			}
 		}
 	}
@@ -152,6 +152,7 @@ func QueryPubkeys(
 // It sends the newest events for each pubkey to the queue using the provided queueHandler.
 func QueryPubkeyBatch(
 	ctx context.Context,
+	logger *logger.Aggregate,
 	pool *nostr.SimplePool,
 	relays []string,
 	pubkeys []string,
@@ -166,7 +167,7 @@ func QueryPubkeyBatch(
 	}}
 
 	// a map that associates each pubkey with the newest follow list
-	newestEvents := make(map[string]*nostr.Event, len(pubkeys))
+	newest := make(map[string]*nostr.Event, len(pubkeys))
 	for event := range pool.SubManyEose(ctx, relays, filters) {
 		if event.Event == nil {
 			continue
@@ -176,19 +177,25 @@ func QueryPubkeyBatch(
 			continue
 		}
 
-		newestEvent, exists := newestEvents[event.PubKey]
+		newestEvent, exists := newest[event.PubKey]
 		if !exists {
-			newestEvents[event.PubKey] = event.Event
+			newest[event.PubKey] = event.Event
 			continue
 		}
 
 		if event.CreatedAt.Time().Unix() > newestEvent.CreatedAt.Time().Unix() {
-			newestEvents[event.PubKey] = event.Event
+			newest[event.PubKey] = event.Event
 		}
 	}
 
 	// send only the newest events to the queue.
-	for _, event := range newestEvents {
+	for _, key := range pubkeys {
+		event, exists := newest[key]
+		if !exists {
+			logger.Warn("QueryPubkeyBatch: follow list not found for %v", key)
+			continue
+		}
+
 		if err := queueHandler(event); err != nil {
 			return err
 		}
