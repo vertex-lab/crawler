@@ -284,7 +284,7 @@ func ArbiterScan(
 
 		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 1000)
 		if err != nil {
-			return fmt.Errorf("ArbiterScan(): error scanning: %w", err)
+			return fmt.Errorf("ArbiterScan(): %w", err)
 		}
 
 		for _, ID := range nodeIDs {

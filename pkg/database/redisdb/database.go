@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
+	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
 const (
@@ -430,6 +431,47 @@ func (DB *Database) ScanNodes(ctx context.Context, cursor uint64, limit int) ([]
 
 // AllNodes() returns a slice with the IDs of all nodes in the DB
 func (DB *Database) AllNodes(ctx context.Context) ([]uint32, error) {
+
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	size := DB.Size(ctx)
+	if size == 0 {
+		return nil, fmt.Errorf("AllNodes(): %w", models.ErrEmptyDB)
+	}
+
+	nodeIDs := make([]uint32, 0, DB.Size(ctx))
+	var cursor uint64
+	var IDs []uint32
+	var err error
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, nil
+		default:
+			// proceed with the scan
+		}
+
+		IDs, cursor, err = DB.ScanNodes(ctx, cursor, 1000)
+		if err != nil {
+			return nil, fmt.Errorf("ScanNodes(): %w", err)
+		}
+
+		nodeIDs = append(nodeIDs, IDs...)
+
+		// If the cursor returns to 0, the scan is complete
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return sliceutils.Unique(nodeIDs), nil
+}
+
+// AllNodes() returns a slice with the IDs of all nodes in the DB
+func (DB *Database) AllNodes2(ctx context.Context) ([]uint32, error) {
 
 	if err := DB.Validate(); err != nil {
 		return nil, err
