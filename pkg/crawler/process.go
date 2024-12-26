@@ -61,10 +61,8 @@ func ProcessEvents(
 	}
 }
 
-/*
-ProcessFollowList() adds the author and its follows to the database.
-It updates the node metadata of the author, and updates the random walks.
-*/
+// ProcessFollowList() adds the author and its follows to the database.
+// It updates the node metadata of the author, and updates the random walks.
 func ProcessFollowList(
 	ctx context.Context,
 	DB models.Database,
@@ -123,8 +121,12 @@ func ProcessFollowList(
 		return err
 	}
 
+	if err := DB.SetPagerank(ctx, pagerank); err != nil {
+		return err
+	}
+
 	pagerankTotal.Add(author.Pagerank)
-	return DB.SetPagerank(ctx, pagerank)
+	return nil
 }
 
 // AssignNodeIDs() returns the nodeIDs of the specified pubkeys.
@@ -167,7 +169,7 @@ func AssignNodeIDs(
 	return nodeIDs, nil
 }
 
-// ParsePubKeys returns the slice of pubkeys that are correctly listed in the nostr.Tags.
+// ParsePubkeys() returns the slice of pubkeys that are correctly listed in the nostr.Tags.
 // - Badly formatted tags are ignored.
 // - Pubkeys will be uniquely added (no repetitions).
 // - The author of the event will be removed from the followed pubkeys if present.
@@ -240,12 +242,12 @@ func NodeArbiter(
 			if pagerankTotal.Load() >= startThreshold {
 
 				if err := ArbiterScan(ctx, DB, RWM, 0.0, queueHandler); err != nil {
-					logger.Error("Arbiter Scan error: %v", err)
+					logger.Error("%v", err)
 					continue
 				}
 
 				if err := FullPagerankUpdate(ctx, DB, RWM.Store); err != nil {
-					logger.Error("Full Pagerank Update error: %v", err)
+					logger.Error("%v", err)
 					continue
 				}
 
@@ -256,7 +258,8 @@ func NodeArbiter(
 	}
 }
 
-// ArbiterScan() performs one entire database scan, promoting or demoting nodes based on their pagerank.
+// ArbiterScan() performs one entire database scan, promoting or demoting nodes
+// based on their pagerank.
 func ArbiterScan(
 	ctx context.Context,
 	DB models.Database,
@@ -276,34 +279,35 @@ func ArbiterScan(
 		case <-ctx.Done():
 			return nil
 		default:
+			// proceed with the scan
 		}
 
 		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 1000)
 		if err != nil {
-			return fmt.Errorf("error scanning: %w", err)
+			return fmt.Errorf("ArbiterScan(): error scanning: %w", err)
 		}
 
-		for _, nodeID := range nodeIDs {
-			node, err := DB.NodeByID(ctx, nodeID)
+		for _, ID := range nodeIDs {
+			node, err := DB.NodeByID(ctx, ID)
 			if err != nil {
 				continue
 			}
 
 			// Active --> Inactive
 			if node.Status == models.StatusActive && node.Pagerank < threshold {
-				if err := DemoteNode(ctx, DB, RWM, nodeID); err != nil {
-					return fmt.Errorf("error demoting nodeID %d: %w", nodeID, err)
+				if err := DemoteNode(ctx, DB, RWM, ID); err != nil {
+					return fmt.Errorf("ArbiterScan(): %w", err)
 				}
 			}
 
 			// Inactive --> Active
 			if node.Status == models.StatusInactive && node.Pagerank >= threshold {
-				if err := PromoteNode(ctx, DB, RWM, nodeID); err != nil {
-					return fmt.Errorf("error promoting nodeID %d: %w", nodeID, err)
+				if err := PromoteNode(ctx, DB, RWM, ID); err != nil {
+					return fmt.Errorf("ArbiterScan(): %w", err)
 				}
 
 				if err := queueHandler(node.Pubkey); err != nil {
-					return fmt.Errorf("error sending pubkey %v to the queue: %w", node.Pubkey, err)
+					return fmt.Errorf("ArbiterScan(): error sending pubkey %v to the queue: %w", node.Pubkey, err)
 				}
 			}
 		}
@@ -326,7 +330,7 @@ func PromoteNode(
 	nodeID uint32) error {
 
 	if err := RWM.Generate(ctx, DB, nodeID); err != nil {
-		return fmt.Errorf("Generate(): %v", err)
+		return fmt.Errorf("PromoteNode(): %w", err)
 	}
 
 	nodeDiff := models.NodeDiff{
@@ -336,7 +340,7 @@ func PromoteNode(
 	}
 
 	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
-		return fmt.Errorf("UpdateNode(): %v", err)
+		return fmt.Errorf("PromoteNode(): %w", err)
 	}
 
 	return nil
@@ -351,7 +355,7 @@ func DemoteNode(
 	nodeID uint32) error {
 
 	if err := RWM.Remove(ctx, nodeID); err != nil {
-		return fmt.Errorf("Remove(): %v", err)
+		return fmt.Errorf("DemoteNode(): %w", err)
 	}
 
 	nodeDiff := models.NodeDiff{
@@ -361,7 +365,7 @@ func DemoteNode(
 	}
 
 	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
-		return fmt.Errorf("UpdateNode(): %v", err)
+		return fmt.Errorf("DemoteNode(): %w", err)
 	}
 
 	return nil
@@ -375,13 +379,17 @@ func FullPagerankUpdate(ctx context.Context, DB models.Database, RWS models.Rand
 
 	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("FullPagerankUpdate(): %w", err)
 	}
 
 	rank, err := pagerank.Global(ctx, RWS, nodeIDs...)
 	if err != nil {
-		return err
+		return fmt.Errorf("FullPagerankUpdate(): %w", err)
 	}
 
-	return DB.SetPagerank(ctx, rank)
+	if err := DB.SetPagerank(ctx, rank); err != nil {
+		return fmt.Errorf("FullPagerankUpdate(): %w", err)
+	}
+
+	return nil
 }

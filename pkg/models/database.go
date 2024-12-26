@@ -97,10 +97,10 @@ type Database interface {
 
 	// ScanNodes() scans over the nodes and returns a batch of nodeIDs of size roughly equal to limit.
 	// Limit controls how much "work" is invested in fetching the batch, hence it is not precise.
+	// See the guarantees of scan: https://redis.io/docs/latest/commands/scan/
 	ScanNodes(ctx context.Context, cursor uint64, limit int) ([]uint32, uint64, error)
 
 	// AllNodes() returns a slice with the IDs of all nodes in the DB.
-	// This is a blocking operation, so ScanNodes should be prefered when running in prod.
 	AllNodes(ctx context.Context) ([]uint32, error)
 
 	// SetPagerank() set the pagerank in the database according to the pagerankMap
