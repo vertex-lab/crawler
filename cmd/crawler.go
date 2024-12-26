@@ -58,7 +58,6 @@ func main() {
 
 	logger, logFile := logger.Init(config.LogFilePath)
 	defer logFile.Close()
-	PrintTitle(logger)
 
 	nostr.InfoLogger = logger.InfoLogger
 	nostr.DebugLogger = logger.WarnLogger
@@ -67,23 +66,22 @@ func main() {
 	defer cancel()
 
 	cl := redisutils.SetupProdClient()
-	DB, err := redisdb.SetupDB(cl, "pip")
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		panic(err)
 	}
-	RWS, err := redistore.NewRWS(ctx, cl, 0.85, 100)
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
 	if err != nil {
 		panic(err)
 	}
 	RWM := &walks.RandomWalkManager{Store: RWS}
-	if err := RWM.GenerateAll(ctx, DB); err != nil {
-		panic(err)
-	}
 
 	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
 	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
 	eventCounter := xsync.NewCounter()
 	pagerankTotal := counter.NewFloatCounter()
+
+	PrintTitle(logger)
 
 	go crawler.HandleSignals(cancel, logger)
 	go DisplayStats(ctx, logger, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
