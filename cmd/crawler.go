@@ -14,7 +14,6 @@ import (
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
@@ -50,6 +49,8 @@ func LoadConfig(filename string) (*Config, error) {
 }
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	config, err := LoadConfig(configFilePath)
 	if err != nil {
@@ -57,31 +58,27 @@ func main() {
 	}
 
 	logger, logFile := logger.Init(config.LogFilePath)
-	defer logFile.Close()
-
 	nostr.InfoLogger = logger.InfoLogger
 	nostr.DebugLogger = logger.WarnLogger
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	defer logFile.Close()
 
 	cl := redisutils.SetupProdClient()
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		panic(err)
 	}
-	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	RWM, err := walks.NewRWMConnection(ctx, cl)
 	if err != nil {
 		panic(err)
 	}
-	RWM := &walks.RandomWalkManager{Store: RWS}
 
 	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
 	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
 	eventCounter := xsync.NewCounter()
 	pagerankTotal := counter.NewFloatCounter()
 
-	PrintTitle(logger)
+	PrintStartup(logger)
+	defer PrintShutdown(logger)
 
 	go crawler.HandleSignals(cancel, logger)
 	go DisplayStats(ctx, logger, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
@@ -90,7 +87,7 @@ func main() {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, DB, RWS, crawler.Relays, config.FirehoseTimeLimit, func(event *nostr.Event) error {
+		crawler.Firehose(ctx, logger, DB, RWM.Store, crawler.Relays, config.FirehoseTimeLimit, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -125,11 +122,7 @@ func main() {
 	}()
 
 	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, pagerankTotal)
-
 	wg.Wait()
-	fmt.Printf("\nExiting\n")
-	logger.Info("Exiting")
-	logger.Info("------------------------------------------------------")
 }
 
 func DisplayStats(
@@ -142,7 +135,7 @@ func DisplayStats(
 	eventCounter *xsync.Counter,
 	pagerankTotal *counter.Float) {
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	const statsLines = 10
@@ -158,7 +151,7 @@ func DisplayStats(
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("\n  > Stopping stats display...")
+			fmt.Println("  > Stopping stats display...")
 			return
 
 		case <-ticker.C:
@@ -171,7 +164,7 @@ func DisplayStats(
 			runtime.ReadMemStats(memStats)
 
 			clearStats()
-			fmt.Printf("\n--- System Stats ---\n")
+			fmt.Printf("\n------------ System Stats -------------\n")
 			fmt.Printf("Database Size: %d nodes\n", DB.Size(ctx))
 			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
 			fmt.Printf("Pubkey Channel: %d/%d\n", pubkeyChanLen, pubkeyChanCap)
@@ -179,18 +172,25 @@ func DisplayStats(
 			fmt.Printf("Pagerank since last recomputation: %v\n", pagerankTotal.Load())
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
-			fmt.Println("---------------------")
+			fmt.Println("---------------------------------------")
 			firstDisplay = false
 		}
 	}
 }
 
-// PrintTitle() prints a title.
-func PrintTitle(l *logger.Aggregate) {
-	fmt.Println("------------------------")
-	fmt.Println("Nostr crawler is running")
-	fmt.Println("------------------------")
-
-	l.Info("------------------------------------------------------")
+// PrintStartup() prints a simple start up message.
+func PrintStartup(l *logger.Aggregate) {
+	fmt.Println("---------------------------------------")
+	fmt.Println("        Nostr crawler is running       ")
+	fmt.Println("---------------------------------------")
+	l.Info("---------------------------------------")
 	l.Info("Nostr crawler is starting up")
+}
+
+// PrintShutdown() prints a simple shutdown message.
+func PrintShutdown(l *logger.Aggregate) {
+	fmt.Println("\nShutdown")
+	fmt.Println("---------------------------------------")
+	l.Info("Shutdown")
+	l.Info("---------------------------------------")
 }

@@ -206,17 +206,17 @@ func QueryPubkeyBatch(
 
 // Close() iterates over the relays in the pool and closes all connections.
 func close(funcName string, pool *nostr.SimplePool) {
-	fmt.Printf("\n  > %v: closing relay connections... ", funcName)
+	fmt.Printf("  > " + funcName + ": closing relay connections... ")
 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
 		relay.Close()
 		return true
 	})
-	fmt.Printf("All closed!")
+	fmt.Printf("All closed!\n")
 }
 
 // The pagerankThreshold() returns the threshold used for promoting or demoting nodes.
 // Note that multiplier must be > 1, otherwise demotions are impossible (since
-// an active node had at least walksPerNode visits).
+// an active node have at least walksPerNode visits).
 func pagerankThreshold(ctx context.Context, RWS models.RandomWalkStore) float64 {
 	const multiplier float64 = 1.5
 	walksPerNode := float64(RWS.WalksPerNode(ctx))
@@ -239,7 +239,7 @@ func HandleSignals(cancel context.CancelFunc, logger *logger.Aggregate) {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-signalChan // Block until a signal is received
-	fmt.Printf("\nSignal received. Shutting down...")
+	fmt.Println(" Signal received. Shutting down...")
 	logger.Info("Signal received. Shutting down...")
 	cancel()
 }

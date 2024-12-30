@@ -29,12 +29,12 @@ func ProcessEvents(
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("\n  > Finishing processing the event... ")
+			fmt.Println("  > Finishing processing the event... ")
 			return
 
 		case event, ok := <-eventChan:
 			if !ok {
-				fmt.Printf("\n  > Event channel closed, stopping processing.")
+				fmt.Println("  > Event channel closed, stopping processing.")
 				logger.Warn("Event channel closed, stopping processing.")
 				return
 			}
@@ -94,7 +94,7 @@ func ProcessFollowList(
 	}
 
 	removed, common, added := sliceutils.Partition(oldFollows[0], newFollows)
-	if len(removed)+len(added) == 0 {
+	if len(removed)+len(added) == 0 { // the follow list is a rebrodcast of one we alreay have
 		return nil
 	}
 
@@ -235,13 +235,13 @@ func NodeArbiter(
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("\n  > Stopping the Node Arbiter... ")
+			fmt.Println("  > Stopping the Node Arbiter... ")
 			return
 
 		case <-ticker.C:
 			if pagerankTotal.Load() >= startThreshold {
 
-				if err := ArbiterScan(ctx, DB, RWM, 0.0, queueHandler); err != nil {
+				if err := ArbiterScan(ctx, DB, RWM, pagerankThreshold(ctx, RWM.Store), queueHandler); err != nil {
 					logger.Error("%v", err)
 					continue
 				}

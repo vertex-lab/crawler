@@ -16,6 +16,15 @@ type RandomWalkManager struct {
 	Store models.RandomWalkStore
 }
 
+// NewRWMConnection() loads the instance of RandomWalkManager using the provided Redis client.
+func NewRWMConnection(ctx context.Context, cl *redis.Client) (*RandomWalkManager, error) {
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		return nil, err
+	}
+	return &RandomWalkManager{Store: RWS}, nil
+}
+
 // NewRWM() returns a RWM using the Redis RWS.
 func NewRWM(cl *redis.Client, alpha float32, walksPerNode uint16) (*RandomWalkManager, error) {
 	RWS, err := redistore.NewRWS(context.Background(), cl, alpha, walksPerNode)
