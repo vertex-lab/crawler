@@ -8,7 +8,7 @@ The goals of this project are
 
 3. Generate random walks for the nodes in the graph, and keep them updated all the time.
 
-4. Use these random walks to efficiently compute acyclic Monte Carlo Pageranks (personalized and normal).
+4. Use these random walks to efficiently compute acyclic Monte Carlo Pageranks (personalized and global).
 
 This project implements the algorithms described in [this paper](http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf)
 
@@ -17,8 +17,11 @@ This project implements the algorithms described in [this paper](http://snap.sta
 `/cmd/crawler.go`: the main function, which should:
 - listen for graph updates (e.g. a node is added, or a node has changed it's out-edges)
 - update the random walks
+- update the database
 
 `/pkg/models/`: defines the fundamental interfaces and structures that are used across packages
+
+`/pkg/crawler/`: defines the high-level functions for the data pipeline, like the `Firehose`, and the `ProcessEvents`. More information in the `docs`
 
 `/pkg/store/`: contains two implementations of the `RandomWalkStore` interface, which deals with saving and fetching random walks from an in-memory database.
 - `/pkg/store/redistore/`: Implementation using redis, for production use.
