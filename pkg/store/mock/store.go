@@ -150,8 +150,9 @@ WalksVisiting() returns up to limit UNIQUE walkIDs evenly distributed among the 
 In other words, it returns up to limit/len(nodeIDs) walkIDs for each of the nodes.
 
 Note:
-- If 0 < limit < nodeIDs, no walk is returned
-- If limit <= 0, all walks for all nodes are returned (use signalling value limit = -1)
+- If limit = 0, no walk is returned
+- If limit < nodeIDs, no walk is returned
+- If limit = -1, all walks for all nodes are returned (USE WITH CAUTION).
 */
 func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
 	_ = ctx
@@ -160,14 +161,18 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 	}
 
 	var limitPerNode int64
-	if limit <= 0 {
+	switch limit {
+	case 0:
+		return nil, nil
+
+	case -1:
 		limitPerNode = 1000000000 // a very big number to return all
 		limit = 100000
-	} else {
 
+	default:
+		limitPerNode = int64(limit) / int64(len(nodeIDs))
 	}
 
-	limitPerNode = int64(limit) / int64(len(nodeIDs))
 	walkIDs := make([]uint32, 0, limit)
 	for _, ID := range nodeIDs {
 		walkSet, exists := RWS.walksVisiting[ID]

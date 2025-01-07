@@ -221,7 +221,7 @@ func TestProcessFollowList(t *testing.T) {
 			t.Fatalf("GenerateAll(): expected nil, got %v", err)
 		}
 
-		// one after the other, the graph will be built: pip --> calle --> odell --> pip
+		// one after the other, the graph will be built: pip --> gigi; calle --> odell --> pip
 		events := []*nostr.Event{
 			{
 				PubKey:    pip,

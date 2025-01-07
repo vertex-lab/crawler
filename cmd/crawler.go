@@ -63,12 +63,16 @@ func main() {
 	defer logFile.Close()
 
 	cl := redisutils.SetupProdClient()
-	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+	DB, err := redisdb.SetupDB(cl, "pip")
 	if err != nil {
 		panic(err)
 	}
-	RWM, err := walks.NewRWMConnection(ctx, cl)
+	RWM, err := walks.NewRWM(cl, 0.85, 100)
 	if err != nil {
+		panic(err)
+	}
+
+	if err := RWM.GenerateAll(ctx, DB); err != nil {
 		panic(err)
 	}
 
