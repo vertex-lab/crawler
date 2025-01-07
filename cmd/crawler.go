@@ -24,12 +24,12 @@ const configFilePath string = "config.json"
 
 // The configuration parameters for the crawler.
 type Config struct {
-	LogFilePath           string  `json:"log_file_path"`
-	EventChanCapacity     int     `json:"event_chan_capacity"`
-	PubkeyChanCapacity    int     `json:"pubkey_chan_capacity"`
-	FirehoseTimeLimit     int64   `json:"firehose_time_limit"`
-	QueryPubkeysBatchSize int     `json:"query_pubkeys_batch_size"`
-	NodeArbiterThreshold  float64 `json:"node_arbiter_threshold"`
+	LogFilePath                    string  `json:"log_file_path"`
+	EventChanCapacity              int     `json:"event_chan_capacity"`
+	PubkeyChanCapacity             int     `json:"pubkey_chan_capacity"`
+	FirehoseTimeLimit              int64   `json:"firehose_time_limit"`
+	QueryPubkeysBatchSize          int     `json:"query_pubkeys_batch_size"`
+	NodeArbiterActivationThreshold float64 `json:"node_arbiter_activation_threshold"`
 }
 
 // LoadConfig() returns an initialized config.
@@ -75,7 +75,7 @@ func main() {
 	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
 	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
 	eventCounter := xsync.NewCounter()
-	pagerankTotal := counter.NewFloatCounter()
+	pagerankTotal := counter.NewFloatCounter() // tracks the pagerank mass accumulated since the last full recomputation.
 
 	PrintStartup(logger)
 	defer PrintShutdown(logger)
@@ -83,8 +83,10 @@ func main() {
 	go crawler.HandleSignals(cancel, logger)
 	go DisplayStats(ctx, logger, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
 
+	// spawn the Firehose, the QueryPubkeys and NodeArbiter as three goroutines.
 	var wg sync.WaitGroup
 	wg.Add(3)
+
 	go func() {
 		defer wg.Done()
 		crawler.Firehose(ctx, logger, DB, RWM.Store, crawler.Relays, config.FirehoseTimeLimit, func(event *nostr.Event) error {
@@ -111,7 +113,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, config.NodeArbiterThreshold, pagerankTotal, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, config.NodeArbiterActivationThreshold, pagerankTotal, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:
