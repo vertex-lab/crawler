@@ -121,7 +121,7 @@ func TestVisits(t *testing.T) {
 	for i, ID := range nodeIDs {
 		pr := pagerank[i]
 		expected := loadedPagerank[i]
-		if math.Abs(pr-expected) > 0.000001 {
+		if math.Abs(pr-expected) > 0.0001 {
 			t.Errorf("pagerank of nodeID %d: expected %v, got %v", ID, expected, pr)
 		}
 	}

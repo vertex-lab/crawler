@@ -4,6 +4,6 @@
     "pubkey_chan_capacity": 200000,
     "firehose_time_limit": 0,
     "query_pubkeys_batch_size": 100,
-    "node_arbiter_threshold": 0.01
+    "node_arbiter_activation_threshold": 0.01
   }
   
