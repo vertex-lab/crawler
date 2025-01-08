@@ -13,8 +13,8 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
-// GetPagerankDB() fetched the pagerank scores from the DB for each of the specified nodes.
-func GetPagerankDB(ctx context.Context, cl *redis.Client, nodeIDs []uint32) ([]float64, error) {
+// ReadPagerank() fetched the pagerank scores from the DB for each of the specified nodes.
+func ReadPagerank(ctx context.Context, cl *redis.Client, nodeIDs []uint32) ([]float64, error) {
 	pipe := cl.Pipeline()
 	cmds := make([]*redis.StringCmd, len(nodeIDs))
 	for i, ID := range nodeIDs {
@@ -54,7 +54,7 @@ func TestPagerankSum(t *testing.T) {
 		t.Fatalf("AllNodes(): expected nil, got %v", err)
 	}
 
-	pagerank, err := GetPagerankDB(ctx, cl, nodeIDs)
+	pagerank, err := ReadPagerank(ctx, cl, nodeIDs)
 	if err != nil {
 		t.Fatalf("GetPagerank(): expected nil, got %v", err)
 	}
@@ -113,7 +113,7 @@ func TestVisits(t *testing.T) {
 		pagerank[i] = float64(v) / float64(totalVisits)
 	}
 
-	loadedPagerank, err := GetPagerankDB(ctx, cl, nodeIDs)
+	loadedPagerank, err := ReadPagerank(ctx, cl, nodeIDs)
 	if err != nil {
 		t.Fatalf("GetPagerank(): expected nil, got %v", err)
 	}
@@ -217,6 +217,47 @@ func BenchmarkPersonalizedPagerank(b *testing.B) {
 		_, err := pagerank.Personalized(ctx, DB, RWS, nodeID, topk)
 		if err != nil {
 			b.Fatalf("Personalized(): benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkReadPagerank(b *testing.B) {
+	cl := redisutils.SetupProdClient()
+	ctx := context.Background()
+
+	const size = 10000
+	nodeIDs := make([]uint32, size)
+	for i := 0; i < size; i++ {
+		nodeIDs[i] = uint32(i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := ReadPagerank(ctx, cl, nodeIDs); err != nil {
+			b.Fatalf("benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkPagerank(b *testing.B) {
+	cl := redisutils.SetupProdClient()
+	ctx := context.Background()
+
+	RWS, err := redistore.NewRWSConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
+	}
+
+	const size = 10000
+	nodeIDs := make([]uint32, size)
+	for i := 0; i < size; i++ {
+		nodeIDs[i] = uint32(i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := pagerank.Global(ctx, RWS, nodeIDs...); err != nil {
+			b.Fatalf("benchmark failed: %v", err)
 		}
 	}
 }

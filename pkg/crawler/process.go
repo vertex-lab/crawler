@@ -267,7 +267,7 @@ func ArbiterScan(
 	threshold float64,
 	queueHandler func(pk string) error) error {
 
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 600*time.Second)
 	defer cancel()
 
 	var cursor uint64
