@@ -31,7 +31,7 @@ Each `node:<nodeID>` (e.g. `node:69`, `node:420`, ...) is a Redis hash, encapsul
 node:<nodeID> = HASH {    id: <nodeID>
                           pubkey: <pubkey>
                           event_timestamp: <timestamp of last kind3>
-                          status: <we do random walks/ we don't>
+                          status: <active/inactive>
                           pagerank: <pagerank>
                       } 
 ```

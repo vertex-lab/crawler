@@ -30,12 +30,12 @@ func (FC *FollowCache) Follows(ctx context.Context, nodeID uint32) ([]uint32, er
 
 	follows, exists := FC.follows[nodeID]
 	if !exists {
-		followSlice, err := FC.DB.Follows(ctx, nodeID)
+		followsByNode, err := FC.DB.Follows(ctx, nodeID)
 		if err != nil {
 			return []uint32{}, err
 		}
 
-		follows = followSlice[0]
+		follows = followsByNode[0]
 		FC.follows[nodeID] = follows
 	}
 
@@ -48,12 +48,12 @@ func (FC *FollowCache) Load(ctx context.Context, nodeIDs ...uint32) error {
 		return ErrNilFCPointer
 	}
 
-	followSlice, err := FC.DB.Follows(ctx, nodeIDs...)
+	followsByNode, err := FC.DB.Follows(ctx, nodeIDs...)
 	if err != nil {
 		return err
 	}
 
-	for i, follows := range followSlice {
+	for i, follows := range followsByNode {
 		ID := nodeIDs[i]
 		FC.follows[ID] = follows
 	}
