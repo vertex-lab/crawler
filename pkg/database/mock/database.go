@@ -384,6 +384,17 @@ func SetupDB(DBType string) *Database {
 		DB.LastNodeID = 2
 		return DB
 
+	case "triangle-with-pks":
+		DB := NewDatabase()
+		DB.KeyIndex[odell] = 0
+		DB.KeyIndex[calle] = 1
+		DB.KeyIndex[pip] = 2
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{1}, Followers: []uint32{2}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{2}, Followers: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{0}, Followers: []uint32{1}}
+		DB.LastNodeID = 2
+		return DB
+
 	case "pip":
 		DB := NewDatabase()
 		DB.KeyIndex[pip] = 0
