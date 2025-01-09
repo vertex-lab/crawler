@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -44,11 +45,25 @@ func LoadConfig() (*Config, error) {
 	var config = NewConfig()
 	var err error
 
-	if err = godotenv.Load(); err != nil {
-		return config, nil
+	size, err := config.RedisClient.DBSize(context.Background()).Result()
+	if err != nil {
+		return nil, err
 	}
 
-	config.RedisClient = redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDRESS")})
+	// if the DB is empty, run with initialization parameters.
+	switch {
+	case size == 0:
+		config.Mode = "init"
+		if err = godotenv.Load("init.env"); err != nil {
+			return nil, fmt.Errorf("failed to load init.env: %v", err)
+		}
+
+	case size > 0:
+		config.Mode = "prod"
+		if err = godotenv.Load("prod.env"); err != nil {
+			return config, nil
+		}
+	}
 
 	logsOut := os.Getenv("LOGS")
 	switch logsOut {
@@ -66,39 +81,27 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	var prefix string
-	config.Mode = os.Getenv("MODE")
-	switch config.Mode {
-	case "prod":
-		prefix = "PROD_"
-	case "init":
-		prefix = "INIT_"
-
-	default:
-		return nil, fmt.Errorf("MODE must be either `init` or `prod`: MODE=%v", config.Mode)
-	}
-
-	config.EventChanCapacity, err = strconv.Atoi(os.Getenv(prefix + "EVENT_CHAN_CAPACITY"))
+	config.EventChanCapacity, err = strconv.Atoi(os.Getenv("EVENT_CHAN_CAPACITY"))
 	if err != nil {
 		return nil, err
 	}
 
-	config.PubkeyChanCapacity, err = strconv.Atoi(os.Getenv(prefix + "PUBKEY_CHAN_CAPACITY"))
+	config.PubkeyChanCapacity, err = strconv.Atoi(os.Getenv("PUBKEY_CHAN_CAPACITY"))
 	if err != nil {
 		return nil, err
 	}
 
-	config.QueryPubkeysBatchSize, err = strconv.Atoi(os.Getenv(prefix + "QUERY_PUBKEYS_BATCH_SIZE"))
+	config.QueryPubkeysBatchSize, err = strconv.Atoi(os.Getenv("QUERY_PUBKEYS_BATCH_SIZE"))
 	if err != nil {
 		return nil, err
 	}
 
-	config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(os.Getenv(prefix+"NODE_ARBITER_ACTIVATION_THRESHOLD"), 64)
+	config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(os.Getenv("NODE_ARBITER_ACTIVATION_THRESHOLD"), 64)
 	if err != nil {
 		return nil, err
 	}
 
-	config.PagerankMultiplier, err = strconv.ParseFloat(os.Getenv(prefix+"PAGERANK_MULTIPLIER"), 64)
+	config.PagerankMultiplier, err = strconv.ParseFloat(os.Getenv("PAGERANK_MULTIPLIER"), 64)
 	if err != nil {
 		return nil, err
 	}

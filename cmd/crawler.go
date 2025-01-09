@@ -17,9 +17,6 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-var DB models.Database
-var RWM *walks.RandomWalkManager
-
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -32,6 +29,8 @@ func main() {
 	logger := logger.New(config.LogWriter)
 	defer config.CloseLogs()
 
+	var DB models.Database
+	var RWM *walks.RandomWalkManager
 	switch config.Mode {
 	case "prod":
 		DB, err = redisdb.NewDatabaseConnection(ctx, config.RedisClient)
@@ -45,15 +44,6 @@ func main() {
 		}
 
 	case "init":
-		// make sure the DB is empty before initializing
-		size, err := config.RedisClient.DBSize(context.Background()).Result()
-		if err != nil {
-			panic(err)
-		}
-		if size != 0 {
-			panic(models.ErrNonEmptyDB)
-		}
-
 		DB, err = redisdb.SetupDB(config.RedisClient, "pip")
 		if err != nil {
 			panic(err)
@@ -64,7 +54,7 @@ func main() {
 			panic(err)
 		}
 
-		if err := RWM.GenerateAll(context.Background(), DB); err != nil {
+		if err = RWM.GenerateAll(context.Background(), DB); err != nil {
 			panic(err)
 		}
 	}
@@ -76,6 +66,7 @@ func main() {
 
 	PrintStartup(logger)
 	defer PrintShutdown(logger)
+
 	go crawler.HandleSignals(cancel, logger)
 	if config.DisplayStats {
 		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
