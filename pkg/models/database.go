@@ -112,9 +112,11 @@ type PagerankMap map[uint32]float64
 
 //--------------------------ERROR-CODES--------------------------
 
-var ErrNilDBPointer = errors.New("database pointer is nil")
-var ErrEmptyDB = errors.New("database is empty")
-var ErrNodeNotFoundDB = errors.New("node not found in the database")
-var ErrNodeAlreadyInDB = errors.New("node already in the database")
-
-var ErrNilClientPointer = errors.New("nil client pointer")
+var (
+	ErrNilClientPointer error = errors.New("nil client pointer")
+	ErrNilDBPointer     error = errors.New("database pointer is nil")
+	ErrEmptyDB          error = errors.New("database is empty")
+	ErrNonEmptyDB       error = errors.New("database is NOT empty")
+	ErrNodeNotFoundDB   error = errors.New("node not found in the database")
+	ErrNodeAlreadyInDB  error = errors.New("node already in the database")
+)

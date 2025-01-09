@@ -37,6 +37,9 @@ type DatabaseFields struct {
 
 // NewDatabaseConnection() returns an initialized Database
 func NewDatabaseConnection(ctx context.Context, cl *redis.Client) (*Database, error) {
+	if cl == nil {
+		return nil, ErrNilClientPointer
+	}
 	return &Database{client: cl}, nil
 }
 

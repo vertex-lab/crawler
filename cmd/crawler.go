@@ -9,7 +9,6 @@ import (
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
-	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -17,6 +16,9 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
+
+var DB models.Database
+var RWM *walks.RandomWalkManager
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -30,17 +32,41 @@ func main() {
 	logger := logger.New(config.LogWriter)
 	defer config.CloseLogs()
 
-	cl := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
+	switch config.Mode {
+	case "prod":
+		DB, err = redisdb.NewDatabaseConnection(ctx, config.RedisClient)
+		if err != nil {
+			panic(err)
+		}
 
-	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
-	if err != nil {
-		panic(err)
-	}
-	RWM, err := walks.NewRWMConnection(ctx, cl)
-	if err != nil {
-		panic(err)
+		RWM, err = walks.NewRWMConnection(ctx, config.RedisClient)
+		if err != nil {
+			panic(err)
+		}
+
+	case "init":
+		// make sure the DB is empty before initializing
+		size, err := config.RedisClient.DBSize(context.Background()).Result()
+		if err != nil {
+			panic(err)
+		}
+		if size != 0 {
+			panic(models.ErrNonEmptyDB)
+		}
+
+		DB, err = redisdb.SetupDB(config.RedisClient, "pip")
+		if err != nil {
+			panic(err)
+		}
+
+		RWM, err = walks.NewRWM(config.RedisClient, 0.85, 100)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := RWM.GenerateAll(context.Background(), DB); err != nil {
+			panic(err)
+		}
 	}
 
 	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
@@ -126,7 +152,7 @@ func DisplayStats(
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("  > Stopping stats display...")
+			fmt.Println(" Stopped stats display.")
 			return
 
 		case <-ticker.C:

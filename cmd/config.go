@@ -7,10 +7,13 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 // The configuration parameters for the crawler.
 type Config struct {
+	Mode                           string
+	RedisClient                    *redis.Client
 	LogWriter                      io.Writer
 	DisplayStats                   bool
 	EventChanCapacity              int
@@ -23,6 +26,8 @@ type Config struct {
 // NewConfig() returns a config with default parameters.
 func NewConfig() *Config {
 	return &Config{
+		Mode:                           "prod",
+		RedisClient:                    redis.NewClient(&redis.Options{Addr: "localhost:6379"}),
 		LogWriter:                      os.Stdout,
 		DisplayStats:                   false,
 		EventChanCapacity:              1000,
@@ -43,6 +48,8 @@ func LoadConfig() (*Config, error) {
 		return config, nil
 	}
 
+	config.RedisClient = redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDRESS")})
+
 	logsOut := os.Getenv("LOGS")
 	switch logsOut {
 	case "terminal":
@@ -59,15 +66,16 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	mode := os.Getenv("MODE")
 	var prefix string
-	switch mode {
+	config.Mode = os.Getenv("MODE")
+	switch config.Mode {
 	case "prod":
 		prefix = "PROD_"
 	case "init":
 		prefix = "INIT_"
+
 	default:
-		return nil, fmt.Errorf("MODE must be either `init` or `prod`: %v", mode)
+		return nil, fmt.Errorf("MODE must be either `init` or `prod`: MODE=%v", config.Mode)
 	}
 
 	config.EventChanCapacity, err = strconv.Atoi(os.Getenv(prefix + "EVENT_CHAN_CAPACITY"))
