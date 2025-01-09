@@ -35,6 +35,7 @@ type DatabaseFields struct {
 	// more fields coming in the future
 }
 
+// NewDatabaseConnection() returns an initialized Database
 func NewDatabaseConnection(ctx context.Context, cl *redis.Client) (*Database, error) {
 	return &Database{client: cl}, nil
 }

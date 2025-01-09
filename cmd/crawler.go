@@ -2,67 +2,38 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
-	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
-
-const configFilePath string = "config.json"
-
-// The configuration parameters for the crawler.
-type Config struct {
-	LogFilePath                    string  `json:"log_file_path"`
-	EventChanCapacity              int     `json:"event_chan_capacity"`
-	PubkeyChanCapacity             int     `json:"pubkey_chan_capacity"`
-	FirehoseTimeLimit              int64   `json:"firehose_time_limit"`
-	QueryPubkeysBatchSize          int     `json:"query_pubkeys_batch_size"`
-	NodeArbiterActivationThreshold float64 `json:"node_arbiter_activation_threshold"`
-}
-
-// LoadConfig() returns an initialized config.
-func LoadConfig(filename string) (*Config, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	config := &Config{}
-	if err := json.NewDecoder(file).Decode(config); err != nil {
-		return nil, err
-	}
-
-	return config, nil
-}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	config, err := LoadConfig(configFilePath)
+	config, err := LoadConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	logger, logFile := logger.Init(config.LogFilePath)
-	nostr.InfoLogger = logger.InfoLogger
-	nostr.DebugLogger = logger.WarnLogger
-	defer logFile.Close()
+	logger := logger.New(config.LogWriter)
+	defer config.CloseLogs()
 
-	cl := redisutils.SetupProdClient()
+	cl := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		panic(err)
@@ -79,9 +50,10 @@ func main() {
 
 	PrintStartup(logger)
 	defer PrintShutdown(logger)
-
 	go crawler.HandleSignals(cancel, logger)
-	go DisplayStats(ctx, logger, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
+	if config.DisplayStats {
+		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
+	}
 
 	// spawn the Firehose, the QueryPubkeys and NodeArbiter as three goroutines.
 	var wg sync.WaitGroup
@@ -89,7 +61,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, DB, RWM.Store, crawler.Relays, config.FirehoseTimeLimit, func(event *nostr.Event) error {
+		crawler.Firehose(ctx, logger, DB, RWM.Store, crawler.Relays, config.PagerankMultiplier, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -113,7 +85,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, config.NodeArbiterActivationThreshold, pagerankTotal, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, config.NodeArbiterActivationThreshold, config.PagerankMultiplier, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:
@@ -127,9 +99,10 @@ func main() {
 	wg.Wait()
 }
 
+// -----------------------------------HELPERS----------------------------------
+
 func DisplayStats(
 	ctx context.Context,
-	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	eventChan <-chan *nostr.Event,
@@ -182,17 +155,12 @@ func DisplayStats(
 
 // PrintStartup() prints a simple start up message.
 func PrintStartup(l *logger.Aggregate) {
-	fmt.Println("---------------------------------------")
-	fmt.Println("        Nostr crawler is running       ")
-	fmt.Println("---------------------------------------")
 	l.Info("---------------------------------------")
 	l.Info("Nostr crawler is starting up")
 }
 
 // PrintShutdown() prints a simple shutdown message.
 func PrintShutdown(l *logger.Aggregate) {
-	fmt.Println("\nShutdown")
-	fmt.Println("---------------------------------------")
 	l.Info("Shutdown")
 	l.Info("---------------------------------------")
 }

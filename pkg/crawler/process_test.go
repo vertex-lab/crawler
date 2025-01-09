@@ -418,7 +418,7 @@ func TestNodeArbiter(t *testing.T) {
 	DB := mockdb.SetupDB("one-node0")
 	RWM := walks.SetupMockRWM("one-node0")
 	pagerankTotal := counter.NewFloatCounter()
-	NodeArbiter(ctx, logger, DB, RWM, 0.0, pagerankTotal, func(pk string) error {
+	NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, 0, 0, func(pk string) error {
 		return nil
 	})
 }

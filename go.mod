@@ -4,6 +4,7 @@ go 1.23.1
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
+	github.com/joho/godotenv v1.5.1
 	github.com/nbd-wtf/go-nostr v0.42.2
 	github.com/puzpuzpuz/xsync/v3 v3.4.0
 	github.com/redis/go-redis/v9 v9.7.0

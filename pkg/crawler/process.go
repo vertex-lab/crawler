@@ -29,12 +29,11 @@ func ProcessEvents(
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("  > Finishing processing the event... ")
+			logger.Info("  > Finishing processing the event... ")
 			return
 
 		case event, ok := <-eventChan:
 			if !ok {
-				fmt.Println("  > Event channel closed, stopping processing.")
 				logger.Warn("Event channel closed, stopping processing.")
 				return
 			}
@@ -218,15 +217,15 @@ func ParsePubkeys(event *nostr.Event) []string {
 
 // NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
 // - scans through all the nodes in the database
-// - promotes or demotes them based on their pagerank
+// - promotes or demotes them based on their pagerank and pagerankMultiplier
 // - recomputes the pagerank of all nodes
 func NodeArbiter(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	startThreshold float64,
 	pagerankTotal *counter.Float,
+	startThreshold, pagerankMultiplier float64,
 	queueHandler func(pk string) error) {
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -235,13 +234,14 @@ func NodeArbiter(
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("  > Stopping the Node Arbiter... ")
+			logger.Info("  > Stopping the Node Arbiter... ")
 			return
 
 		case <-ticker.C:
 			if pagerankTotal.Load() >= startThreshold {
 
-				if err := ArbiterScan(ctx, DB, RWM, pagerankThreshold(ctx, RWM.Store), queueHandler); err != nil {
+				threshold := pagerankThreshold(ctx, RWM.Store, pagerankMultiplier)
+				if err := ArbiterScan(ctx, DB, RWM, threshold, queueHandler); err != nil {
 					logger.Error("%v", err)
 					continue
 				}

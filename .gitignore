@@ -1,2 +1,5 @@
 # Ignore all log files
 **/*.log
+
+# Ignore all the .env
+**/*.env

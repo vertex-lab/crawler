@@ -21,19 +21,18 @@ func TestFirehose(t *testing.T) {
 	defer cancel()
 
 	go HandleSignals(cancel, logger)
-	Firehose(ctx, logger, DB, RWS, Relays, 500, PrintEvent)
+	Firehose(ctx, logger, DB, RWS, Relays, 0, PrintEvent)
 }
 
 func TestQueryPubkeyBatch(t *testing.T) {
-	pool := nostr.NewSimplePool(context.Background())
-	defer close("QueryPubkeyBatch", pool)
-
 	logger := logger.New(os.Stdout)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	go HandleSignals(cancel, logger)
 
+	pool := nostr.NewSimplePool(context.Background())
+	defer close(logger, "QueryPubkeyBatch", pool)
+
 	pubkeys := []string{pip, calle, gigi, odell}
-	QueryPubkeyBatch(ctx, logger, pool, Relays, pubkeys, PrintEvent)
+	QueryPubkeyBatch(ctx, pool, Relays, pubkeys, PrintEvent)
 }

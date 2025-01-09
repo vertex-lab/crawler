@@ -51,8 +51,7 @@ var (
 )
 
 /*
-Firehose connects to a list of relays and pulls kind:3 events that are newer than
-current time - timeLimit.
+Firehose connects to a list of relays and pulls kind:3 events that are newer than the current time.
 It efficiently filters events based on the pubkey "spamminess", determined by our
 own pagerank-based reputation system.
 
@@ -65,13 +64,13 @@ func Firehose(
 	DB models.Database,
 	RWS models.RandomWalkStore,
 	relays []string,
-	timeLimit int64, // use a value <= 1000, or you will get rate-limited
+	pagerankMultiplier float64,
 	queueHandler func(event *nostr.Event) error) {
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close("Firehose", pool)
+	defer close(logger, "Firehose", pool)
 
-	ts := nostr.Timestamp(time.Now().Unix() - timeLimit)
+	ts := nostr.Now()
 	filters := nostr.Filters{{
 		Kinds: RelevantKinds,
 		Since: &ts,
@@ -96,7 +95,7 @@ func Firehose(
 		}
 
 		// if the author has low pagerank, skip.
-		if node.Pagerank < pagerankThreshold(ctx, RWS) {
+		if node.Pagerank < pagerankThreshold(ctx, RWS, pagerankMultiplier) {
 			continue
 		}
 
@@ -119,7 +118,7 @@ func QueryPubkeys(
 
 	batch := make([]string, 0, batchSize)
 	pool := nostr.NewSimplePool(ctx)
-	defer close("QueryPubkeys", pool)
+	defer close(logger, "QueryPubkeys", pool)
 
 	for {
 		select {
@@ -136,7 +135,7 @@ func QueryPubkeys(
 			batch = append(batch, pubkey)
 			if len(batch) >= batchSize {
 
-				if err := QueryPubkeyBatch(ctx, logger, pool, relays, batch, queueHandler); err != nil {
+				if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
 					logger.Error("QueryPubkeys queue handler: %v", err)
 					continue
 				}
@@ -152,7 +151,6 @@ func QueryPubkeys(
 // It sends the newest events for each pubkey to the queue using the provided queueHandler.
 func QueryPubkeyBatch(
 	ctx context.Context,
-	logger *logger.Aggregate,
 	pool *nostr.SimplePool,
 	relays []string,
 	pubkeys []string,
@@ -189,13 +187,7 @@ func QueryPubkeyBatch(
 	}
 
 	// send only the newest events to the queue.
-	for _, key := range pubkeys {
-		event, exists := newest[key]
-		if !exists {
-			logger.Warn("QueryPubkeyBatch: follow list not found for %v", key)
-			continue
-		}
-
+	for _, event := range newest {
 		if err := queueHandler(event); err != nil {
 			return err
 		}
@@ -205,23 +197,20 @@ func QueryPubkeyBatch(
 }
 
 // Close() iterates over the relays in the pool and closes all connections.
-func close(funcName string, pool *nostr.SimplePool) {
-	fmt.Printf("  > " + funcName + ": closing relay connections... ")
+func close(logger *logger.Aggregate, funcName string, pool *nostr.SimplePool) {
+	logger.Info("  > " + funcName + ": closing relay connections... ")
 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
 		relay.Close()
 		return true
 	})
-	fmt.Printf("All closed!\n")
 }
 
-// The pagerankThreshold() returns the threshold used for promoting or demoting nodes.
+// The pagerankThreshold() returns the threshold used for accepting events, promoting or demoting nodes.
 // Note that multiplier must be > 1, otherwise demotions are impossible (since
 // an active node have at least walksPerNode visits).
-func pagerankThreshold(ctx context.Context, RWS models.RandomWalkStore) float64 {
-	const multiplier float64 = 1.5
+func pagerankThreshold(ctx context.Context, RWS models.RandomWalkStore, multiplier float64) float64 {
 	walksPerNode := float64(RWS.WalksPerNode(ctx))
 	totalVisits := float64(RWS.TotalVisits(ctx))
-
 	return min(multiplier*walksPerNode/totalVisits, 1.0)
 }
 
@@ -234,12 +223,11 @@ func PrintEvent(event *nostr.Event) error {
 }
 
 // HandleSignals() listens for OS signals and triggers context cancellation.
-func HandleSignals(cancel context.CancelFunc, logger *logger.Aggregate) {
+func HandleSignals(cancel context.CancelFunc, l *logger.Aggregate) {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-signalChan // Block until a signal is received
-	fmt.Println(" Signal received. Shutting down...")
-	logger.Info("Signal received. Shutting down...")
+	l.Info(" Signal received. Shutting down...")
 	cancel()
 }
