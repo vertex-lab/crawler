@@ -78,7 +78,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, DB, RWM.Store, crawler.Relays, config.PagerankMultiplier, func(event *nostr.Event) error {
+		crawler.Firehose(ctx, logger, DB, crawler.Relays, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:
@@ -102,7 +102,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, config.NodeArbiterActivationThreshold, config.PagerankMultiplier, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:

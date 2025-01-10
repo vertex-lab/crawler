@@ -21,7 +21,8 @@ type Config struct {
 	PubkeyChanCapacity             int
 	QueryPubkeysBatchSize          int
 	NodeArbiterActivationThreshold float64
-	PagerankMultiplier             float64
+	PromotionMultiplier            float64
+	DemotionMultiplier             float64
 }
 
 // NewConfig() returns a config with default parameters.
@@ -35,7 +36,8 @@ func NewConfig() *Config {
 		PubkeyChanCapacity:             1000,
 		QueryPubkeysBatchSize:          5,
 		NodeArbiterActivationThreshold: 0.01,
-		PagerankMultiplier:             1.5,
+		PromotionMultiplier:            0.1,
+		DemotionMultiplier:             1.1,
 	}
 }
 
@@ -50,15 +52,15 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	// if the DB is empty, run with initialization parameters.
-	switch {
-	case size == 0:
+	switch size {
+	case 0:
+		// if the DB is empty, run with initialization parameters.
 		config.Mode = "init"
 		if err = godotenv.Load("init.env"); err != nil {
 			return nil, fmt.Errorf("failed to load init.env: %v", err)
 		}
 
-	case size > 0:
+	default:
 		config.Mode = "prod"
 		if err = godotenv.Load("prod.env"); err != nil {
 			return config, nil
@@ -78,32 +80,37 @@ func LoadConfig() (*Config, error) {
 
 	config.DisplayStats, err = strconv.ParseBool(os.Getenv("DISPLAY_STATS"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing DISPLAY_STATS: %v", err)
 	}
 
 	config.EventChanCapacity, err = strconv.Atoi(os.Getenv("EVENT_CHAN_CAPACITY"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing EVENT_CHAN_CAPACITY: %v", err)
 	}
 
 	config.PubkeyChanCapacity, err = strconv.Atoi(os.Getenv("PUBKEY_CHAN_CAPACITY"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing PUBKEY_CHAN_CAPACITY: %v", err)
 	}
 
 	config.QueryPubkeysBatchSize, err = strconv.Atoi(os.Getenv("QUERY_PUBKEYS_BATCH_SIZE"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing QUERY_PUBKEYS_BATCH_SIZE: %v", err)
 	}
 
 	config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(os.Getenv("NODE_ARBITER_ACTIVATION_THRESHOLD"), 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing NODE_ARBITER_ACTIVATION_THRESHOLD: %v", err)
 	}
 
-	config.PagerankMultiplier, err = strconv.ParseFloat(os.Getenv("PAGERANK_MULTIPLIER"), 64)
+	config.PromotionMultiplier, err = strconv.ParseFloat(os.Getenv("PROMOTION_MULTIPLIER"), 64)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing PROMOTION_MULTIPLIER: %v", err)
+	}
+
+	config.DemotionMultiplier, err = strconv.ParseFloat(os.Getenv("DEMOTION_MULTIPLIER"), 64)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing DEMOTION_MULTIPLIER: %v", err)
 	}
 
 	return config, nil

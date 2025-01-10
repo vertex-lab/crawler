@@ -69,7 +69,7 @@ func ProcessFollowList(
 	event *nostr.Event,
 	pagerankTotal *counter.Float) error {
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
@@ -77,7 +77,7 @@ func ProcessFollowList(
 		return err
 	}
 
-	if event.CreatedAt.Time().Unix() < author.EventTS {
+	if event.CreatedAt.Time().Unix() <= author.EventTS {
 		return nil
 	}
 
@@ -87,17 +87,18 @@ func ProcessFollowList(
 		return err
 	}
 
-	oldFollows, err := DB.Follows(ctx, author.ID)
+	followsByNode, err := DB.Follows(ctx, author.ID)
 	if err != nil {
 		return err
 	}
+	oldFollows := followsByNode[0]
 
-	removed, common, added := sliceutils.Partition(oldFollows[0], newFollows)
+	removed, common, added := sliceutils.Partition(oldFollows, newFollows)
 	if len(removed)+len(added) == 0 { // the follow list is a rebrodcast of one we alreay have
 		return nil
 	}
 
-	authorNodeDiff := models.NodeDiff{
+	nodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
 			EventTS: event.CreatedAt.Time().Unix(),
 		},
@@ -105,7 +106,7 @@ func ProcessFollowList(
 		RemovedFollows: removed,
 	}
 
-	if err := DB.UpdateNode(ctx, author.ID, &authorNodeDiff); err != nil {
+	if err := DB.UpdateNode(ctx, author.ID, &nodeDiff); err != nil {
 		return err
 	}
 
@@ -114,8 +115,7 @@ func ProcessFollowList(
 	}
 
 	// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
-	impacted := append(added, removed...)
-	pagerank, err := pagerank.Global(ctx, RWM.Store, impacted...)
+	pagerank, err := pagerank.Global(ctx, RWM.Store, newFollows...)
 	if err != nil {
 		return err
 	}
@@ -175,12 +175,8 @@ func AssignNodeIDs(
 func ParsePubkeys(event *nostr.Event) []string {
 	const followPrefix = "p"
 
-	if event == nil || len(event.Tags) == 0 {
-		return []string{}
-	}
-
-	// if it's very big, skip
-	if len(event.Tags) > 100000 {
+	// if it's empty or very big, skip
+	if event == nil || len(event.Tags) == 0 || len(event.Tags) > 100000 {
 		return []string{}
 	}
 
@@ -225,7 +221,7 @@ func NodeArbiter(
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	pagerankTotal *counter.Float,
-	startThreshold, pagerankMultiplier float64,
+	startThreshold, promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) {
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -240,8 +236,7 @@ func NodeArbiter(
 		case <-ticker.C:
 			if pagerankTotal.Load() >= startThreshold {
 
-				threshold := pagerankThreshold(ctx, RWM.Store, pagerankMultiplier)
-				if err := ArbiterScan(ctx, DB, RWM, threshold, queueHandler); err != nil {
+				if err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler); err != nil {
 					logger.Error("%v", err)
 					continue
 				}
@@ -251,6 +246,7 @@ func NodeArbiter(
 					continue
 				}
 
+				// resetting the pagerank since the last recomputation
 				pagerankTotal.Store(0)
 				logger.Info("NodeArbiter: scan completed")
 			}
@@ -264,7 +260,7 @@ func ArbiterScan(
 	ctx context.Context,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	threshold float64,
+	promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) error {
 
 	ctx, cancel := context.WithTimeout(ctx, 600*time.Second)
@@ -287,6 +283,10 @@ func ArbiterScan(
 			return fmt.Errorf("ArbiterScan(): %w", err)
 		}
 
+		minPagerank := minPagerank(ctx, RWM.Store)
+		promotionThreshold := minPagerank * promotionMultiplier
+		demotionThreshold := minPagerank * demotionMultiplier
+
 		for _, ID := range nodeIDs {
 			node, err := DB.NodeByID(ctx, ID)
 			if err != nil {
@@ -294,14 +294,14 @@ func ArbiterScan(
 			}
 
 			// Active --> Inactive
-			if node.Status == models.StatusActive && node.Pagerank < threshold {
+			if node.Status == models.StatusActive && node.Pagerank < demotionThreshold {
 				if err := DemoteNode(ctx, DB, RWM, ID); err != nil {
 					return fmt.Errorf("ArbiterScan(): %w", err)
 				}
 			}
 
 			// Inactive --> Active
-			if node.Status == models.StatusInactive && node.Pagerank >= threshold {
+			if node.Status == models.StatusInactive && node.Pagerank >= promotionThreshold {
 				if err := PromoteNode(ctx, DB, RWM, ID); err != nil {
 					return fmt.Errorf("ArbiterScan(): %w", err)
 				}
@@ -319,6 +319,14 @@ func ArbiterScan(
 	}
 
 	return nil
+}
+
+// The minPagerank() returns the minimum pagerank for an active node, which is
+// walksPerNode / TotalVisits in the extreme case that a node is visited only by its own walks.
+func minPagerank(ctx context.Context, RWS models.RandomWalkStore) float64 {
+	walksPerNode := float64(RWS.WalksPerNode(ctx))
+	totalVisits := float64(RWS.TotalVisits(ctx))
+	return walksPerNode / totalVisits
 }
 
 // PromoteNode() makes a node active, which means it generates random walks

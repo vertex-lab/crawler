@@ -62,9 +62,7 @@ func Firehose(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
-	RWS models.RandomWalkStore,
 	relays []string,
-	pagerankMultiplier float64,
 	queueHandler func(event *nostr.Event) error) {
 
 	pool := nostr.NewSimplePool(ctx)
@@ -94,8 +92,8 @@ func Firehose(
 			continue
 		}
 
-		// if the author has low pagerank, skip.
-		if node.Pagerank < pagerankThreshold(ctx, RWS, pagerankMultiplier) {
+		// if the author is an inactive node, skip
+		if node.Status == models.StatusInactive {
 			continue
 		}
 
@@ -203,15 +201,6 @@ func close(logger *logger.Aggregate, funcName string, pool *nostr.SimplePool) {
 		relay.Close()
 		return true
 	})
-}
-
-// The pagerankThreshold() returns the threshold used for accepting events, promoting or demoting nodes.
-// Note that multiplier must be > 1, otherwise demotions are impossible (since
-// an active node have at least walksPerNode visits).
-func pagerankThreshold(ctx context.Context, RWS models.RandomWalkStore, multiplier float64) float64 {
-	walksPerNode := float64(RWS.WalksPerNode(ctx))
-	totalVisits := float64(RWS.TotalVisits(ctx))
-	return min(multiplier*walksPerNode/totalVisits, 1.0)
 }
 
 // PrintEvent() is a simple function that prints the event ID, PubKey and Timestamp.

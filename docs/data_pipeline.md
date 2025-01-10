@@ -22,7 +22,7 @@
   Discarted by Firehose after one Database query
 
 - [x] **Unknown pubkey in the follow list of an active node**
-  Added to the database in the Process Events as inactive node.
+  Added to the database in the Process Events as an inactive node.
 
 - [x] **Inactive node acquires enough pagerank**
   Gets promoted by Node Arbiter --> Pubkey Channel --> Query Pubkeys --> Event Channel --> Process Events

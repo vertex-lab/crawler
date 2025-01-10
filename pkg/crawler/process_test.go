@@ -312,7 +312,7 @@ func TestArbiterScan(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWMType)
-				err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
+				err := ArbiterScan(context.Background(), DB, RWM, 0, 0, func(pk string) error {
 					return nil
 				})
 
@@ -325,12 +325,12 @@ func TestArbiterScan(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		t.Run("demotion", func(t *testing.T) {
-			// calle will be demoted to inactive, because the threshold is 1.0
+			// calle will be demoted to inactive, because the demotion threshold is 1.0 * 1/1  = 1
 			ctx := context.Background()
 			DB := mockdb.SetupDB("promotion-demotion")
 			RWM := walks.SetupMockRWM("one-node1")
 
-			err := ArbiterScan(context.Background(), DB, RWM, 1.0, func(pk string) error {
+			err := ArbiterScan(ctx, DB, RWM, 1.0, 1.0, func(pk string) error {
 				return nil
 			})
 			if err != nil {
@@ -359,13 +359,13 @@ func TestArbiterScan(t *testing.T) {
 
 		})
 		t.Run("promotion", func(t *testing.T) {
-			// pip and odell will be promoted from inactive to active
+			// pip and odell will be promoted from inactive to active, because the promotion threshold is 0 * 1/1  = 0
 			ctx := context.Background()
 			DB := mockdb.SetupDB("promotion-demotion")
 			RWM := walks.SetupMockRWM("one-node1")
 			queue := []string{}
 
-			err := ArbiterScan(context.Background(), DB, RWM, 0, func(pk string) error {
+			err := ArbiterScan(ctx, DB, RWM, 0, 0, func(pk string) error {
 				queue = append(queue, pk)
 				return nil
 			})
@@ -418,7 +418,7 @@ func TestNodeArbiter(t *testing.T) {
 	DB := mockdb.SetupDB("one-node0")
 	RWM := walks.SetupMockRWM("one-node0")
 	pagerankTotal := counter.NewFloatCounter()
-	NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, 0, 0, func(pk string) error {
+	NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, 0, 0, 0, func(pk string) error {
 		return nil
 	})
 }
