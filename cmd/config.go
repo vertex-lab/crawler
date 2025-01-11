@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/nbd-wtf/go-nostr"
@@ -13,12 +14,15 @@ import (
 
 // The configuration parameters for the crawler.
 type Config struct {
-	LogWriter                      io.Writer
-	DisplayStats                   bool
-	InitPubkeys                    []string // only used during initialization
-	EventChanCapacity              int
-	PubkeyChanCapacity             int
-	QueryPubkeysBatchSize          int
+	LogWriter          io.Writer
+	DisplayStats       bool
+	InitPubkeys        []string // only used during initialization
+	EventChanCapacity  int
+	PubkeyChanCapacity int
+
+	QueryBatchSize int
+	QueryInterval  time.Duration
+
 	NodeArbiterActivationThreshold float64
 	PromotionMultiplier            float64
 	DemotionMultiplier             float64
@@ -31,7 +35,8 @@ func NewConfig() *Config {
 		DisplayStats:                   false,
 		EventChanCapacity:              1000,
 		PubkeyChanCapacity:             1000,
-		QueryPubkeysBatchSize:          5,
+		QueryBatchSize:                 5,
+		QueryInterval:                  30 * time.Second,
 		NodeArbiterActivationThreshold: 0.01,
 		PromotionMultiplier:            0.1,
 		DemotionMultiplier:             1.1,
@@ -74,10 +79,16 @@ func LoadConfig(envFile string) (*Config, error) {
 		return nil, fmt.Errorf("error parsing PUBKEY_CHAN_CAPACITY: %v", err)
 	}
 
-	config.QueryPubkeysBatchSize, err = strconv.Atoi(os.Getenv("QUERY_PUBKEYS_BATCH_SIZE"))
+	config.QueryBatchSize, err = strconv.Atoi(os.Getenv("QUERY_BATCH_SIZE"))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing QUERY_PUBKEYS_BATCH_SIZE: %v", err)
+		return nil, fmt.Errorf("error parsing QUERY_BATCH_SIZE: %v", err)
 	}
+
+	queryInterval, err := strconv.Atoi(os.Getenv("QUERY_INTERVAL"))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing QUERY_INTERVAL: %v", err)
+	}
+	config.QueryInterval = time.Duration(queryInterval) * time.Second
 
 	config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(os.Getenv("NODE_ARBITER_ACTIVATION_THRESHOLD"), 64)
 	if err != nil {

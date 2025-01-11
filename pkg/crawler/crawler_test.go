@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nbd-wtf/go-nostr"
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 )
@@ -22,15 +21,39 @@ func TestFirehose(t *testing.T) {
 	Firehose(ctx, logger, DB, Relays, PrintEvent)
 }
 
-func TestQueryPubkeyBatch(t *testing.T) {
-	logger := logger.New(os.Stdout)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go HandleSignals(cancel, logger)
+func TestQueryPubkeys(t *testing.T) {
 
-	pool := nostr.NewSimplePool(context.Background())
-	defer close(logger, pool, "QueryPubkeyBatch")
+	t.Run("batchSize", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
 
-	pubkeys := []string{pip, calle, gigi, odell}
-	QueryPubkeyBatch(ctx, pool, Relays, pubkeys, PrintEvent)
+		logger := logger.New(os.Stdout)
+		go HandleSignals(cancel, logger)
+
+		pubkeyChan := make(chan string, 10)
+		pubkeys := []string{pip, calle, gigi, odell}
+		for _, pk := range pubkeys { // send the pubkeys to the queue
+			pubkeyChan <- pk
+		}
+
+		// the channel contains enough pubkeys, so it should query immediately and then print.
+		QueryPubkeys(ctx, logger, Relays, pubkeyChan, 3, 30*time.Second, PrintEvent)
+	})
+
+	t.Run("timer", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		logger := logger.New(os.Stdout)
+		go HandleSignals(cancel, logger)
+
+		pubkeyChan := make(chan string, 10)
+		pubkeys := []string{pip, calle, gigi, odell}
+		for _, pk := range pubkeys { // send the pubkeys to the queue
+			pubkeyChan <- pk
+		}
+
+		// there aren't enough pubkeys, but the timer will kick in, so it should query and then print.
+		QueryPubkeys(ctx, logger, Relays, pubkeyChan, 11, 2*time.Second, PrintEvent)
+	})
 }

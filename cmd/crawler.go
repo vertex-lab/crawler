@@ -108,7 +108,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, config.QueryPubkeysBatchSize, func(event *nostr.Event) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, config.QueryBatchSize, config.QueryInterval, func(event *nostr.Event) error {
 			select {
 			case eventChan <- event:
 			default:

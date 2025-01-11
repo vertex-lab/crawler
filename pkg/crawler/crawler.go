@@ -104,18 +104,20 @@ func Firehose(
 	}
 }
 
-// QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries for their events in batches of batchSize.
+// QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries for
+// their events when the batch is bigger than batchSize, OR after queryInterval since the last query.
 func QueryPubkeys(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	relays []string,
 	pubkeyChan <-chan string,
 	batchSize int,
+	queryInterval time.Duration,
 	queueHandler func(event *nostr.Event) error) {
 
-	var firstQuery bool = true // the first query runs right away to speed up initialization
-
 	batch := make([]string, 0, batchSize)
+	timer := time.After(queryInterval)
+
 	pool := nostr.NewSimplePool(ctx)
 	defer close(logger, pool, "QueryPubkeys")
 
@@ -126,23 +128,34 @@ func QueryPubkeys(
 
 		case pubkey, ok := <-pubkeyChan:
 			if !ok {
-				fmt.Println("\n  > Pubkey channel closed, stopping processing.")
 				logger.Warn("Pubkey channel closed, stopping processing.")
 				return
 			}
 
 			batch = append(batch, pubkey)
-			if len(batch) >= batchSize || firstQuery {
-
-				if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
-					logger.Error("QueryPubkeys queue handler: %v", err)
-					continue
-				}
-
-				// reset only if successful
-				batch = make([]string, 0, batchSize)
-				//firstQuery = false
+			if len(batch) < batchSize {
+				continue
 			}
+
+			if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
+				logger.Error("QueryPubkeys queue handler: %v", err)
+				continue
+			}
+
+			// reset batch and timer only if successful
+			batch = make([]string, 0, batchSize)
+			timer = time.After(queryInterval)
+
+		case <-timer:
+
+			if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
+				logger.Error("QueryPubkeys queue handler: %v", err)
+				continue
+			}
+
+			// reset batch and timer only if successful
+			batch = make([]string, 0, batchSize)
+			timer = time.After(queryInterval)
 		}
 	}
 }
@@ -155,6 +168,10 @@ func QueryPubkeyBatch(
 	relays []string,
 	pubkeys []string,
 	queueHandler func(event *nostr.Event) error) error {
+
+	if len(pubkeys) == 0 {
+		return nil
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
