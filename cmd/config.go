@@ -1,22 +1,21 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 // The configuration parameters for the crawler.
 type Config struct {
-	Mode                           string
-	RedisClient                    *redis.Client
 	LogWriter                      io.Writer
 	DisplayStats                   bool
+	InitPubkeys                    []string // only used during initialization
 	EventChanCapacity              int
 	PubkeyChanCapacity             int
 	QueryPubkeysBatchSize          int
@@ -28,8 +27,6 @@ type Config struct {
 // NewConfig() returns a config with default parameters.
 func NewConfig() *Config {
 	return &Config{
-		Mode:                           "prod",
-		RedisClient:                    redis.NewClient(&redis.Options{Addr: "localhost:6379"}),
 		LogWriter:                      os.Stdout,
 		DisplayStats:                   false,
 		EventChanCapacity:              1000,
@@ -41,30 +38,14 @@ func NewConfig() *Config {
 	}
 }
 
-// LoadConfig() read the variables from the .env file and returns an initialized config.
+// LoadConfig() read the variables from the specified .env file and returns an initialized config.
 // If the .env file doesn't exist, default parameters are returned.
-func LoadConfig() (*Config, error) {
+func LoadConfig(envFile string) (*Config, error) {
 	var config = NewConfig()
 	var err error
 
-	size, err := config.RedisClient.DBSize(context.Background()).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	switch size {
-	case 0:
-		// if the DB is empty, run with initialization parameters.
-		config.Mode = "init"
-		if err = godotenv.Load("init.env"); err != nil {
-			return nil, fmt.Errorf("failed to load init.env: %v", err)
-		}
-
-	default:
-		config.Mode = "prod"
-		if err = godotenv.Load("prod.env"); err != nil {
-			return config, nil
-		}
+	if err = godotenv.Load(envFile); err != nil {
+		return config, nil
 	}
 
 	logsOut := os.Getenv("LOGS")
@@ -74,7 +55,7 @@ func LoadConfig() (*Config, error) {
 	default:
 		config.LogWriter, err = os.OpenFile(logsOut, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error opening file %v: %v", logsOut, err)
 		}
 	}
 
@@ -111,6 +92,13 @@ func LoadConfig() (*Config, error) {
 	config.DemotionMultiplier, err = strconv.ParseFloat(os.Getenv("DEMOTION_MULTIPLIER"), 64)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing DEMOTION_MULTIPLIER: %v", err)
+	}
+
+	pubkeys := strings.Split(os.Getenv("INIT_PUBKEYS"), ",")
+	for _, pk := range pubkeys {
+		if nostr.IsValidPublicKey(pk) {
+			config.InitPubkeys = append(config.InitPubkeys, pk)
+		}
 	}
 
 	return config, nil

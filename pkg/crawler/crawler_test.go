@@ -29,7 +29,7 @@ func TestQueryPubkeyBatch(t *testing.T) {
 	go HandleSignals(cancel, logger)
 
 	pool := nostr.NewSimplePool(context.Background())
-	defer close(logger, "QueryPubkeyBatch", pool)
+	defer close(logger, pool, "QueryPubkeyBatch")
 
 	pubkeys := []string{pip, calle, gigi, odell}
 	QueryPubkeyBatch(ctx, pool, Relays, pubkeys, PrintEvent)

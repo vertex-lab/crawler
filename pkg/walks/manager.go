@@ -26,8 +26,10 @@ func NewRWMConnection(ctx context.Context, cl *redis.Client) (*RandomWalkManager
 }
 
 // NewRWM() returns a RWM using the Redis RWS.
-func NewRWM(cl *redis.Client, alpha float32, walksPerNode uint16) (*RandomWalkManager, error) {
-	RWS, err := redistore.NewRWS(context.Background(), cl, alpha, walksPerNode)
+// - alpha is the dampening factor used in the walks
+// - walksPerNode is the number of walks to simulate for each active node.
+func NewRWM(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode uint16) (*RandomWalkManager, error) {
+	RWS, err := redistore.NewRWS(ctx, cl, alpha, walksPerNode)
 	if err != nil {
 		return nil, err
 	}

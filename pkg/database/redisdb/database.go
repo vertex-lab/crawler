@@ -568,6 +568,37 @@ func (DB *Database) SetPagerank(ctx context.Context, pagerankMap models.Pagerank
 	return nil
 }
 
+// --------------------------------------HELPERS--------------------------------
+
+// NewDatabaseFromPubkeys() returns an initialized database storing the specified pubkeys.
+func NewDatabaseFromPubkeys(ctx context.Context, cl *redis.Client, pubkeys []string) (*Database, error) {
+	DB, err := NewDatabase(ctx, cl)
+	if err != nil {
+		return nil, err
+	}
+
+	initialPagerank := 1.0 / float64(len(pubkeys))
+	for _, pk := range pubkeys {
+
+		node := models.Node{
+			Metadata: models.NodeMeta{
+				Pubkey:   pk,
+				EventTS:  1,
+				Status:   models.StatusInactive,
+				Pagerank: initialPagerank,
+			},
+			Follows:   []uint32{},
+			Followers: []uint32{},
+		}
+
+		if _, err := DB.AddNode(ctx, &node); err != nil {
+			return nil, err
+		}
+	}
+
+	return DB, nil
+}
+
 // function that returns a DB setup based on the DBType
 func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 	ctx := context.Background()

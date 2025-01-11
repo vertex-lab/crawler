@@ -9,6 +9,7 @@ import (
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -21,55 +22,72 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	config, err := LoadConfig()
+	redis := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	size, err := redis.DBSize(ctx).Result()
 	if err != nil {
 		panic(err)
 	}
 
-	logger := logger.New(config.LogWriter)
-	defer config.CloseLogs()
-
+	var config *Config
 	var DB models.Database
 	var RWM *walks.RandomWalkManager
-	switch config.Mode {
-	case "prod":
-		DB, err = redisdb.NewDatabaseConnection(ctx, config.RedisClient)
+
+	switch size {
+	case 0:
+		// if redis is empty, initialize a new database with the INIT_PUBKEYS specified in the init.env file
+		config, err = LoadConfig("init.env")
 		if err != nil {
 			panic(err)
 		}
 
-		RWM, err = walks.NewRWMConnection(ctx, config.RedisClient)
+		DB, err = redisdb.NewDatabaseFromPubkeys(ctx, redis, config.InitPubkeys)
 		if err != nil {
 			panic(err)
 		}
 
-	case "init":
-		DB, err = redisdb.SetupDB(config.RedisClient, "pip")
+		RWM, err = walks.NewRWM(ctx, redis, 0.85, 100)
 		if err != nil {
 			panic(err)
 		}
 
-		RWM, err = walks.NewRWM(config.RedisClient, 0.85, 100)
+		if err = RWM.GenerateAll(ctx, DB); err != nil {
+			panic(err)
+		}
+
+	default:
+		config, err = LoadConfig("prod.env")
 		if err != nil {
 			panic(err)
 		}
 
-		if err = RWM.GenerateAll(context.Background(), DB); err != nil {
+		DB, err = redisdb.NewDatabaseConnection(ctx, redis)
+		if err != nil {
+			panic(err)
+		}
+
+		RWM, err = walks.NewRWMConnection(ctx, redis)
+		if err != nil {
 			panic(err)
 		}
 	}
 
-	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
-	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
-	eventCounter := xsync.NewCounter()
-	pagerankTotal := counter.NewFloatCounter() // tracks the pagerank mass accumulated since the last full recomputation.
+	// configuring all the logs to write to the same place
+	logger := logger.New(config.LogWriter)
+	nostr.InfoLogger.SetOutput(config.LogWriter)
+	nostr.DebugLogger.SetOutput(config.LogWriter)
+	defer config.CloseLogs()
 
 	PrintStartup(logger)
 	defer PrintShutdown(logger)
-
 	go crawler.HandleSignals(cancel, logger)
-	if config.DisplayStats {
-		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
+
+	eventCounter := xsync.NewCounter()         // tracks the number of events processed
+	pagerankTotal := counter.NewFloatCounter() // tracks the pagerank mass accumulated since the last scan of NodeArbiter.
+
+	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
+	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
+	for _, pk := range config.InitPubkeys { // send the initialization pubkeys to the queue (if any)
+		pubkeyChan <- pk
 	}
 
 	// spawn the Firehose, the QueryPubkeys and NodeArbiter as three goroutines.
@@ -111,6 +129,10 @@ func main() {
 			return nil
 		})
 	}()
+
+	if config.DisplayStats {
+		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
+	}
 
 	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, pagerankTotal)
 	wg.Wait()

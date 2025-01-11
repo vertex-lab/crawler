@@ -213,7 +213,7 @@ func ParsePubkeys(event *nostr.Event) []string {
 
 // NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
 // - scans through all the nodes in the database
-// - promotes or demotes them based on their pagerank and pagerankMultiplier
+// - promotes or demotes them based on their pagerank and promotion/demotion multipliers
 // - recomputes the pagerank of all nodes
 func NodeArbiter(
 	ctx context.Context,
