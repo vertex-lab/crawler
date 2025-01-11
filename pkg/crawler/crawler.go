@@ -66,7 +66,7 @@ func Firehose(
 	queueHandler func(event *nostr.Event) error) {
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close(logger, "Firehose", pool)
+	defer close(logger, pool, "Firehose")
 
 	ts := nostr.Now()
 	filters := nostr.Filters{{
@@ -104,8 +104,7 @@ func Firehose(
 	}
 }
 
-// QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries
-// for their events in batches of batchSize.
+// QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries for their events in batches of batchSize.
 func QueryPubkeys(
 	ctx context.Context,
 	logger *logger.Aggregate,
@@ -114,9 +113,11 @@ func QueryPubkeys(
 	batchSize int,
 	queueHandler func(event *nostr.Event) error) {
 
+	var firstQuery bool = true // the first query runs right away to speed up initialization
+
 	batch := make([]string, 0, batchSize)
 	pool := nostr.NewSimplePool(ctx)
-	defer close(logger, "QueryPubkeys", pool)
+	defer close(logger, pool, "QueryPubkeys")
 
 	for {
 		select {
@@ -131,7 +132,7 @@ func QueryPubkeys(
 			}
 
 			batch = append(batch, pubkey)
-			if len(batch) >= batchSize {
+			if len(batch) >= batchSize || firstQuery {
 
 				if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
 					logger.Error("QueryPubkeys queue handler: %v", err)
@@ -140,6 +141,7 @@ func QueryPubkeys(
 
 				// reset only if successful
 				batch = make([]string, 0, batchSize)
+				//firstQuery = false
 			}
 		}
 	}
@@ -195,7 +197,7 @@ func QueryPubkeyBatch(
 }
 
 // Close() iterates over the relays in the pool and closes all connections.
-func close(logger *logger.Aggregate, funcName string, pool *nostr.SimplePool) {
+func close(logger *logger.Aggregate, pool *nostr.SimplePool, funcName string) {
 	logger.Info("  > " + funcName + ": closing relay connections... ")
 	pool.Relays.Range(func(_ string, relay *nostr.Relay) bool {
 		relay.Close()
