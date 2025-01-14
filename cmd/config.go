@@ -49,8 +49,8 @@ func LoadConfig(envFile string) (*Config, error) {
 	var config = NewConfig()
 	var err error
 
-	if err = godotenv.Load(envFile); err != nil {
-		panic(err)
+	// try to load the file, if there are errors then use the global enviroment.
+	if err := godotenv.Load(envFile); err != nil {
 	}
 
 	for _, item := range os.Environ() {
