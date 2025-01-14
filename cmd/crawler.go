@@ -71,6 +71,9 @@ func main() {
 		}
 	}
 
+	config.Print()
+	return
+
 	// configuring all the logs to write to the same place
 	logger := logger.New(config.LogWriter)
 	nostr.InfoLogger.SetOutput(config.LogWriter)

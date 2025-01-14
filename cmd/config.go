@@ -53,62 +53,78 @@ func LoadConfig(envFile string) (*Config, error) {
 		return config, nil
 	}
 
-	logsOut := os.Getenv("LOGS")
-	switch logsOut {
-	case "terminal":
-		config.LogWriter = os.Stdout
-	default:
-		config.LogWriter, err = os.OpenFile(logsOut, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-		if err != nil {
-			return nil, fmt.Errorf("error opening file %v: %v", logsOut, err)
-		}
-	}
+	for _, item := range os.Environ() {
+		parts := strings.SplitN(item, "=", 2)
+		key, val := parts[0], parts[1]
 
-	config.DisplayStats, err = strconv.ParseBool(os.Getenv("DISPLAY_STATS"))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing DISPLAY_STATS: %v", err)
-	}
+		switch key {
+		case "LOGS":
+			switch val {
+			case "terminal":
+				config.LogWriter = os.Stdout
+			default:
+				config.LogWriter, err = os.OpenFile(val, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+				if err != nil {
+					return nil, fmt.Errorf("error opening file %v: %v", val, err)
+				}
+			}
 
-	config.EventChanCapacity, err = strconv.Atoi(os.Getenv("EVENT_CHAN_CAPACITY"))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing EVENT_CHAN_CAPACITY: %v", err)
-	}
+		case "DISPLAY_STATS":
+			config.DisplayStats, err = strconv.ParseBool(val)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
 
-	config.PubkeyChanCapacity, err = strconv.Atoi(os.Getenv("PUBKEY_CHAN_CAPACITY"))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing PUBKEY_CHAN_CAPACITY: %v", err)
-	}
+		case "EVENT_CHAN_CAPACITY":
+			config.EventChanCapacity, err = strconv.Atoi(val)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
 
-	config.QueryBatchSize, err = strconv.Atoi(os.Getenv("QUERY_BATCH_SIZE"))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing QUERY_BATCH_SIZE: %v", err)
-	}
+		case "PUBKEY_CHAN_CAPACITY":
+			config.PubkeyChanCapacity, err = strconv.Atoi(val)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
 
-	queryInterval, err := strconv.Atoi(os.Getenv("QUERY_INTERVAL"))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing QUERY_INTERVAL: %v", err)
-	}
-	config.QueryInterval = time.Duration(queryInterval) * time.Second
+		case "QUERY_BATCH_SIZE":
+			config.QueryBatchSize, err = strconv.Atoi(val)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
 
-	config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(os.Getenv("NODE_ARBITER_ACTIVATION_THRESHOLD"), 64)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing NODE_ARBITER_ACTIVATION_THRESHOLD: %v", err)
-	}
+		case "QUERY_INTERVAL":
+			queryInterval, err := strconv.Atoi(val)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
+			config.QueryInterval = time.Duration(queryInterval) * time.Second
 
-	config.PromotionMultiplier, err = strconv.ParseFloat(os.Getenv("PROMOTION_MULTIPLIER"), 64)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing PROMOTION_MULTIPLIER: %v", err)
-	}
+		case "NODE_ARBITER_ACTIVATION_THRESHOLD":
+			config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
 
-	config.DemotionMultiplier, err = strconv.ParseFloat(os.Getenv("DEMOTION_MULTIPLIER"), 64)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing DEMOTION_MULTIPLIER: %v", err)
-	}
+		case "PROMOTION_MULTIPLIER":
+			config.PromotionMultiplier, err = strconv.ParseFloat(val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
 
-	pubkeys := strings.Split(os.Getenv("INIT_PUBKEYS"), ",")
-	for _, pk := range pubkeys {
-		if nostr.IsValidPublicKey(pk) {
-			config.InitPubkeys = append(config.InitPubkeys, pk)
+		case "DEMOTION_MULTIPLIER":
+			config.DemotionMultiplier, err = strconv.ParseFloat(val, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+			}
+
+		case "INIT_PUBKEYS":
+			pubkeys := strings.Split(val, ",")
+			for _, pk := range pubkeys {
+				if nostr.IsValidPublicKey(pk) {
+					config.InitPubkeys = append(config.InitPubkeys, pk)
+				}
+			}
 		}
 	}
 
@@ -120,4 +136,18 @@ func (c *Config) CloseLogs() {
 	if file, ok := c.LogWriter.(*os.File); ok {
 		file.Close()
 	}
+}
+
+func (c *Config) Print() {
+	fmt.Println("Config:")
+	fmt.Printf("  LogWriter: %T\n", c.LogWriter) // Prints the type of LogWriter
+	fmt.Printf("  DisplayStats: %t\n", c.DisplayStats)
+	fmt.Printf("  InitPubkeys: %v\n", c.InitPubkeys)
+	fmt.Printf("  EventChanCapacity: %d\n", c.EventChanCapacity)
+	fmt.Printf("  PubkeyChanCapacity: %d\n", c.PubkeyChanCapacity)
+	fmt.Printf("  QueryBatchSize: %d\n", c.QueryBatchSize)
+	fmt.Printf("  QueryInterval: %s\n", c.QueryInterval)
+	fmt.Printf("  NodeArbiterActivationThreshold: %f\n", c.NodeArbiterActivationThreshold)
+	fmt.Printf("  PromotionMultiplier: %f\n", c.PromotionMultiplier)
+	fmt.Printf("  DemotionMultiplier: %f\n", c.DemotionMultiplier)
 }
