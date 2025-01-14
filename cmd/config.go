@@ -50,7 +50,7 @@ func LoadConfig(envFile string) (*Config, error) {
 	var err error
 
 	if err = godotenv.Load(envFile); err != nil {
-		return config, nil
+		panic(err)
 	}
 
 	for _, item := range os.Environ() {
