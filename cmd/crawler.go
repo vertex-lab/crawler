@@ -46,6 +46,7 @@ func main() {
 	switch size {
 	case 0:
 		// if redis is empty, initialize a new database with the INIT_PUBKEYS specified in the enviroment
+		logger.Info("initializing crawler")
 		DB, err = redisdb.NewDatabaseFromPubkeys(ctx, redis, config.InitPubkeys)
 		if err != nil {
 			panic(err)
