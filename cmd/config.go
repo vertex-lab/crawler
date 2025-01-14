@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -43,15 +42,10 @@ func NewConfig() *Config {
 	}
 }
 
-// LoadConfig() read the variables from the specified .env file and returns an initialized config.
-// If the .env file doesn't exist, default parameters are returned.
-func LoadConfig(envFile string) (*Config, error) {
+// LoadConfig() read the variables from the enviroment and parses them into a config struct.
+func LoadConfig() (*Config, error) {
 	var config = NewConfig()
 	var err error
-
-	// try to load the file, if there are errors then use the global enviroment.
-	if err := godotenv.Load(envFile); err != nil {
-	}
 
 	for _, item := range os.Environ() {
 		parts := strings.SplitN(item, "=", 2)
@@ -133,14 +127,14 @@ func LoadConfig(envFile string) (*Config, error) {
 
 // CloseLogs() closes the config.LogWriter if that is a file.
 func (c *Config) CloseLogs() {
-	if file, ok := c.LogWriter.(*os.File); ok {
+	if file, ok := c.LogWriter.(*os.File); ok && file != os.Stdout {
 		file.Close()
 	}
 }
 
 func (c *Config) Print() {
 	fmt.Println("Config:")
-	fmt.Printf("  LogWriter: %T\n", c.LogWriter) // Prints the type of LogWriter
+	fmt.Printf("  LogWriter: %T\n", c.LogWriter)
 	fmt.Printf("  DisplayStats: %t\n", c.DisplayStats)
 	fmt.Printf("  InitPubkeys: %v\n", c.InitPubkeys)
 	fmt.Printf("  EventChanCapacity: %d\n", c.EventChanCapacity)

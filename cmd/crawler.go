@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/joho/godotenv/autoload" // responsible for loading .env
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/redis/go-redis/v9"
@@ -22,24 +23,29 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	config, err := LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	// configuring all the logs to write to the same place
+	logger := logger.New(config.LogWriter)
+	nostr.InfoLogger.SetOutput(config.LogWriter)
+	nostr.DebugLogger.SetOutput(config.LogWriter)
+	defer config.CloseLogs()
+
 	redis := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	size, err := redis.DBSize(ctx).Result()
 	if err != nil {
 		panic(err)
 	}
 
-	var config *Config
 	var DB models.Database
 	var RWM *walks.RandomWalkManager
 
 	switch size {
 	case 0:
-		// if redis is empty, initialize a new database with the INIT_PUBKEYS specified in the init.env file
-		config, err = LoadConfig("init.env")
-		if err != nil {
-			panic(err)
-		}
-
+		// if redis is empty, initialize a new database with the INIT_PUBKEYS specified in the enviroment
 		DB, err = redisdb.NewDatabaseFromPubkeys(ctx, redis, config.InitPubkeys)
 		if err != nil {
 			panic(err)
@@ -55,11 +61,6 @@ func main() {
 		}
 
 	default:
-		config, err = LoadConfig("prod.env")
-		if err != nil {
-			panic(err)
-		}
-
 		DB, err = redisdb.NewDatabaseConnection(ctx, redis)
 		if err != nil {
 			panic(err)
@@ -70,15 +71,6 @@ func main() {
 			panic(err)
 		}
 	}
-
-	config.Print()
-	return
-
-	// configuring all the logs to write to the same place
-	logger := logger.New(config.LogWriter)
-	nostr.InfoLogger.SetOutput(config.LogWriter)
-	nostr.DebugLogger.SetOutput(config.LogWriter)
-	defer config.CloseLogs()
 
 	PrintStartup(logger)
 	defer PrintShutdown(logger)
