@@ -53,10 +53,7 @@ func LoadConfig() (*Config, error) {
 
 		switch key {
 		case "LOGS":
-			switch val {
-			case "terminal":
-				config.LogWriter = os.Stdout
-			default:
+			if strings.HasSuffix(val, ".log") {
 				config.LogWriter, err = os.OpenFile(val, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 				if err != nil {
 					return nil, fmt.Errorf("error opening file %v: %v", val, err)
