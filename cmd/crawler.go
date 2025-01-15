@@ -132,6 +132,7 @@ func main() {
 	}
 
 	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, pagerankTotal)
+	logger.Info("ready to process events")
 	wg.Wait()
 }
 
