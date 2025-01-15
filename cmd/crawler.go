@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"runtime"
 	"sync"
 	"time"
@@ -28,10 +29,10 @@ func main() {
 		panic(err)
 	}
 
-	// configuring all the logs to write to the same place
+	// configuring the logs
 	logger := logger.New(config.LogWriter)
-	nostr.InfoLogger.SetOutput(config.LogWriter)
 	nostr.DebugLogger.SetOutput(config.LogWriter)
+	nostr.InfoLogger.SetOutput(io.Discard) // discarding info logs
 	defer config.CloseLogs()
 
 	redis := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
@@ -46,7 +47,7 @@ func main() {
 	switch size {
 	case 0:
 		// if redis is empty, initialize a new database with the INIT_PUBKEYS specified in the enviroment
-		logger.Info("initializing crawler")
+		logger.Info("initializing crawler from empty database")
 		DB, err = redisdb.NewDatabaseFromPubkeys(ctx, redis, config.InitPubkeys)
 		if err != nil {
 			panic(err)
