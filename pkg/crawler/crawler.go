@@ -75,7 +75,12 @@ func Firehose(
 	}}
 
 	for event := range pool.SubMany(ctx, relays, filters) {
+
 		if event.Event == nil {
+			continue
+		}
+
+		if !event.CheckID() {
 			continue
 		}
 
@@ -84,7 +89,7 @@ func Firehose(
 		}
 
 		node, err := DB.NodeByKey(ctx, event.PubKey)
-		if err != nil {
+		if err != nil || node == nil {
 			continue // If the node is not found (err != nil), skip
 		}
 
@@ -184,7 +189,12 @@ func QueryPubkeyBatch(
 	// a map that associates each pubkey with the newest follow list
 	newest := make(map[string]*nostr.Event, len(pubkeys))
 	for event := range pool.SubManyEose(ctx, relays, filters) {
+
 		if event.Event == nil {
+			continue
+		}
+
+		if !event.CheckID() {
 			continue
 		}
 
