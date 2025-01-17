@@ -237,7 +237,10 @@ func NodeArbiter(
 		case <-ticker.C:
 			if pagerankTotal.Load() >= startThreshold {
 
-				if err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler); err != nil {
+				promoted, demoted, err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler)
+				logger.Info("promoted %d, demoted %d", promoted, demoted)
+
+				if err != nil {
 					logger.Error("%v", err)
 					continue
 				}
@@ -261,26 +264,26 @@ func ArbiterScan(
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	promotionMultiplier, demotionMultiplier float64,
-	queueHandler func(pk string) error) error {
+	queueHandler func(pk string) error) (promoted, demoted int, err error) {
 
 	ctx, cancel := context.WithTimeout(ctx, 600*time.Second)
 	defer cancel()
 
 	var cursor uint64
 	var nodeIDs []uint32
-	var err error
+	// var err error
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return promoted, demoted, nil
 		default:
 			// proceed with the scan
 		}
 
 		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 10000)
 		if err != nil {
-			return fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
+			return promoted, demoted, fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
 		}
 
 		minPagerank := minPagerank(ctx, RWM.Store)
@@ -291,7 +294,7 @@ func ArbiterScan(
 			// use a new context for the operation to avoid it being interrupted,
 			// which might result in an inconsistent state of the database. Expected time <100ms
 			err = func() error {
-				opCtx, opCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				opCtx, opCancel := context.WithTimeout(context.Background(), 1*time.Second)
 				defer opCancel()
 
 				node, err := DB.NodeByID(opCtx, ID)
@@ -304,6 +307,9 @@ func ArbiterScan(
 					if err := DemoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to demote node %d: %w", ID, err)
 					}
+
+					demoted++
+					return nil
 				}
 
 				// Inactive --> Active
@@ -315,13 +321,16 @@ func ArbiterScan(
 					if err := queueHandler(node.Pubkey); err != nil {
 						return fmt.Errorf("failed to queue pubkey %s: %w", node.Pubkey, err)
 					}
+
+					promoted++
+					return nil
 				}
 
 				return nil
 			}()
 
 			if err != nil {
-				return fmt.Errorf("ArbiterScan(): %w", err)
+				return promoted, demoted, fmt.Errorf("ArbiterScan(): %w", err)
 			}
 		}
 
@@ -331,7 +340,7 @@ func ArbiterScan(
 		}
 	}
 
-	return nil
+	return promoted, demoted, nil
 }
 
 // The minPagerank() returns the minimum pagerank for an active node, which is

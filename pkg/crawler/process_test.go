@@ -312,7 +312,8 @@ func TestArbiterScan(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWMType)
-				err := ArbiterScan(context.Background(), DB, RWM, 0, 0, func(pk string) error {
+
+				_, _, err := ArbiterScan(context.Background(), DB, RWM, 0, 0, func(pk string) error {
 					return nil
 				})
 
@@ -330,7 +331,7 @@ func TestArbiterScan(t *testing.T) {
 			DB := mockdb.SetupDB("promotion-demotion")
 			RWM := walks.SetupMockRWM("one-node1")
 
-			err := ArbiterScan(ctx, DB, RWM, 1.0, 1.0, func(pk string) error {
+			_, _, err := ArbiterScan(ctx, DB, RWM, 1.0, 1.0, func(pk string) error {
 				return nil
 			})
 			if err != nil {
@@ -365,7 +366,7 @@ func TestArbiterScan(t *testing.T) {
 			RWM := walks.SetupMockRWM("one-node1")
 			queue := []string{}
 
-			err := ArbiterScan(ctx, DB, RWM, 0, 0, func(pk string) error {
+			_, _, err := ArbiterScan(ctx, DB, RWM, 0, 0, func(pk string) error {
 				queue = append(queue, pk)
 				return nil
 			})
