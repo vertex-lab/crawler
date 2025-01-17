@@ -468,11 +468,11 @@ func TestWalksVisitingAll(t *testing.T) {
 
 			walkIDs, err := RWS.WalksVisitingAll(context.Background(), test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("WalksVisitingAll(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(walkIDs, test.expectedIDs) {
-				t.Errorf("Walks(): expected %v, got %v", test.expectedIDs, walkIDs)
+				t.Errorf("WalksVisitingAll(): expected %v, got %v", test.expectedIDs, walkIDs)
 			}
 		})
 	}
