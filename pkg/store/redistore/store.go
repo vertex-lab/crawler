@@ -250,6 +250,10 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 		return nil, err
 	}
 
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
 	var limitPerNode int64
 	switch limit {
 	case 0:
@@ -274,22 +278,18 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 	}
 
 	strIDs := make([]string, 0, limit)
-	for i, cmd := range cmds {
-		IDs := cmd.Val()
-		if len(IDs) == 0 {
-			return nil, fmt.Errorf("%w: nodeID %v", models.ErrNodeNotFoundRWS, nodeIDs[i])
-		}
-
-		strIDs = append(strIDs, IDs...)
+	for _, cmd := range cmds {
+		strIDs = append(strIDs, cmd.Val()...)
 	}
 
-	if len(nodeIDs) > 1 {
+	switch len(nodeIDs) {
+	case 1:
+		return redisutils.ParseIDs(strIDs)
+
+	default:
 		// multiple nodes might have walks in common, hence we remove duplicates.
 		return redisutils.ParseUniqueIDs(strIDs)
-	} else {
-		return redisutils.ParseIDs(strIDs)
 	}
-
 }
 
 // WalksVisitingAll() returns all the IDs of the walk that visit ALL specified nodes.
@@ -298,26 +298,13 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 		return nil, err
 	}
 
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
 	keys := make([]string, len(nodeIDs))
 	for i, ID := range nodeIDs {
 		keys[i] = KeyWalksVisiting(ID)
-	}
-
-	// check first if all the keys exist, otherwise the intersection will be empty
-	pipe := RWS.client.Pipeline()
-	cmds := make([]*redis.IntCmd, len(keys))
-	for i, key := range keys {
-		cmds[i] = pipe.Exists(ctx, key)
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return nil, fmt.Errorf("pipeline failed: %w", err)
-	}
-
-	for i, cmd := range cmds {
-		if cmd.Val() != 1 {
-			return nil, fmt.Errorf("%w: nodeID %v", models.ErrNodeNotFoundRWS, nodeIDs[i])
-		}
 	}
 
 	strIDs, err := RWS.client.SInter(ctx, keys...).Result()

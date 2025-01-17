@@ -331,9 +331,6 @@ func TestWalks(t *testing.T) {
 }
 
 func TestWalksVisiting(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
 		name          string
 		RWSType       string
@@ -350,18 +347,27 @@ func TestWalksVisiting(t *testing.T) {
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
+			name:          "nil nodeIDs",
+			RWSType:       "one-node0",
+			nodeIDs:       nil,
+			expectedError: nil,
+			expectedIDs:   nil,
+		},
+		{
 			name:          "empty RWS",
 			RWSType:       "empty",
 			limit:         1,
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
 		},
 		{
 			name:          "nodeID not found in RWS",
 			RWSType:       "one-node0",
 			limit:         1,
 			nodeIDs:       []uint32{1},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
 		},
 		{
 			name:        "one nodeID",
@@ -381,6 +387,9 @@ func TestWalksVisiting(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			RWS, err := SetupRWS(cl, test.RWSType)
 			if err != nil {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
@@ -388,20 +397,17 @@ func TestWalksVisiting(t *testing.T) {
 
 			walkIDs, err := RWS.WalksVisiting(context.Background(), test.limit, test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("WalksVisiting(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(walkIDs, test.expectedIDs) {
-				t.Errorf("Walks(): expected %v, got %v", test.expectedIDs, walkIDs)
+				t.Errorf("WalksVisiting(): expected %v, got %v", test.expectedIDs, walkIDs)
 			}
 		})
 	}
 }
 
 func TestWalksVisitingAll(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
 		name          string
 		RWSType       string
@@ -416,16 +422,25 @@ func TestWalksVisitingAll(t *testing.T) {
 			expectedError: models.ErrNilRWSPointer,
 		},
 		{
+			name:          "nil nodeIDs",
+			RWSType:       "one-node0",
+			nodeIDs:       nil,
+			expectedError: nil,
+			expectedIDs:   nil,
+		},
+		{
 			name:          "empty RWS",
 			RWSType:       "empty",
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
 		},
 		{
 			name:          "nodeID not found in RWS",
 			RWSType:       "one-node0",
 			nodeIDs:       []uint32{1},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
 		},
 		{
 			name:        "one nodeID",
@@ -443,6 +458,9 @@ func TestWalksVisitingAll(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			RWS, err := SetupRWS(cl, test.RWSType)
 			if err != nil {
 				t.Fatalf("SetupRWS(): expected nil, got %v", err)
