@@ -45,7 +45,7 @@ func ProcessEvents(
 
 			switch event.Kind {
 			case nostr.KindFollowList:
-				if err := ProcessFollowList(ctx, DB, RWM, event, pagerankTotal); err != nil {
+				if err := ProcessFollowList(DB, RWM, event, pagerankTotal); err != nil {
 					logger.Error("Error processing the eventID %v: %v", event.ID, err)
 				}
 			default:
@@ -63,13 +63,14 @@ func ProcessEvents(
 // ProcessFollowList() adds the author and its follows to the database.
 // It updates the node metadata of the author, and updates the random walks.
 func ProcessFollowList(
-	ctx context.Context,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	event *nostr.Event,
 	pagerankTotal *counter.Float) error {
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// use a new context for the operation to avoid it being interrupted,
+	// which might result in an inconsistent state of the database. Expected time <1000ms
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
@@ -254,8 +255,7 @@ func NodeArbiter(
 	}
 }
 
-// ArbiterScan() performs one entire database scan, promoting or demoting nodes
-// based on their pagerank.
+// ArbiterScan() performs one entire database scan, promoting or demoting nodes based on their pagerank.
 func ArbiterScan(
 	ctx context.Context,
 	DB models.Database,
@@ -278,9 +278,9 @@ func ArbiterScan(
 			// proceed with the scan
 		}
 
-		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 1000)
+		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 10000)
 		if err != nil {
-			return fmt.Errorf("ArbiterScan(): %w", err)
+			return fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
 		}
 
 		minPagerank := minPagerank(ctx, RWM.Store)
@@ -288,27 +288,40 @@ func ArbiterScan(
 		demotionThreshold := minPagerank * demotionMultiplier
 
 		for _, ID := range nodeIDs {
-			node, err := DB.NodeByID(ctx, ID)
+			// use a new context for the operation to avoid it being interrupted,
+			// which might result in an inconsistent state of the database. Expected time <100ms
+			err = func() error {
+				opCtx, opCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer opCancel()
+
+				node, err := DB.NodeByID(opCtx, ID)
+				if err != nil {
+					return fmt.Errorf("failed to retrieve node by ID %d: %w", ID, err)
+				}
+
+				// Active --> Inactive
+				if node.Status == models.StatusActive && node.Pagerank < demotionThreshold {
+					if err := DemoteNode(opCtx, DB, RWM, ID); err != nil {
+						return fmt.Errorf("failed to demote node %d: %w", ID, err)
+					}
+				}
+
+				// Inactive --> Active
+				if node.Status == models.StatusInactive && node.Pagerank >= promotionThreshold {
+					if err := PromoteNode(opCtx, DB, RWM, ID); err != nil {
+						return fmt.Errorf("failed to promote node %d: %w", ID, err)
+					}
+
+					if err := queueHandler(node.Pubkey); err != nil {
+						return fmt.Errorf("failed to queue pubkey %s: %w", node.Pubkey, err)
+					}
+				}
+
+				return nil
+			}()
+
 			if err != nil {
-				continue
-			}
-
-			// Active --> Inactive
-			if node.Status == models.StatusActive && node.Pagerank < demotionThreshold {
-				if err := DemoteNode(ctx, DB, RWM, ID); err != nil {
-					return fmt.Errorf("ArbiterScan(): %w", err)
-				}
-			}
-
-			// Inactive --> Active
-			if node.Status == models.StatusInactive && node.Pagerank >= promotionThreshold {
-				if err := PromoteNode(ctx, DB, RWM, ID); err != nil {
-					return fmt.Errorf("ArbiterScan(): %w", err)
-				}
-
-				if err := queueHandler(node.Pubkey); err != nil {
-					return fmt.Errorf("ArbiterScan(): error sending pubkey %v to the queue: %w", node.Pubkey, err)
-				}
+				return fmt.Errorf("ArbiterScan(): %w", err)
 			}
 		}
 

@@ -196,7 +196,7 @@ func TestProcessFollowList(t *testing.T) {
 				RWM := walks.SetupMockRWM(test.RWSType)
 				pagerankTotal := counter.NewFloatCounter()
 
-				err := ProcessFollowList(context.Background(), DB, RWM, &validEvent, pagerankTotal)
+				err := ProcessFollowList(DB, RWM, &validEvent, pagerankTotal)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
@@ -260,7 +260,7 @@ func TestProcessFollowList(t *testing.T) {
 
 		pagerankTotal := counter.NewFloatCounter()
 		for i, event := range events {
-			err := ProcessFollowList(ctx, DB, RWM, event, pagerankTotal)
+			err := ProcessFollowList(DB, RWM, event, pagerankTotal)
 			if err != nil {
 				t.Fatalf("ProcessFollowList(event%d): expected nil, got %v", i, err)
 			}

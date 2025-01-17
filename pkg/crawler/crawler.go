@@ -173,7 +173,7 @@ func QueryPubkeyBatch(
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*15)
 	defer cancel()
 
 	filters := nostr.Filters{{
