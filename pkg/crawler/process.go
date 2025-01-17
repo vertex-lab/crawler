@@ -302,18 +302,17 @@ func ArbiterScan(
 					return fmt.Errorf("failed to retrieve node by ID %d: %w", ID, err)
 				}
 
+				switch {
 				// Active --> Inactive
-				if node.Status == models.StatusActive && node.Pagerank < demotionThreshold {
+				case node.Status == models.StatusActive && node.Pagerank < demotionThreshold:
 					if err := DemoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to demote node %d: %w", ID, err)
 					}
 
 					demoted++
-					return nil
-				}
 
 				// Inactive --> Active
-				if node.Status == models.StatusInactive && node.Pagerank >= promotionThreshold {
+				case node.Status == models.StatusInactive && node.Pagerank >= promotionThreshold:
 					if err := PromoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to promote node %d: %w", ID, err)
 					}
@@ -323,7 +322,6 @@ func ArbiterScan(
 					}
 
 					promoted++
-					return nil
 				}
 
 				return nil
