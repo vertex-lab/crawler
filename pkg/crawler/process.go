@@ -276,14 +276,19 @@ func ArbiterScan(
 			// proceed with the scan
 		}
 
+		minPagerank := minPagerank(ctx, RWM.Store)
+		promotionThreshold := minPagerank * promotionMultiplier
+		demotionThreshold := minPagerank * demotionMultiplier
+
 		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 10000)
 		if err != nil {
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
 		}
 
-		minPagerank := minPagerank(ctx, RWM.Store)
-		promotionThreshold := minPagerank * promotionMultiplier
-		demotionThreshold := minPagerank * demotionMultiplier
+		ranks, err := pagerank.Global(ctx, RWM.Store, nodeIDs...)
+		if err != nil {
+			return promoted, demoted, fmt.Errorf("ArbiterScan(): pagerank: %w", err)
+		}
 
 		for _, ID := range nodeIDs {
 			// use a new context for the operation to avoid it being interrupted,
@@ -299,7 +304,7 @@ func ArbiterScan(
 
 				switch {
 				// Active --> Inactive
-				case node.Status == models.StatusActive && node.Pagerank < demotionThreshold:
+				case node.Status == models.StatusActive && ranks[ID] < demotionThreshold:
 					if err := DemoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to demote node %d: %w", ID, err)
 					}
@@ -307,7 +312,7 @@ func ArbiterScan(
 					demoted++
 
 				// Inactive --> Active
-				case node.Status == models.StatusInactive && node.Pagerank >= promotionThreshold:
+				case node.Status == models.StatusInactive && ranks[ID] >= promotionThreshold:
 					if err := PromoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to promote node %d: %w", ID, err)
 					}
