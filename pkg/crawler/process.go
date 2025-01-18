@@ -95,10 +95,6 @@ func ProcessFollowList(
 	oldFollows := followsByNode[0]
 
 	removed, common, added := sliceutils.Partition(oldFollows, newFollows)
-	if len(removed)+len(added) == 0 { // the follow list is a rebrodcast of one we alreay have
-		return nil
-	}
-
 	nodeDiff := models.NodeDiff{
 		Metadata: models.NodeMeta{
 			EventTS: event.CreatedAt.Time().Unix(),
@@ -197,7 +193,7 @@ func ParsePubkeys(event *nostr.Event) []string {
 			continue
 		}
 
-		// pubkeys should be unique in the follow list
+		// pubkeys should be unique in the follow list; TODO, this is inefficient.
 		if slices.Contains(pubkeys, pubkey) {
 			continue
 		}
@@ -271,7 +267,6 @@ func ArbiterScan(
 
 	var cursor uint64
 	var nodeIDs []uint32
-	// var err error
 
 	for {
 		select {

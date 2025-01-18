@@ -80,6 +80,7 @@ func main() {
 
 	eventCounter := xsync.NewCounter()         // tracks the number of events processed
 	pagerankTotal := counter.NewFloatCounter() // tracks the pagerank mass accumulated since the last scan of NodeArbiter.
+	pagerankTotal.Add(1)                       // to make NodeArbiter activate immediately
 
 	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
 	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
