@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -15,7 +16,6 @@ import (
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
-	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -194,9 +194,9 @@ func TestProcessFollowList(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWM := walks.SetupMockRWM(test.RWSType)
-				pagerankTotal := counter.NewFloatCounter()
+				walksCounter := atomic.Uint32{}
 
-				err := ProcessFollowList(DB, RWM, &validEvent, pagerankTotal)
+				err := ProcessFollowList(DB, RWM, &validEvent, &walksCounter)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
@@ -206,10 +206,14 @@ func TestProcessFollowList(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
+		var maxDist float64 = 0.01
+		var walksPerNode uint16 = 5000
+		var alpha float32 = 0.85
+		var maxWalkDiff float64 = 3 * maxDist * float64(walksPerNode) // the walks counter seems to converge slower than the pagerank
 		ctx := context.Background()
-		maxDist := 0.01
+
 		DB := mockdb.SetupDB("pip")
-		RWS, err := mockstore.NewRWS(0.85, 1000)
+		RWS, err := mockstore.NewRWS(alpha, walksPerNode)
 		if err != nil {
 			t.Fatalf("NewRWS(): expected nil, got %v", err)
 		}
@@ -247,38 +251,40 @@ func TestProcessFollowList(t *testing.T) {
 		}
 
 		expectedPagerank := map[int]models.PagerankMap{
-			0: {1: 0.46},
-			1: {2: 0.2809},
-			2: {0: 0.389},
+			0: {0: 0.54, 1: 0.46, 2: 0},
+			1: {0: 0.3887, 1: 0.3304, 2: 0.2809},
+			2: {0: 0.3887, 1: 0.3304, 2: 0.2809},
 		}
 
-		expectedTotal := map[int]float64{
-			0: 1.0,
-			1: 1.46,
-			2: 1.74,
+		expectedWalksCounter := map[int]float64{
+			0: float64(walksPerNode),
+			1: float64(walksPerNode) + float64(walksPerNode)*float64(alpha),
+			2: float64(walksPerNode) + float64(walksPerNode)*float64(alpha) + float64(walksPerNode)*float64(alpha)*float64(alpha),
 		}
 
-		pagerankTotal := counter.NewFloatCounter()
+		walksCounter := atomic.Uint32{}
 		for i, event := range events {
-			err := ProcessFollowList(DB, RWM, event, pagerankTotal)
-			if err != nil {
+			if err := ProcessFollowList(DB, RWM, event, &walksCounter); err != nil {
 				t.Fatalf("ProcessFollowList(event%d): expected nil, got %v", i, err)
 			}
 
-			total := pagerankTotal.Load()
-			if math.Abs(expectedTotal[i]-total) > maxDist {
-				t.Errorf("Expected distance %v, got %v", maxDist, math.Abs(expectedTotal[i]-total))
+			walks := walksCounter.Load()
+			expectedWalks := expectedWalksCounter[i]
+			diff := math.Abs(float64(expectedWalks) - float64(walks))
+
+			if diff > maxWalkDiff {
+				t.Errorf("Expected distance %v, got abs(%v)", maxWalkDiff, diff)
 			}
 
-			rank := make(models.PagerankMap, 1)
-			for ID := range expectedPagerank[i] {
-				rank[ID] = DB.NodeIndex[ID].Metadata.Pagerank
+			ranks, err := pagerank.Global(ctx, RWS, 0, 1, 2)
+			if err != nil {
+				t.Errorf("pagerank Global failed(): %v", err)
 			}
 
-			distance := pagerank.Distance(rank, expectedPagerank[i])
+			distance := pagerank.Distance(ranks, expectedPagerank[i])
 			if distance > maxDist {
 				t.Errorf("Expected distance %v, got %v", maxDist, distance)
-				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], rank)
+				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], ranks)
 			}
 		}
 	})
@@ -331,7 +337,7 @@ func TestArbiterScan(t *testing.T) {
 			DB := mockdb.SetupDB("promotion-demotion")
 			RWM := walks.SetupMockRWM("one-node1")
 
-			_, _, err := ArbiterScan(ctx, DB, RWM, 1.0, 1.0, func(pk string) error {
+			_, _, err := ArbiterScan(ctx, DB, RWM, 2.0, 2.0, func(pk string) error {
 				return nil
 			})
 			if err != nil {
@@ -418,8 +424,8 @@ func TestNodeArbiter(t *testing.T) {
 
 	DB := mockdb.SetupDB("one-node0")
 	RWM := walks.SetupMockRWM("one-node0")
-	pagerankTotal := counter.NewFloatCounter()
-	NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, 0, 0, 0, func(pk string) error {
+	walksCounter := &atomic.Uint32{}
+	NodeArbiter(ctx, logger, DB, RWM, walksCounter, 0, 0, 0, func(pk string) error {
 		return nil
 	})
 }

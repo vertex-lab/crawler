@@ -6,16 +6,15 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload" // responsible for loading .env
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -78,9 +77,9 @@ func main() {
 	defer PrintShutdown(logger)
 	go crawler.HandleSignals(cancel, logger)
 
-	eventCounter := xsync.NewCounter()         // tracks the number of events processed
-	pagerankTotal := counter.NewFloatCounter() // tracks the pagerank mass accumulated since the last scan of NodeArbiter.
-	pagerankTotal.Add(1)                       // to make NodeArbiter activate immediately
+	eventCounter := &atomic.Uint32{} // tracks the number of events processed
+	walksChanged := &atomic.Uint32{} // tracks the pagerank mass accumulated since the last scan of NodeArbiter.
+	walksChanged.Add(1000000)        // to make NodeArbiter activate immediately
 
 	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
 	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
@@ -118,7 +117,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, pagerankTotal, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWM, walksChanged, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:
@@ -129,11 +128,11 @@ func main() {
 	}()
 
 	if config.DisplayStats {
-		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, pagerankTotal)
+		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, walksChanged)
 	}
 
 	logger.Info("ready to process events")
-	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, pagerankTotal)
+	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, walksChanged)
 	wg.Wait()
 }
 
@@ -145,8 +144,7 @@ func DisplayStats(
 	RWM *walks.RandomWalkManager,
 	eventChan <-chan *nostr.Event,
 	pubkeyChan <-chan string,
-	eventCounter *xsync.Counter,
-	pagerankTotal *counter.Float) {
+	eventCounter, walksChanged *atomic.Uint32) {
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -181,8 +179,8 @@ func DisplayStats(
 			fmt.Printf("Database Size: %d nodes\n", DB.Size(ctx))
 			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
 			fmt.Printf("Pubkey Channel: %d/%d\n", pubkeyChanLen, pubkeyChanCap)
-			fmt.Printf("Processed Events: %d\n", eventCounter.Value())
-			fmt.Printf("Pagerank since last recomputation: %v\n", pagerankTotal.Load())
+			fmt.Printf("Processed Events: %d\n", eventCounter.Load())
+			fmt.Printf("Walks changed since last scan: %v\n", walksChanged.Load())
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
 			fmt.Println("---------------------------------------")

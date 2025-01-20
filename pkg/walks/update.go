@@ -28,27 +28,27 @@ func (RWM *RandomWalkManager) Update(
 	removed, common, added []uint32) (int, error) {
 
 	if err := DB.Validate(); err != nil {
-		return 0, fmt.Errorf("Update(): %w", err)
+		return 0, fmt.Errorf("Update(%d): %w", nodeID, err)
 	}
 
 	if err := RWM.Store.Validate(); err != nil {
-		return 0, fmt.Errorf("Update(): %w", err)
+		return 0, fmt.Errorf("Update(%d): %w", nodeID, err)
 	}
 
 	if !DB.ContainsNode(ctx, nodeID) {
-		return 0, fmt.Errorf("Update(): %w: %v", models.ErrNodeNotFoundDB, nodeID)
+		return 0, fmt.Errorf("Update(%d): %w", nodeID, models.ErrNodeNotFoundDB)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	updated1, err := RWM.updateRemovedNodes(ctx, DB, nodeID, removed, common, rng)
 	if err != nil {
-		return updated1, fmt.Errorf("Update(): %w", err)
+		return updated1, fmt.Errorf("Update(%d): %w", nodeID, err)
 	}
 
 	followsCount := len(common) + len(added)
 	updated2, err := RWM.updateAddedNodes(ctx, DB, nodeID, added, followsCount, rng)
 	if err != nil {
-		return updated1 + updated2, fmt.Errorf("Update(): %w", err)
+		return updated1 + updated2, fmt.Errorf("Update(%d): %w", nodeID, err)
 	}
 
 	return updated1 + updated2, nil

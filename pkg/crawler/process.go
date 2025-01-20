@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
-	"github.com/vertex-lab/crawler/pkg/utils/counter"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
@@ -23,8 +22,7 @@ func ProcessEvents(
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	eventChan <-chan *nostr.Event,
-	eventCounter *xsync.Counter,
-	pagerankTotal *counter.Float) {
+	eventCounter, walksChanged *atomic.Uint32) {
 
 	for {
 		select {
@@ -45,16 +43,16 @@ func ProcessEvents(
 
 			switch event.Kind {
 			case nostr.KindFollowList:
-				if err := ProcessFollowList(DB, RWM, event, pagerankTotal); err != nil {
+				if err := ProcessFollowList(DB, RWM, event, walksChanged); err != nil {
 					logger.Error("Error processing the eventID %v: %v", event.ID, err)
 				}
 			default:
 				logger.Warn("event of unwanted kind: %v", event.Kind)
 			}
 
-			eventCounter.Inc()
-			if eventCounter.Value()%1000 == 0 {
-				logger.Info("processed %d events", eventCounter.Value())
+			eventCounter.Add(1)
+			if eventCounter.Load()%1000 == 0 {
+				logger.Info("processed %d events", eventCounter.Load())
 			}
 		}
 	}
@@ -66,7 +64,7 @@ func ProcessFollowList(
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
 	event *nostr.Event,
-	pagerankTotal *counter.Float) error {
+	walksChanged *atomic.Uint32) error {
 
 	// use a new context for the operation to avoid it being interrupted,
 	// which might result in an inconsistent state of the database. Expected time <1000ms
@@ -75,7 +73,7 @@ func ProcessFollowList(
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch node by key %v: %w", event.PubKey, err)
 	}
 
 	if event.CreatedAt.Time().Unix() <= author.EventTS {
@@ -85,12 +83,12 @@ func ProcessFollowList(
 	pubkeys := ParsePubkeys(event)
 	newFollows, err := AssignNodeIDs(ctx, DB, pubkeys)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to assign node IDs to the follows of %v: %w", event.PubKey, err)
 	}
 
 	followsByNode, err := DB.Follows(ctx, author.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch the old follows of %v: %w", author.ID, err)
 	}
 	oldFollows := followsByNode[0]
 
@@ -104,29 +102,19 @@ func ProcessFollowList(
 	}
 
 	if err := DB.UpdateNode(ctx, author.ID, &nodeDiff); err != nil {
-		return err
+		return fmt.Errorf("failed to update nodeID %d: %w", author.ID, err)
 	}
 
-	if _, err := RWM.Update(ctx, DB, author.ID, removed, common, added); err != nil {
-		return err
-	}
-
-	// lazy recomputation of pagerank. Update the scores of the most impacted nodes only
-	pagerank, err := pagerank.Global(ctx, RWM.Store, newFollows...)
+	updated, err := RWM.Update(ctx, DB, author.ID, removed, common, added)
 	if err != nil {
 		return err
 	}
 
-	if err := DB.SetPagerank(ctx, pagerank); err != nil {
-		return err
-	}
-
-	pagerankTotal.Add(author.Pagerank)
+	walksChanged.Add(uint32(updated)) // this counter triggers the activation of NodeArbiter
 	return nil
 }
 
-// AssignNodeIDs() returns the nodeIDs of the specified pubkeys.
-// If a pubkey isn't found in the database, it gets added.
+// AssignNodeIDs() returns the nodeIDs of the specified pubkeys. If a pubkey isn't found in the database, it gets added.
 func AssignNodeIDs(
 	ctx context.Context,
 	DB models.Database,
@@ -211,17 +199,19 @@ func ParsePubkeys(event *nostr.Event) []string {
 // NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
 // - scans through all the nodes in the database
 // - promotes or demotes them based on their pagerank and promotion/demotion multipliers
-// - recomputes the pagerank of all nodes
 func NodeArbiter(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
 	RWM *walks.RandomWalkManager,
-	pagerankTotal *counter.Float,
+	walksChanged *atomic.Uint32,
 	startThreshold, promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) {
 
-	ticker := time.NewTicker(5 * time.Second)
+	var totalVisits float64
+	var changeRatio float64
+
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -231,8 +221,10 @@ func NodeArbiter(
 			return
 
 		case <-ticker.C:
-			if pagerankTotal.Load() >= startThreshold {
+			totalVisits = float64(RWM.Store.TotalVisits(ctx))
+			changeRatio = float64(walksChanged.Load()) / totalVisits
 
+			if changeRatio >= startThreshold {
 				promoted, demoted, err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler)
 				logger.Info("promoted %d, demoted %d", promoted, demoted)
 
@@ -241,13 +233,8 @@ func NodeArbiter(
 					continue
 				}
 
-				if err := FullPagerankUpdate(ctx, DB, RWM.Store); err != nil {
-					logger.Error("%v", err)
-					continue
-				}
-
-				// resetting the pagerank since the last recomputation
-				pagerankTotal.Store(0)
+				// resetting the walksChanged since the last recomputation
+				walksChanged.Store(0)
 				logger.Info("NodeArbiter: scan completed")
 			}
 		}
@@ -394,29 +381,6 @@ func DemoteNode(
 
 	if err := DB.UpdateNode(ctx, nodeID, &nodeDiff); err != nil {
 		return fmt.Errorf("DemoteNode(): %w", err)
-	}
-
-	return nil
-}
-
-// FullPagerankUpdate() performs a full pagerank recomputation, which is computationally expensive.
-func FullPagerankUpdate(ctx context.Context, DB models.Database, RWS models.RandomWalkStore) error {
-
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
-	nodeIDs, err := DB.AllNodes(ctx)
-	if err != nil {
-		return fmt.Errorf("FullPagerankUpdate(): %w", err)
-	}
-
-	rank, err := pagerank.Global(ctx, RWS, nodeIDs...)
-	if err != nil {
-		return fmt.Errorf("FullPagerankUpdate(): %w", err)
-	}
-
-	if err := DB.SetPagerank(ctx, rank); err != nil {
-		return fmt.Errorf("FullPagerankUpdate(): %w", err)
 	}
 
 	return nil
