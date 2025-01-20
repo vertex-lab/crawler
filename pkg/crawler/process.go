@@ -70,7 +70,7 @@ func ProcessFollowList(
 
 	// use a new context for the operation to avoid it being interrupted,
 	// which might result in an inconsistent state of the database. Expected time <1000ms
-	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
@@ -107,7 +107,7 @@ func ProcessFollowList(
 		return err
 	}
 
-	if err := RWM.Update(ctx, DB, author.ID, removed, common, added); err != nil {
+	if _, err := RWM.Update(ctx, DB, author.ID, removed, common, added); err != nil {
 		return err
 	}
 
