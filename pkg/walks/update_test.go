@@ -66,39 +66,44 @@ func TestUpdateRemovedNodes(t *testing.T) {
 	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
-			name           string
-			DBType         string
-			RWMType        string
-			removedFollows []uint32
-			expectedError  error
+			name            string
+			DBType          string
+			RWMType         string
+			removed         []uint32
+			expectedError   error
+			expectedUpdated int
 		}{
 			{
-				name:           "nil RWM",
-				DBType:         "one-node0",
-				RWMType:        "nil",
-				removedFollows: []uint32{0},
-				expectedError:  models.ErrNilRWSPointer,
+				name:            "nil RWM",
+				DBType:          "one-node0",
+				RWMType:         "nil",
+				removed:         []uint32{0},
+				expectedError:   models.ErrNilRWSPointer,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "empty RWM",
-				DBType:         "one-node0",
-				RWMType:        "empty",
-				removedFollows: []uint32{0},
-				expectedError:  models.ErrNodeNotFoundRWS,
+				name:            "empty RWM",
+				DBType:          "one-node0",
+				RWMType:         "empty",
+				removed:         []uint32{0},
+				expectedError:   nil,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "node not found in the RWM",
-				DBType:         "one-node0",
-				RWMType:        "one-node1",
-				removedFollows: []uint32{1},
-				expectedError:  models.ErrNodeNotFoundRWS,
+				name:            "node not found in the RWM",
+				DBType:          "one-node0",
+				RWMType:         "one-node1",
+				removed:         []uint32{1},
+				expectedError:   nil,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "empty removedFollows",
-				DBType:         "triangle",
-				RWMType:        "triangle",
-				removedFollows: []uint32{},
-				expectedError:  nil,
+				name:            "empty removedFollows",
+				DBType:          "triangle",
+				RWMType:         "triangle",
+				removed:         []uint32{},
+				expectedError:   nil,
+				expectedUpdated: 0,
 			},
 		}
 
@@ -107,12 +112,15 @@ func TestUpdateRemovedNodes(t *testing.T) {
 				DB := mock.SetupDB(test.DBType)
 				RWM := SetupMockRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-				err := RWM.updateRemovedNodes(ctx, DB, 0, test.removedFollows, []uint32{2}, rng)
+				updated, err := RWM.updateRemovedNodes(ctx, DB, 0, test.removed, []uint32{2}, rng)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
 				}
 
+				if updated != test.expectedUpdated {
+					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedUpdated, updated)
+				}
 			})
 		}
 	})
@@ -129,6 +137,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		DB.NodeIndex[nodeID].Follows = commonFollows
 
 		rng := rand.New(rand.NewSource(5))
+		expectedUpdated := 2
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
 			0: {
 				0: {0, 2},
@@ -145,8 +154,13 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			},
 		}
 
-		if err := RWM.updateRemovedNodes(ctx, DB, nodeID, removeFollows, commonFollows, rng); err != nil {
-			t.Errorf("updateRemovedNodes(): expected nil, got %v", err)
+		updated, err := RWM.updateRemovedNodes(ctx, DB, nodeID, removeFollows, commonFollows, rng)
+		if err != nil {
+			t.Fatalf("updateRemovedNodes(): expected nil, got %v", err)
+		}
+
+		if updated != expectedUpdated {
+			t.Fatalf("updateRemovedNodes(): expected updated %v, got %v", expectedUpdated, updated)
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
@@ -177,44 +191,49 @@ func TestUpdateAddedNodes(t *testing.T) {
 	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
-			name          string
-			DBType        string
-			RWMType       string
-			addedFollows  []uint32
-			newOutDegree  int
-			expectedError error
+			name            string
+			DBType          string
+			RWMType         string
+			addedFollows    []uint32
+			newOutDegree    int
+			expectedError   error
+			expectedUpdated int
 		}{
 			{
-				name:          "nil RWM",
-				DBType:        "one-node0",
-				RWMType:       "nil",
-				addedFollows:  []uint32{3},
-				newOutDegree:  1,
-				expectedError: models.ErrNilRWSPointer,
+				name:            "nil RWM",
+				DBType:          "one-node0",
+				RWMType:         "nil",
+				addedFollows:    []uint32{3},
+				newOutDegree:    1,
+				expectedError:   models.ErrNilRWSPointer,
+				expectedUpdated: 0,
 			},
 			{
-				name:          "empty RWM",
-				DBType:        "one-node0",
-				RWMType:       "empty",
-				addedFollows:  []uint32{3},
-				newOutDegree:  1,
-				expectedError: models.ErrNodeNotFoundRWS,
+				name:            "empty RWM",
+				DBType:          "one-node0",
+				RWMType:         "empty",
+				addedFollows:    []uint32{3},
+				newOutDegree:    1,
+				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedUpdated: 0,
 			},
 			{
-				name:          "node not found in the RWM",
-				DBType:        "one-node0",
-				RWMType:       "one-node1",
-				addedFollows:  []uint32{3},
-				newOutDegree:  1,
-				expectedError: models.ErrNodeNotFoundRWS,
+				name:            "node not found in the RWM",
+				DBType:          "one-node0",
+				RWMType:         "one-node1",
+				addedFollows:    []uint32{3},
+				newOutDegree:    1,
+				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedUpdated: 0,
 			},
 			{
-				name:          "empty addedFollows",
-				DBType:        "triangle",
-				RWMType:       "triangle",
-				addedFollows:  []uint32{},
-				newOutDegree:  1,
-				expectedError: nil,
+				name:            "empty addedFollows",
+				DBType:          "triangle",
+				RWMType:         "triangle",
+				addedFollows:    []uint32{},
+				newOutDegree:    1,
+				expectedError:   nil,
+				expectedUpdated: 0,
 			},
 		}
 
@@ -224,9 +243,13 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWM := SetupMockRWM(test.RWMType)
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-				err := RWM.updateAddedNodes(ctx, DB, 0, test.addedFollows, test.newOutDegree, rng)
+				updated, err := RWM.updateAddedNodes(ctx, DB, 0, test.addedFollows, test.newOutDegree, rng)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
+				}
+
+				if updated != test.expectedUpdated {
+					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedUpdated, updated)
 				}
 			})
 		}
@@ -243,6 +266,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 		DB.NodeIndex[nodeID].Follows = currentFollows
 
 		rng := rand.New(rand.NewSource(5))
+		expectedUpdated := 1
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
 			0: {
 				0: {0, 2},
@@ -253,8 +277,13 @@ func TestUpdateAddedNodes(t *testing.T) {
 			},
 		}
 
-		if err := RWM.updateAddedNodes(ctx, DB, nodeID, addedFollows, len(currentFollows), rng); err != nil {
-			t.Errorf("updateAddedNodes(): expected nil, got %v", err)
+		updated, err := RWM.updateAddedNodes(ctx, DB, nodeID, addedFollows, len(currentFollows), rng)
+		if err != nil {
+			t.Fatalf("updateAddedNodes(): expected nil, got %v", err)
+		}
+
+		if updated != expectedUpdated {
+			t.Fatalf("updateAddedNodes(): expected updated %v, got %v", expectedUpdated, updated)
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
@@ -285,76 +314,84 @@ func TestUpdate(t *testing.T) {
 	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
-			name           string
-			DBType         string
-			RWMType        string
-			nodeID         uint32
-			oldFollows     []uint32
-			currentFollows []uint32
-			expectedError  error
+			name            string
+			DBType          string
+			RWMType         string
+			nodeID          uint32
+			oldFollows      []uint32
+			currentFollows  []uint32
+			expectedError   error
+			expectedUpdated int
 		}{
 			{
-				name:           "nil DB",
-				DBType:         "nil",
-				RWMType:        "triangle",
-				nodeID:         0,
-				oldFollows:     []uint32{0},
-				currentFollows: []uint32{1},
-				expectedError:  models.ErrNilDBPointer,
+				name:            "nil DB",
+				DBType:          "nil",
+				RWMType:         "triangle",
+				nodeID:          0,
+				oldFollows:      []uint32{0},
+				currentFollows:  []uint32{1},
+				expectedError:   models.ErrNilDBPointer,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "empty DB",
-				DBType:         "empty",
-				RWMType:        "triangle",
-				nodeID:         0,
-				oldFollows:     []uint32{0},
-				currentFollows: []uint32{1},
-				expectedError:  models.ErrNodeNotFoundDB,
+				name:            "empty DB",
+				DBType:          "empty",
+				RWMType:         "triangle",
+				nodeID:          0,
+				oldFollows:      []uint32{0},
+				currentFollows:  []uint32{1},
+				expectedError:   models.ErrNodeNotFoundDB,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "nil RWM",
-				DBType:         "one-node0",
-				RWMType:        "nil",
-				nodeID:         0,
-				oldFollows:     []uint32{0},
-				currentFollows: []uint32{1},
-				expectedError:  models.ErrNilRWSPointer,
+				name:            "nil RWM",
+				DBType:          "one-node0",
+				RWMType:         "nil",
+				nodeID:          0,
+				oldFollows:      []uint32{0},
+				currentFollows:  []uint32{1},
+				expectedError:   models.ErrNilRWSPointer,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "empty RWM",
-				DBType:         "one-node0",
-				RWMType:        "empty",
-				nodeID:         0,
-				oldFollows:     []uint32{0},
-				currentFollows: []uint32{1},
-				expectedError:  models.ErrNodeNotFoundRWS,
+				name:            "empty RWM",
+				DBType:          "one-node0",
+				RWMType:         "empty",
+				nodeID:          0,
+				oldFollows:      []uint32{0},
+				currentFollows:  []uint32{1},
+				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "node not found in the DB",
-				DBType:         "one-node1",
-				RWMType:        "one-node1",
-				nodeID:         0,
-				oldFollows:     []uint32{0},
-				currentFollows: []uint32{1},
-				expectedError:  models.ErrNodeNotFoundDB,
+				name:            "node not found in the DB",
+				DBType:          "one-node1",
+				RWMType:         "one-node1",
+				nodeID:          0,
+				oldFollows:      []uint32{0},
+				currentFollows:  []uint32{1},
+				expectedError:   models.ErrNodeNotFoundDB,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "node not found in the RWM",
-				DBType:         "one-node0",
-				RWMType:        "one-node1",
-				nodeID:         0,
-				oldFollows:     []uint32{0},
-				currentFollows: []uint32{1},
-				expectedError:  models.ErrNodeNotFoundRWS,
+				name:            "node not found in the RWM",
+				DBType:          "one-node0",
+				RWMType:         "one-node1",
+				nodeID:          0,
+				oldFollows:      []uint32{0},
+				currentFollows:  []uint32{1},
+				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedUpdated: 0,
 			},
 			{
-				name:           "oldFollows == currentFollows",
-				DBType:         "triangle",
-				RWMType:        "triangle",
-				nodeID:         0,
-				oldFollows:     []uint32{1},
-				currentFollows: []uint32{1},
-				expectedError:  nil,
+				name:            "oldFollows == currentFollows",
+				DBType:          "triangle",
+				RWMType:         "triangle",
+				nodeID:          0,
+				oldFollows:      []uint32{1},
+				currentFollows:  []uint32{1},
+				expectedError:   nil,
+				expectedUpdated: 0,
 			},
 		}
 
@@ -365,9 +402,13 @@ func TestUpdate(t *testing.T) {
 
 				removed, common, added := sliceutils.Partition(test.oldFollows, test.currentFollows)
 
-				err := RWM.Update(ctx, DB, test.nodeID, removed, common, added)
+				updated, err := RWM.Update(ctx, DB, test.nodeID, removed, common, added)
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("updateAddedNodes(): expected %v, got %v", test.expectedError, err)
+					t.Fatalf("Update(): expected %v, got %v", test.expectedError, err)
+				}
+
+				if updated != test.expectedUpdated {
+					t.Fatalf("Update(): expected %v, got %v", test.expectedUpdated, updated)
 				}
 			})
 		}
@@ -395,7 +436,7 @@ func TestUpdate(t *testing.T) {
 
 			removed, common, added := sliceutils.Partition(oldFollows, newFollows)
 
-			if err := RWM.Update(ctx, DB1, nodeID, removed, common, added); err != nil {
+			if _, err := RWM.Update(ctx, DB1, nodeID, removed, common, added); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
 			}
 		}
@@ -453,8 +494,7 @@ func BenchmarkUpdateAddedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			nodeID := uint32(i % nodesSize)
 
-			err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID])
-			if err != nil {
+			if _, err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID]); err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}
 		}
@@ -496,11 +536,9 @@ func BenchmarkUpdateRemovedNodes(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			nodeID := uint32(i % nodesSize)
 
-			err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID])
-			if err != nil {
+			if _, err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID]); err != nil {
 				b.Fatalf("Update() failed: %v", err)
 			}
-
 		}
 	})
 }

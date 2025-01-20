@@ -215,7 +215,7 @@ func TestWalks(t *testing.T) {
 	}
 }
 
-func TestWalksVisitingAny(t *testing.T) {
+func TestWalksVisiting(t *testing.T) {
 	testCases := []struct {
 		name          string
 		RWSType       string
@@ -236,14 +236,16 @@ func TestWalksVisitingAny(t *testing.T) {
 			RWSType:       "empty",
 			limit:         1,
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
 		},
 		{
 			name:          "nodeID not found in RWS",
 			RWSType:       "one-node0",
 			limit:         1,
 			nodeIDs:       []uint32{1},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
+			expectedIDs:   []uint32{},
 		},
 		{
 			name:        "one nodeID",
@@ -267,11 +269,11 @@ func TestWalksVisitingAny(t *testing.T) {
 			walkIDs, err := RWS.WalksVisiting(context.Background(), test.limit, test.nodeIDs...)
 
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("WalksVisiting(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(walkIDs, test.expectedIDs) {
-				t.Errorf("Walks(): expected %v, got %v", test.expectedIDs, walkIDs)
+				t.Errorf("WalksVisiting(): expected %v, got %v", test.expectedIDs, walkIDs)
 			}
 		})
 	}
@@ -295,13 +297,13 @@ func TestWalksVisitingAll(t *testing.T) {
 			name:          "empty RWS",
 			RWSType:       "empty",
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
 		},
 		{
 			name:          "nodeID not found in RWS",
 			RWSType:       "one-node0",
 			nodeIDs:       []uint32{1},
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
 		},
 		{
 			name:        "one nodeID",
@@ -323,11 +325,11 @@ func TestWalksVisitingAll(t *testing.T) {
 
 			walkIDs, err := RWS.WalksVisitingAll(context.Background(), test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Walks(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("WalksVisitingAll(): expected %v, got %v", test.expectedError, err)
 			}
 
 			if !reflect.DeepEqual(walkIDs, test.expectedIDs) {
-				t.Errorf("Walks(): expected %v, got %v", test.expectedIDs, walkIDs)
+				t.Errorf("WalksVisitingAll(): expected %v, got %v", test.expectedIDs, walkIDs)
 			}
 		})
 	}

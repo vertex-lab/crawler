@@ -160,6 +160,10 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 		return nil, err
 	}
 
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
 	var limitPerNode int64
 	switch limit {
 	case 0:
@@ -177,13 +181,15 @@ func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeID
 	for _, ID := range nodeIDs {
 		walkSet, exists := RWS.walksVisiting[ID]
 		if !exists {
-			return nil, models.ErrNodeNotFoundRWS
+			continue
 		}
 
 		IDs := walkSet.ToSlice()
-		if limitPerNode <= 0 || limitPerNode > int64(len(IDs)) {
+		switch {
+		case limitPerNode > int64(len(IDs)):
 			walkIDs = append(walkIDs, IDs...)
-		} else {
+
+		default:
 			walkIDs = append(walkIDs, IDs[:limitPerNode]...)
 		}
 	}
@@ -200,15 +206,14 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 
 	intersection, exists := RWS.walksVisiting[nodeIDs[0]]
 	if !exists {
-		return nil, models.ErrNodeNotFoundRWS
+		return nil, nil
 	}
 
 	for _, ID := range nodeIDs[1:] {
 		walkSet, exists := RWS.walksVisiting[ID]
 		if !exists {
-			return nil, models.ErrNodeNotFoundRWS
+			continue
 		}
-
 		intersection = intersection.Intersect(walkSet)
 	}
 

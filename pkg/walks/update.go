@@ -13,7 +13,8 @@ import (
 
 /*
 Update() updates the RandomWalkManager when a node's follows changes.
-These changes are represented by some removed follows, common follows and added follows
+These changes are represented by some removed follows, common follows and added follows.
+It returns the number of walks that have been updated, and an error.
 
 # REFERENCES
 
@@ -24,31 +25,33 @@ func (RWM *RandomWalkManager) Update(
 	ctx context.Context,
 	DB models.Database,
 	nodeID uint32,
-	removed, common, added []uint32) error {
+	removed, common, added []uint32) (int, error) {
 
 	if err := DB.Validate(); err != nil {
-		return fmt.Errorf("Update(): %w", err)
+		return 0, fmt.Errorf("Update(): %w", err)
 	}
 
 	if err := RWM.Store.Validate(); err != nil {
-		return fmt.Errorf("Update(): %w", err)
+		return 0, fmt.Errorf("Update(): %w", err)
 	}
 
 	if !DB.ContainsNode(ctx, nodeID) {
-		return fmt.Errorf("Update(): %w: %v", models.ErrNodeNotFoundDB, nodeID)
+		return 0, fmt.Errorf("Update(): %w: %v", models.ErrNodeNotFoundDB, nodeID)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	if err := RWM.updateRemovedNodes(ctx, DB, nodeID, removed, common, rng); err != nil {
-		return fmt.Errorf("Update(): %w", err)
+	updated1, err := RWM.updateRemovedNodes(ctx, DB, nodeID, removed, common, rng)
+	if err != nil {
+		return updated1, fmt.Errorf("Update(): %w", err)
 	}
 
 	followsCount := len(common) + len(added)
-	if err := RWM.updateAddedNodes(ctx, DB, nodeID, added, followsCount, rng); err != nil {
-		return fmt.Errorf("Update(): %w", err)
+	updated2, err := RWM.updateAddedNodes(ctx, DB, nodeID, added, followsCount, rng)
+	if err != nil {
+		return updated1 + updated2, fmt.Errorf("Update(): %w", err)
 	}
 
-	return nil
+	return updated1 + updated2, nil
 }
 
 /*
@@ -57,16 +60,18 @@ contain the invalid step `nodeID` --> `removedID` in `removed`.
 
 After the execution of this method, the state of the walks of nodeID is as if nodeID
 only follows are the common follows `common`.
+
+It returns the number of walks updated, and an error.
 */
 func (RWM *RandomWalkManager) updateRemovedNodes(
 	ctx context.Context,
 	DB models.Database,
 	nodeID uint32,
 	removed, common []uint32,
-	rng *rand.Rand) error {
+	rng *rand.Rand) (int, error) {
 
 	if len(removed) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	// fetching only the walks that contain nodeID AND at least one of the removed nodes.
@@ -74,7 +79,7 @@ func (RWM *RandomWalkManager) updateRemovedNodes(
 	for _, r := range removed {
 		IDs, err := RWM.Store.WalksVisitingAll(ctx, nodeID, r)
 		if err != nil {
-			return fmt.Errorf("updateRemovedNodes(): %w", err)
+			return 0, fmt.Errorf("here: updateRemovedNodes(): %w", err)
 		}
 
 		walkIDs = append(walkIDs, IDs...)
@@ -83,9 +88,10 @@ func (RWM *RandomWalkManager) updateRemovedNodes(
 	walkIDs = sliceutils.Unique(walkIDs) // removing duplicates
 	walks, err := RWM.Store.Walks(ctx, walkIDs...)
 	if err != nil {
-		return fmt.Errorf("updateRemovedNodes(): %w", err)
+		return 0, fmt.Errorf("updateRemovedNodes(): %w", err)
 	}
 
+	var updated int
 	for i, ID := range walkIDs {
 		walk := walks[i]
 
@@ -97,16 +103,18 @@ func (RWM *RandomWalkManager) updateRemovedNodes(
 		// generate a new walk segment that will replace the invalid segment of the walk
 		newSegment, err := generateWalkSegment(ctx, DB, common, walk[:cutIndex], RWM.Store.Alpha(ctx), rng)
 		if err != nil {
-			return fmt.Errorf("updateRemovedNodes(): %w", err)
+			return updated, fmt.Errorf("updateRemovedNodes(): %w", err)
 		}
 
 		// prune and graft the walk with the new walk segment
 		if err = RWM.Store.PruneGraftWalk(ctx, ID, cutIndex, newSegment); err != nil {
-			return fmt.Errorf("updateRemovedNodes(): %w", err)
+			return updated, fmt.Errorf("updateRemovedNodes(): %w", err)
 		}
+
+		updated++
 	}
 
-	return nil
+	return updated, nil
 }
 
 /*
@@ -119,27 +127,28 @@ func (RWM *RandomWalkManager) updateAddedNodes(
 	nodeID uint32,
 	added []uint32,
 	followsCount int,
-	rng *rand.Rand) error {
+	rng *rand.Rand) (int, error) {
 
 	if len(added) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	limit, err := estimateWalksToUpdate(ctx, RWM, nodeID, len(added), followsCount)
 	if err != nil {
-		return fmt.Errorf("updateAddedNodes(): %w", err)
+		return 0, fmt.Errorf("updateAddedNodes(): %w", err)
 	}
 
 	walkIDs, err := RWM.Store.WalksVisiting(ctx, limit, nodeID)
 	if err != nil {
-		return fmt.Errorf("updateAddedNodes(): %w", err)
+		return 0, fmt.Errorf("updateAddedNodes(): %w", err)
 	}
 
 	walks, err := RWM.Store.Walks(ctx, walkIDs...)
 	if err != nil {
-		return fmt.Errorf("updateAddedNodes(): %w", err)
+		return 0, fmt.Errorf("updateAddedNodes(): %w", err)
 	}
 
+	var updated int
 	for i, ID := range walkIDs {
 		walk := walks[i]
 
@@ -152,17 +161,19 @@ func (RWM *RandomWalkManager) updateAddedNodes(
 
 			newSegment, err = generateWalkSegment(ctx, DB, added, walk[:cutIndex], RWM.Store.Alpha(ctx), rng)
 			if err != nil {
-				return fmt.Errorf("updateAddedNodes(): %w", err)
+				return updated, fmt.Errorf("updateAddedNodes(): %w", err)
 			}
 		}
 
 		// prune and graft the walk with the new walk segment
 		if err := RWM.Store.PruneGraftWalk(ctx, ID, cutIndex, newSegment); err != nil {
-			return fmt.Errorf("updateAddedNodes(): %w", err)
+			return updated, fmt.Errorf("updateAddedNodes(): %w", err)
 		}
+
+		updated++
 	}
 
-	return nil
+	return updated, nil
 }
 
 /*

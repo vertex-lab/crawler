@@ -24,7 +24,7 @@ const (
 	KeyStatus   string = "status"
 	KeyPagerank string = "pagerank"
 
-	StatusActive   string = "active" // we generate random walks for this node
+	StatusActive   string = "active" // meaning, we generate random walks for this node
 	StatusInactive string = "inactive"
 )
 
@@ -47,8 +47,7 @@ type Node struct {
 // NodeDiff represent the updates to do for a specified node.
 type NodeDiff struct {
 
-	// Only the specified metadata fields will be changed; the others will
-	// mantain the old value thanks to "omitempty".
+	// Only the specified metadata fields will be changed; the others will mantain the old value thanks to "omitempty".
 	Metadata NodeMeta
 
 	// The slice of nodeIDs to be added to the node's successors
