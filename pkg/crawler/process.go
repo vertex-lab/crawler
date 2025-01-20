@@ -70,7 +70,7 @@ func ProcessFollowList(
 
 	// use a new context for the operation to avoid it being interrupted,
 	// which might result in an inconsistent state of the database. Expected time <1000ms
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
@@ -276,10 +276,6 @@ func ArbiterScan(
 			// proceed with the scan
 		}
 
-		minPagerank := minPagerank(ctx, RWM.Store)
-		promotionThreshold := minPagerank * promotionMultiplier
-		demotionThreshold := minPagerank * demotionMultiplier
-
 		nodeIDs, cursor, err = DB.ScanNodes(ctx, cursor, 10000)
 		if err != nil {
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
@@ -289,6 +285,10 @@ func ArbiterScan(
 		if err != nil {
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): pagerank: %w", err)
 		}
+
+		minPagerank := minPagerank(ctx, RWM.Store)
+		promotionThreshold := minPagerank * promotionMultiplier
+		demotionThreshold := minPagerank * demotionMultiplier
 
 		for _, ID := range nodeIDs {
 			// use a new context for the operation to avoid it being interrupted,
