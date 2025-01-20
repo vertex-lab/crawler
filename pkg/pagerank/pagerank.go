@@ -27,7 +27,7 @@ func Global(
 		return nil, err
 	}
 
-	totalVisits := RWS.TotalVisits(ctx)
+	totalVisits := float64(RWS.TotalVisits(ctx))
 	if totalVisits == 0 {
 		return nil, models.ErrEmptyRWS
 	}
@@ -39,7 +39,7 @@ func Global(
 	// compute the pagerank as the frequency of visits
 	pagerank := make(models.PagerankMap, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		pagerank[ID] = float64(visits[i]) / float64(totalVisits)
+		pagerank[ID] = float64(visits[i]) / totalVisits
 
 	}
 

@@ -251,7 +251,7 @@ func BenchmarkPagerank(b *testing.B) {
 		b.Fatalf("NewRWSConnection(): benchmark failed: %v", err)
 	}
 
-	const size = 100
+	const size = 1000
 	nodeIDs := make([]uint32, size)
 	for i := 0; i < size; i++ {
 		nodeIDs[i] = uint32(i)

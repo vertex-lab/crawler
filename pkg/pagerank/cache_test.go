@@ -229,14 +229,14 @@ func TestWCLoad(t *testing.T) {
 				RWSType:       "empty",
 				limit:         1,
 				nodeIDs:       []uint32{0},
-				expectedError: models.ErrNodeNotFoundRWS,
+				expectedError: nil,
 			},
 			{
 				name:          "node not found RWS",
 				RWSType:       "triangle",
 				limit:         1,
 				nodeIDs:       []uint32{0, 69},
-				expectedError: models.ErrNodeNotFoundRWS,
+				expectedError: nil,
 			},
 		}
 

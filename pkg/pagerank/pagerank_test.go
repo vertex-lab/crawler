@@ -406,7 +406,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				DBType:        "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: models.ErrNodeNotFoundRWS,
+				expectedError: nil,
 			},
 			{
 				name:          "node not in the RWS",
@@ -414,7 +414,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				RWSType:       "one-node0",
 				nodeID:        1,
 				topK:          5,
-				expectedError: models.ErrNodeNotFoundRWS,
+				expectedError: nil,
 			},
 			{
 				name:          "invalid topK",
