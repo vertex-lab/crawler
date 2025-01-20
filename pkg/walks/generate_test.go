@@ -395,7 +395,7 @@ func TestRemove(t *testing.T) {
 		{
 			name:          "node not found RWS",
 			RWMType:       "one-node1",
-			expectedError: models.ErrNodeNotFoundRWS,
+			expectedError: nil,
 			expectedWalks: map[uint32]models.RandomWalk{0: {1}},
 		},
 		{

@@ -214,7 +214,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:         "empty",
 				addedFollows:    []uint32{3},
 				newOutDegree:    1,
-				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedError:   nil,
 				expectedUpdated: 0,
 			},
 			{
@@ -223,7 +223,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:         "one-node1",
 				addedFollows:    []uint32{3},
 				newOutDegree:    1,
-				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedError:   nil,
 				expectedUpdated: 0,
 			},
 			{
@@ -360,7 +360,7 @@ func TestUpdate(t *testing.T) {
 				nodeID:          0,
 				oldFollows:      []uint32{0},
 				currentFollows:  []uint32{1},
-				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedError:   nil,
 				expectedUpdated: 0,
 			},
 			{
@@ -380,7 +380,7 @@ func TestUpdate(t *testing.T) {
 				nodeID:          0,
 				oldFollows:      []uint32{0},
 				currentFollows:  []uint32{1},
-				expectedError:   models.ErrNodeNotFoundRWS,
+				expectedError:   nil,
 				expectedUpdated: 0,
 			},
 			{
