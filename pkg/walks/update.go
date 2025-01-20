@@ -224,11 +224,17 @@ func estimateWalksToUpdate(
 	nodeID uint32,
 	addedSize, currentSize int) (int, error) {
 
-	visits, err := RWM.Store.VisitCounts(ctx, nodeID)
+	visitsByNode, err := RWM.Store.VisitCounts(ctx, nodeID)
 	if err != nil {
 		return 0, fmt.Errorf("estimateWalksToUpdate(): %w", err)
 	}
 
-	p := float32(addedSize) / float32(currentSize)
-	return int(p * float32(visits[0])), nil
+	if len(visitsByNode) != 1 {
+		return 0, fmt.Errorf("estimateWalksToUpdate(): visitsByNode has len %d instead of 1", len(visitsByNode))
+	}
+
+	visits := float32(visitsByNode[0])             // the number of walks that visit (go through) nodeID
+	p := float32(addedSize) / float32(currentSize) // the ratio of walks that are impacted by the added follows
+
+	return int(p*visits + 0.5), nil // int() rounds to the smaller nearest integer. +0.5 makes sure it rounds to the nearest overall.
 }

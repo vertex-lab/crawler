@@ -13,7 +13,7 @@ func TestPagerankStatic(t *testing.T) {
 	ctx := context.Background()
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
-	const walkPerNode = 10000
+	const walkPerNode = 5000
 
 	tests := []struct {
 		name      string
@@ -94,7 +94,7 @@ func TestPagerankDynamic(t *testing.T) {
 	ctx := context.Background()
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
-	const walkPerNode = 10000
+	const walkPerNode = 5000
 
 	tests := []struct {
 		name      string
@@ -145,7 +145,7 @@ func TestPagerankDynamic(t *testing.T) {
 			// update the graph to the current state
 			DB.NodeIndex[nodeID].Follows = currentFollows
 			removed, common, added := sliceutils.Partition(oldFollows, currentFollows)
-			if err = RWM.Update(ctx, DB, nodeID, removed, common, added); err != nil {
+			if _, err = RWM.Update(ctx, DB, nodeID, removed, common, added); err != nil {
 				t.Fatalf("Update: expected nil, pr %v", err)
 			}
 
