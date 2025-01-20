@@ -9,7 +9,6 @@ import (
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
@@ -268,16 +267,16 @@ func ArbiterScan(
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
 		}
 
-		ranks, err := pagerank.Global(ctx, RWM.Store, nodeIDs...)
+		visits, err := RWM.Store.VisitCounts(ctx, nodeIDs...)
 		if err != nil {
-			return promoted, demoted, fmt.Errorf("ArbiterScan(): pagerank: %w", err)
+			return promoted, demoted, fmt.Errorf("ArbiterScan(): visits: %w", err)
 		}
 
-		minPagerank := minPagerank(ctx, RWM.Store)
-		promotionThreshold := minPagerank * promotionMultiplier
-		demotionThreshold := minPagerank * demotionMultiplier
+		walksPerNode := float64(RWM.Store.WalksPerNode(ctx))
+		promotionThreshold := int(promotionMultiplier*walksPerNode + 0.5)
+		demotionThreshold := int(demotionMultiplier*walksPerNode + 0.5)
 
-		for _, ID := range nodeIDs {
+		for i, ID := range nodeIDs {
 			// use a new context for the operation to avoid it being interrupted,
 			// which might result in an inconsistent state of the database. Expected time <100ms
 			err = func() error {
@@ -291,7 +290,7 @@ func ArbiterScan(
 
 				switch {
 				// Active --> Inactive
-				case node.Status == models.StatusActive && ranks[ID] < demotionThreshold:
+				case node.Status == models.StatusActive && visits[i] < demotionThreshold:
 					if err := DemoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to demote node %d: %w", ID, err)
 					}
@@ -299,7 +298,7 @@ func ArbiterScan(
 					demoted++
 
 				// Inactive --> Active
-				case node.Status == models.StatusInactive && ranks[ID] >= promotionThreshold:
+				case node.Status == models.StatusInactive && visits[i] >= promotionThreshold:
 					if err := PromoteNode(opCtx, DB, RWM, ID); err != nil {
 						return fmt.Errorf("failed to promote node %d: %w", ID, err)
 					}
@@ -330,11 +329,11 @@ func ArbiterScan(
 
 // The minPagerank() returns the minimum pagerank for an active node, which is
 // walksPerNode / TotalVisits in the extreme case that a node is visited only by its own walks.
-func minPagerank(ctx context.Context, RWS models.RandomWalkStore) float64 {
-	walksPerNode := float64(RWS.WalksPerNode(ctx))
-	totalVisits := float64(RWS.TotalVisits(ctx))
-	return walksPerNode / totalVisits
-}
+// func minPagerank(ctx context.Context, RWS models.RandomWalkStore) float64 {
+// 	walksPerNode := float64(RWS.WalksPerNode(ctx))
+// 	totalVisits := float64(RWS.TotalVisits(ctx))
+// 	return walksPerNode / totalVisits
+// }
 
 // PromoteNode() makes a node active, which means it generates random walks
 // for it and updates the status to active.
