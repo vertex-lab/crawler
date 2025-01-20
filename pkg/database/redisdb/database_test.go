@@ -257,11 +257,10 @@ func TestNodeByID(t *testing.T) {
 			DBType: "one-node0",
 			nodeID: 0,
 			expectedNodeMeta: &models.NodeMeta{
-				ID:       0,
-				Pubkey:   "zero",
-				EventTS:  1731685733,
-				Status:   "idk",
-				Pagerank: 1.0,
+				ID:      0,
+				Pubkey:  "zero",
+				EventTS: 1731685733,
+				Status:  "idk",
 			},
 			expectedError: nil,
 		},
@@ -323,11 +322,10 @@ func TestNodeByKey(t *testing.T) {
 			DBType: "one-node0",
 			pubkey: "zero",
 			expectedNodeMeta: &models.NodeMeta{
-				ID:       0,
-				Pubkey:   "zero",
-				EventTS:  1731685733,
-				Status:   "idk",
-				Pagerank: 1.0,
+				ID:      0,
+				Pubkey:  "zero",
+				EventTS: 1731685733,
+				Status:  "idk",
 			},
 			expectedError: nil,
 		},
@@ -423,10 +421,9 @@ func TestAddNode(t *testing.T) {
 				expectedLastNodeID: 1,
 				Node: &models.Node{
 					Metadata: models.NodeMeta{
-						Pubkey:   "one",
-						EventTS:  0,
-						Status:   "not-crawled",
-						Pagerank: 0.0,
+						Pubkey:  "one",
+						EventTS: 0,
+						Status:  models.StatusInactive,
 					},
 				},
 			},
@@ -527,10 +524,9 @@ func TestUpdateNode(t *testing.T) {
 			nodeDiff: &models.NodeDiff{
 				Metadata: models.NodeMeta{EventTS: 11}},
 			expectedNodeMeta: &models.NodeMeta{
-				Pubkey:   "zero",
-				EventTS:  11, // the only field that changes
-				Status:   "idk",
-				Pagerank: 1.0,
+				Pubkey:  "zero",
+				EventTS: 11, // the only field that changes
+				Status:  "idk",
 			},
 		},
 	}

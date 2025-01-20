@@ -131,10 +131,9 @@ func AssignNodeIDs(
 			// add a new node to the database, and assign it an ID
 			node := models.Node{
 				Metadata: models.NodeMeta{
-					Pubkey:   pubkeys[i],
-					EventTS:  0,
-					Status:   models.StatusInactive,
-					Pagerank: 0.0,
+					Pubkey:  pubkeys[i],
+					EventTS: 0,
+					Status:  models.StatusInactive,
 				},
 			}
 			nodeID, err := DB.AddNode(ctx, &node)

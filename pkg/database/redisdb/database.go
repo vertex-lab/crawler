@@ -577,15 +577,12 @@ func NewDatabaseFromPubkeys(ctx context.Context, cl *redis.Client, pubkeys []str
 		return nil, err
 	}
 
-	initialPagerank := 1.0 / float64(len(pubkeys))
 	for _, pk := range pubkeys {
-
 		node := models.Node{
 			Metadata: models.NodeMeta{
-				Pubkey:   pk,
-				EventTS:  1,
-				Status:   models.StatusInactive,
-				Pagerank: initialPagerank,
+				Pubkey:  pk,
+				EventTS: 1,
+				Status:  models.StatusInactive,
 			},
 			Follows:   []uint32{},
 			Followers: []uint32{},
@@ -644,10 +641,9 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		// add node0  metadata
 		fields := models.NodeMeta{
-			Pubkey:   "zero",
-			EventTS:  1731685733,
-			Status:   "idk",
-			Pagerank: 1.0,
+			Pubkey:  "zero",
+			EventTS: 1731685733,
+			Status:  "idk",
 		}
 		if err = cl.HSet(ctx, KeyNode(0), fields).Err(); err != nil {
 			return nil, err
@@ -677,10 +673,9 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		// add node0  metadata
 		fields := models.NodeMeta{
-			Pubkey:   "zero",
-			EventTS:  1731685733,
-			Status:   "idk",
-			Pagerank: 0.0,
+			Pubkey:  "zero",
+			EventTS: 1731685733,
+			Status:  "idk",
 		}
 		if err = cl.HSet(ctx, KeyNode(0), fields).Err(); err != nil {
 			return nil, err
@@ -697,10 +692,9 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		node := models.Node{
 			Metadata: models.NodeMeta{
-				Pubkey:   fiatjaf,
-				EventTS:  0,
-				Status:   models.StatusActive,
-				Pagerank: 1.0,
+				Pubkey:  fiatjaf,
+				EventTS: 0,
+				Status:  models.StatusActive,
 			},
 			Follows:   []uint32{},
 			Followers: []uint32{},
@@ -721,10 +715,9 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 
 		node := models.Node{
 			Metadata: models.NodeMeta{
-				Pubkey:   pip,
-				EventTS:  0,
-				Status:   models.StatusActive,
-				Pagerank: 1.0,
+				Pubkey:  pip,
+				EventTS: 0,
+				Status:  models.StatusActive,
 			},
 			Follows:   []uint32{},
 			Followers: []uint32{},
@@ -733,37 +726,6 @@ func SetupDB(cl *redis.Client, DBType string) (*Database, error) {
 		if _, err := DB.AddNode(ctx, &node); err != nil {
 			return nil, err
 		}
-		return DB, nil
-
-	case "fran-pip":
-		const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
-		const fran = "726a1e261cc6474674e8285e3951b3bb139be9a773d1acf49dc868db861a1c11"
-		pks := []string{fran, pip}
-
-		DB, err := NewDatabase(ctx, cl)
-		if err != nil {
-			return nil, err
-		}
-
-		initialPagerank := 1.0 / float64(len(pks))
-		for _, pk := range pks {
-
-			node := models.Node{
-				Metadata: models.NodeMeta{
-					Pubkey:   pk,
-					EventTS:  0,
-					Status:   models.StatusInactive,
-					Pagerank: initialPagerank,
-				},
-				Follows:   []uint32{},
-				Followers: []uint32{},
-			}
-
-			if _, err := DB.AddNode(ctx, &node); err != nil {
-				return nil, err
-			}
-		}
-
 		return DB, nil
 
 	case "triangle":

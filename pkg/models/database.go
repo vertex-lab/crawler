@@ -30,11 +30,10 @@ const (
 
 // NodeMeta contains the metadata about a node, meaning everything that is not a relationship
 type NodeMeta struct {
-	ID       uint32  `redis:"id,omitempty"`
-	Pubkey   string  `redis:"pubkey,omitempty"`
-	EventTS  int64   `redis:"event_timestamp,omitempty"`
-	Status   string  `redis:"status,omitempty"`
-	Pagerank float64 `redis:"pagerank,omitempty"`
+	ID      uint32 `redis:"id,omitempty"`
+	Pubkey  string `redis:"pubkey,omitempty"`
+	EventTS int64  `redis:"event_timestamp,omitempty"`
+	Status  string `redis:"status,omitempty"`
 }
 
 // Node represent the basic structure of a node in the graph
@@ -101,15 +100,12 @@ type Database interface {
 
 	// AllNodes() returns a slice with the IDs of all nodes in the DB.
 	AllNodes(ctx context.Context) ([]uint32, error)
-
-	// SetPagerank() set the pagerank in the database according to the pagerankMap
-	SetPagerank(ctx context.Context, p PagerankMap) error
 }
 
 // a map that associates each nodeID with its corrisponding pagerank value
 type PagerankMap map[uint32]float64
 
-//--------------------------ERROR-CODES--------------------------
+//--------------------------------ERROR-CODES-----------------------------------
 
 var (
 	ErrNilClientPointer error = errors.New("nil client pointer")

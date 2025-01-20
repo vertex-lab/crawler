@@ -97,10 +97,6 @@ func (DB *Database) updateNodeMeta(ctx context.Context, nodeID uint32, nodeDiff 
 	if nodeDiff.Metadata.Status != "" {
 		DB.NodeIndex[nodeID].Metadata.Status = nodeDiff.Metadata.Status
 	}
-
-	if nodeDiff.Metadata.Pagerank > 0.0 {
-		DB.NodeIndex[nodeID].Metadata.Pagerank = nodeDiff.Metadata.Pagerank
-	}
 }
 
 // updateNodeFollows() updates the successors of nodeID by adding nodeDiff.AddedFollows
@@ -281,25 +277,6 @@ func (DB *Database) Size(ctx context.Context) int {
 	return len(DB.NodeIndex)
 }
 
-// SetPagerank() set the pagerank in the database according to the pagerankMap
-func (DB *Database) SetPagerank(ctx context.Context, p models.PagerankMap) error {
-	_ = ctx
-	if err := DB.Validate(); err != nil {
-		return err
-	}
-
-	for nodeID, rank := range p {
-		// if nodeID doesn't exists, skip
-		if _, exists := DB.NodeIndex[nodeID]; !exists {
-			return models.ErrNodeNotFoundDB
-		}
-
-		DB.NodeIndex[nodeID].Metadata.Pagerank = rank
-	}
-
-	return nil
-}
-
 // ScanNodes() scans over the nodes and returns all of the nodeIDs, ignoring the limit.
 func (DB *Database) ScanNodes(ctx context.Context, cursor uint64, limit int) ([]uint32, uint64, error) {
 	_ = ctx
@@ -367,9 +344,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex["zero"] = 0
 		DB.KeyIndex["one"] = 1
 		DB.KeyIndex["two"] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: "zero", EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: "one", EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: "two", EventTS: 0, Pagerank: 0.26}, Follows: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: "zero", EventTS: 0}, Follows: []uint32{1}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: "one", EventTS: 0}, Follows: []uint32{}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: "two", EventTS: 0}, Follows: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -378,9 +355,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}, Followers: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}, Followers: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{}, Followers: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{1}, Followers: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{}, Followers: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{}, Followers: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 
@@ -398,7 +375,7 @@ func SetupDB(DBType string) *Database {
 	case "pip":
 		DB := NewDatabase()
 		DB.KeyIndex[pip] = 0
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0, Pagerank: 1.0}, Follows: []uint32{}, Followers: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{Pubkey: pip, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{}, Followers: []uint32{}}
 		DB.LastNodeID = 0
 		return DB
 
@@ -407,9 +384,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex[odell] = 0
 		DB.KeyIndex[calle] = 1 // the only active
 		DB.KeyIndex[pip] = 2
-		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{1}, Followers: []uint32{}}
-		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0, Pagerank: 0.48}, Follows: []uint32{}, Followers: []uint32{0}}
-		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusInactive, EventTS: 0, Pagerank: 0.26}, Follows: []uint32{}, Followers: []uint32{}}
+		DB.NodeIndex[0] = &models.Node{Metadata: models.NodeMeta{ID: 0, Pubkey: odell, Status: models.StatusInactive, EventTS: 0}, Follows: []uint32{1}, Followers: []uint32{}}
+		DB.NodeIndex[1] = &models.Node{Metadata: models.NodeMeta{ID: 1, Pubkey: calle, Status: models.StatusActive, EventTS: 0}, Follows: []uint32{}, Followers: []uint32{0}}
+		DB.NodeIndex[2] = &models.Node{Metadata: models.NodeMeta{ID: 2, Pubkey: pip, Status: models.StatusInactive, EventTS: 0}, Follows: []uint32{}, Followers: []uint32{}}
 		DB.LastNodeID = 2
 		return DB
 

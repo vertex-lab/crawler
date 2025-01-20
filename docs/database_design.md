@@ -32,7 +32,6 @@ node:<nodeID> = HASH {    id: <nodeID>
                           pubkey: <pubkey>
                           event_timestamp: <timestamp of last kind3>
                           status: <active/inactive>
-                          pagerank: <pagerank>
                       } 
 ```
 
