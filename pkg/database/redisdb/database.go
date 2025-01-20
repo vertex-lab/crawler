@@ -582,7 +582,7 @@ func NewDatabaseFromPubkeys(ctx context.Context, cl *redis.Client, pubkeys []str
 			Metadata: models.NodeMeta{
 				Pubkey:  pk,
 				EventTS: 1,
-				Status:  models.StatusInactive,
+				Status:  models.StatusInactive, // must be inactive for the INIT_PUNKEYS to be promoted
 			},
 			Follows:   []uint32{},
 			Followers: []uint32{},
