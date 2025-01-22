@@ -206,7 +206,7 @@ func NodeArbiter(
 	startThreshold, promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) {
 
-	var totalVisits float64
+	var totalWalks float64
 	var changeRatio float64
 
 	ticker := time.NewTicker(10 * time.Second)
@@ -219,8 +219,8 @@ func NodeArbiter(
 			return
 
 		case <-ticker.C:
-			totalVisits = float64(RWM.Store.TotalVisits(ctx))
-			changeRatio = float64(walksChanged.Load()) / totalVisits
+			totalWalks = float64(RWM.Store.TotalVisits(ctx)) * float64(1-RWM.Store.Alpha(ctx)) // on average a walk is 1/(1-alpha) steps long (roughly)
+			changeRatio = float64(walksChanged.Load()) / totalWalks
 
 			if changeRatio >= startThreshold {
 				promoted, demoted, err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler)
@@ -325,14 +325,6 @@ func ArbiterScan(
 
 	return promoted, demoted, nil
 }
-
-// The minPagerank() returns the minimum pagerank for an active node, which is
-// walksPerNode / TotalVisits in the extreme case that a node is visited only by its own walks.
-// func minPagerank(ctx context.Context, RWS models.RandomWalkStore) float64 {
-// 	walksPerNode := float64(RWS.WalksPerNode(ctx))
-// 	totalVisits := float64(RWS.TotalVisits(ctx))
-// 	return walksPerNode / totalVisits
-// }
 
 // PromoteNode() makes a node active, which means it generates random walks
 // for it and updates the status to active.
