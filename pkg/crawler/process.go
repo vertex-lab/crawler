@@ -67,7 +67,7 @@ func ProcessFollowList(
 
 	// use a new context for the operation to avoid it being interrupted,
 	// which might result in an inconsistent state of the database. Expected time <1000ms
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
