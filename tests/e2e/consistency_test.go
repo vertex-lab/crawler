@@ -3,11 +3,8 @@ package e2e
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/nbd-wtf/go-nostr"
 	"github.com/redis/go-redis/v9"
-	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
@@ -128,25 +125,5 @@ func BenchmarkPagerank(b *testing.B) {
 		if _, err := pagerank.Global(ctx, RWS, nodeIDs...); err != nil {
 			b.Fatalf("benchmark failed: %v", err)
 		}
-	}
-}
-
-func TestEvents(t *testing.T) {
-	filter := nostr.Filter{
-		IDs: []string{
-			"deada45e474fa1b0f17094d2a75a83f55e97cc244ed68b9647a8109a595a7eea",
-			"7895074efe842d8c1fba23284be2bee6a704cc9d12c6fee22504c6a093a6b36b",
-			"3b33092298164376154e470b3d7ff766a3a993c407210564ef882077e486e4b3",
-			"581e59bcb626d6a200df20611e2381e5e75f4c1cdfa11913c7ac35e5a6e7ed89",
-		},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	pool := nostr.NewSimplePool(ctx)
-
-	for event := range pool.SubManyEose(ctx, crawler.Relays, nostr.Filters{filter}) {
-		t.Errorf("event %v \n\n", event)
 	}
 }
