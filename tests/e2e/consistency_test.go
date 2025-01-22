@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"math"
 	"testing"
 	"time"
 
@@ -10,125 +9,10 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
-	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
-
-// ReadPagerank() fetched the pagerank scores from the DB for each of the specified nodes.
-func ReadPagerank(ctx context.Context, cl *redis.Client, nodeIDs []uint32) ([]float64, error) {
-	pipe := cl.Pipeline()
-	cmds := make([]*redis.StringCmd, len(nodeIDs))
-	for i, ID := range nodeIDs {
-		cmds[i] = pipe.HGet(ctx, redisdb.KeyNode(ID), models.KeyPagerank)
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return nil, err
-	}
-
-	pagerank := make([]float64, len(nodeIDs))
-	for i, cmd := range cmds {
-		strRank := cmd.Val()
-		rank, err := redisutils.ParseFloat64(strRank)
-		if err != nil {
-			return nil, err
-		}
-
-		pagerank[i] = rank
-	}
-
-	return pagerank, nil
-}
-
-// TestPagerankSum() tests if the L1 norm of the pagerank vector is equal to 1, as it should be.
-func TestPagerankSum(t *testing.T) {
-	cl := redisutils.SetupProdClient()
-	ctx := context.Background()
-
-	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
-	if err != nil {
-		t.Fatalf("NewDatabaseConnection(): expected nil, got %v", err)
-	}
-
-	nodeIDs, err := DB.AllNodes(ctx)
-	if err != nil {
-		t.Fatalf("AllNodes(): expected nil, got %v", err)
-	}
-
-	pagerank, err := ReadPagerank(ctx, cl, nodeIDs)
-	if err != nil {
-		t.Fatalf("GetPagerank(): expected nil, got %v", err)
-	}
-
-	sum := 0.0
-	for _, rank := range pagerank {
-		sum += rank
-	}
-
-	if math.Abs(sum-1) > 0.001 {
-		t.Errorf("the L1 norm of the pagerank is: %v", sum)
-	}
-}
-
-// TestVisits() check if:
-// - the totalVisits = sum of the visits
-// - the ratio visit/totalVisits = pagerank
-func TestVisits(t *testing.T) {
-	cl := redisutils.SetupProdClient()
-	ctx := context.Background()
-
-	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
-	if err != nil {
-		t.Fatalf("NewDatabaseConnection(): expected nil, got %v", err)
-	}
-
-	RWS, err := redistore.NewRWSConnection(ctx, cl)
-	if err != nil {
-		t.Fatalf("NewRWSConnection(): expected nil, got %v", err)
-	}
-
-	nodeIDs, err := DB.AllNodes(ctx)
-	if err != nil {
-		t.Fatalf("AllNodes(): expected nil, got %v", err)
-	}
-
-	visits, err := RWS.VisitCounts(ctx, nodeIDs...)
-	if err != nil {
-		t.Fatalf("VisitCounts(): expected nil, got %v", err)
-	}
-	totalVisits := RWS.TotalVisits(ctx)
-
-	// check if the sum of the visits is  = totalVisits
-	var sumVisits int
-	for _, v := range visits {
-		sumVisits += v
-	}
-
-	if sumVisits != totalVisits {
-		t.Errorf("totalVisits: expected %v, got %v", totalVisits, sumVisits)
-	}
-
-	// check if the pagerank is indeed visit/totalVisits
-	pagerank := make([]float64, len(nodeIDs))
-	for i, v := range visits {
-		pagerank[i] = float64(v) / float64(totalVisits)
-	}
-
-	loadedPagerank, err := ReadPagerank(ctx, cl, nodeIDs)
-	if err != nil {
-		t.Fatalf("GetPagerank(): expected nil, got %v", err)
-	}
-
-	for i, ID := range nodeIDs {
-		pr := pagerank[i]
-		expected := loadedPagerank[i]
-		if math.Abs(pr-expected) > 0.0001 {
-			t.Errorf("pagerank of nodeID %d: expected %v, got %v", ID, expected, pr)
-		}
-	}
-}
 
 /*
 TestWalks() will:
@@ -220,24 +104,6 @@ func BenchmarkPersonalizedPagerank(b *testing.B) {
 		_, err := pagerank.Personalized(ctx, DB, RWS, nodeID, topk)
 		if err != nil {
 			b.Fatalf("Personalized(): benchmark failed: %v", err)
-		}
-	}
-}
-
-func BenchmarkReadPagerank(b *testing.B) {
-	cl := redisutils.SetupProdClient()
-	ctx := context.Background()
-
-	const size = 100
-	nodeIDs := make([]uint32, size)
-	for i := 0; i < size; i++ {
-		nodeIDs[i] = uint32(i)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := ReadPagerank(ctx, cl, nodeIDs); err != nil {
-			b.Fatalf("benchmark failed: %v", err)
 		}
 	}
 }
