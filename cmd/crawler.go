@@ -34,6 +34,10 @@ func main() {
 	nostr.InfoLogger.SetOutput(io.Discard) // discarding info logs
 	defer config.CloseLogs()
 
+	PrintStartup(logger)
+	defer PrintShutdown(logger)
+	go crawler.HandleSignals(cancel, logger)
+
 	redis := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	size, err := redis.DBSize(ctx).Result()
 	if err != nil {
@@ -72,10 +76,6 @@ func main() {
 			panic(err)
 		}
 	}
-
-	PrintStartup(logger)
-	defer PrintShutdown(logger)
-	go crawler.HandleSignals(cancel, logger)
 
 	eventCounter := &atomic.Uint32{} // tracks the number of events processed
 	walksChanged := &atomic.Uint32{} // tracks the pagerank mass accumulated since the last scan of NodeArbiter.
