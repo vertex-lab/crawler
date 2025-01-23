@@ -458,7 +458,7 @@ func (DB *Database) AllNodes(ctx context.Context) ([]uint32, error) {
 			// proceed with the scan
 		}
 
-		IDs, cursor, err = DB.ScanNodes(ctx, cursor, 1000)
+		IDs, cursor, err = DB.ScanNodes(ctx, cursor, 10000)
 		if err != nil {
 			return nil, fmt.Errorf("ScanNodes(): %w", err)
 		}
@@ -474,39 +474,8 @@ func (DB *Database) AllNodes(ctx context.Context) ([]uint32, error) {
 	return sliceutils.Unique(nodeIDs), nil
 }
 
-// AllNodes() returns a slice with the IDs of all nodes in the DB
-func (DB *Database) AllNodes2(ctx context.Context) ([]uint32, error) {
-
-	if err := DB.Validate(); err != nil {
-		return nil, err
-	}
-
-	strIDs, err := DB.client.HVals(ctx, KeyKeyIndex).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(strIDs) == 0 {
-		return nil, models.ErrEmptyDB
-	}
-
-	nodeIDs := make([]uint32, 0, len(strIDs))
-	for _, ID := range strIDs {
-
-		nodeID, err := redisutils.ParseID(ID)
-		if err != nil {
-			return nil, err
-		}
-
-		nodeIDs = append(nodeIDs, nodeID)
-	}
-
-	return nodeIDs, nil
-}
-
 // Size() returns the number of nodes in the DB. In case of errors, it returns 0.
 func (DB *Database) Size(ctx context.Context) int {
-
 	if err := DB.Validate(); err != nil {
 		return 0
 	}
@@ -517,55 +486,6 @@ func (DB *Database) Size(ctx context.Context) int {
 	}
 
 	return int(size)
-}
-
-// SetPagerank() writes the pagerank values on the specified nodeIDs.
-// Before writing, it ensures that all keys exists. If that's not the case
-// no writes occur and an error is returned.
-func (DB *Database) SetPagerank(ctx context.Context, pagerankMap models.PagerankMap) error {
-
-	if err := DB.Validate(); err != nil {
-		return err
-	}
-
-	if len(pagerankMap) == 0 {
-		return nil
-	}
-
-	// prepare keys and values
-	keys := make([]string, 0, len(pagerankMap))
-	vals := make([]float64, 0, len(pagerankMap))
-	for nodeID, rank := range pagerankMap {
-		keys = append(keys, KeyNode(nodeID))
-		vals = append(vals, rank)
-	}
-
-	// validate the existence of all the keys before writing.
-	existsPipe := DB.client.Pipeline()
-	for _, key := range keys {
-		existsPipe.Exists(ctx, key)
-	}
-	cmds, err := existsPipe.Exec(ctx)
-	if err != nil {
-		return err
-	}
-
-	for i, cmd := range cmds {
-		if cmd.(*redis.IntCmd).Val() <= 0 { // Key does not exist
-			return fmt.Errorf("%w: %v", models.ErrNodeNotFoundDB, keys[i])
-		}
-	}
-
-	// write the new pagerank scores
-	writePipe := DB.client.TxPipeline()
-	for i, val := range vals {
-		writePipe.HSet(ctx, keys[i], models.KeyPagerank, val)
-	}
-	if _, err := writePipe.Exec(ctx); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // --------------------------------------HELPERS--------------------------------
@@ -809,7 +729,7 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 	return DB, nil
 }
 
-// KeyNode() returns the Redis key for the node with specified nodeID
+// KeyNode() returns the Redis key for the node with specified nodeID.
 func KeyNode(nodeID interface{}) string {
 	return fmt.Sprintf("%v%d", KeyNodePrefix, nodeID)
 }

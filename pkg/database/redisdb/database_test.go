@@ -1017,104 +1017,9 @@ func TestSize(t *testing.T) {
 	}
 }
 
-func TestSetPagerank(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
-	type testCases struct {
-		name          string
-		DBType        string
-		pagerank      models.PagerankMap
-		expectedError error
-	}
-
-	t.Run("simple errors", func(t *testing.T) {
-		testCases := []testCases{
-			{
-				name:          "nil DB",
-				DBType:        "nil",
-				pagerank:      models.PagerankMap{0: 1.0},
-				expectedError: models.ErrNilDBPointer,
-			},
-			{
-				name:          "empty DB",
-				DBType:        "empty",
-				pagerank:      models.PagerankMap{0: 1.0},
-				expectedError: models.ErrNodeNotFoundDB,
-			},
-			{
-				name:          "node not found DB",
-				DBType:        "one-node0",
-				pagerank:      models.PagerankMap{99: 1.0},
-				expectedError: models.ErrNodeNotFoundDB,
-			},
-		}
-
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				DB, err := SetupDB(cl, test.DBType)
-				if err != nil {
-					t.Fatalf("SetupDB(): expected nil, got %v", err)
-				}
-
-				err = DB.SetPagerank(context.Background(), test.pagerank)
-
-				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("SetPagerank(): expected %v, got %v", test.expectedError, err)
-				}
-			})
-		}
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		testCases := []testCases{
-			{
-				name:          "valid",
-				DBType:        "one-node0",
-				pagerank:      models.PagerankMap{0: 11.0}, // random values
-				expectedError: nil,
-			},
-		}
-
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				ctx := context.Background()
-				DB, err := SetupDB(cl, test.DBType)
-				if err != nil {
-					t.Fatalf("SetupDB(): expected nil, got %v", err)
-				}
-
-				err = DB.SetPagerank(ctx, test.pagerank)
-
-				if !errors.Is(err, test.expectedError) {
-					t.Errorf("SetPagerank(): expected %v, got %v", test.expectedError, err)
-				}
-
-				for nodeID, rank := range test.pagerank {
-
-					strP, err := DB.client.HGet(ctx, KeyNode(nodeID), "pagerank").Result()
-					if err != nil {
-						t.Errorf("HGet(): expected nil, got %v", err)
-					}
-
-					p, err := redisutils.ParseFloat64(strP)
-					if err != nil {
-						t.Errorf("ParseFloat64(): expected nil, got %v", err)
-					}
-
-					if p != rank {
-						t.Errorf("Pagerank(%d): expected %v, got %v", nodeID, rank, p)
-					}
-				}
-
-			})
-		}
-	})
+func TestInterface(t *testing.T) {
+	var _ models.Database = &Database{}
 }
-
-// func TestInterface(t *testing.T) {
-// 	var _ models.Database = &Database{}
-// }
 
 // ------------------------------------BENCHMARKS------------------------------
 
@@ -1155,38 +1060,6 @@ func BenchmarkNodeByID(b *testing.B) {
 		if err != nil {
 			b.Fatalf("benchmark failed: %v", err)
 		}
-	}
-}
-
-func BenchmarkSetPagerank(b *testing.B) {
-	ctx := context.Background()
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-
-	// Different DB sizes
-	for _, nodesSize := range []int{100, 1000, 10000} {
-		b.Run(fmt.Sprintf("DBSize=%d", nodesSize), func(b *testing.B) {
-			cl := redisutils.SetupTestClient()
-			defer redisutils.CleanupRedis(cl)
-
-			DB, err := GenerateDB(cl, nodesSize, edgesPerNode, rng)
-			if err != nil {
-				b.Fatalf("GenerateDB(): expected nil, got %v", err)
-			}
-
-			pagerank := make(models.PagerankMap, nodesSize)
-			for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
-				pagerank[nodeID] = rand.Float64()
-			}
-
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-
-				if err := DB.SetPagerank(ctx, pagerank); err != nil {
-					b.Fatalf("benchmark failed: %v", err)
-				}
-			}
-		})
 	}
 }
 

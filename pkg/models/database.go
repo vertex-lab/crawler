@@ -18,11 +18,10 @@ import (
 )
 
 const (
-	KeyID       string = "id"
-	KeyPubkey   string = "pubkey"
-	KeyEventTS  string = "event_timestamp"
-	KeyStatus   string = "status"
-	KeyPagerank string = "pagerank"
+	KeyID      string = "id"
+	KeyPubkey  string = "pubkey"
+	KeyEventTS string = "event_timestamp"
+	KeyStatus  string = "status"
 
 	StatusActive   string = "active" // meaning, we generate random walks for this node
 	StatusInactive string = "inactive"
