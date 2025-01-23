@@ -396,7 +396,7 @@ func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs ...uint32) 
 		walks = append(walks, walk)
 	}
 
-	var removedVisits int64 = 0.0
+	var removedVisits int64 = 0
 	pipe := RWS.client.TxPipeline()
 
 	for i, strID := range strIDs {
