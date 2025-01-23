@@ -296,38 +296,38 @@ func pipelineSMembers[ID uint32 | int64 | int](
 		return nil, err
 	}
 
-	var potentialMissingKeys []string
-	membersSlice := make([][]uint32, 0, len(nodeIDs))
+	var potentialMissing []string
+	members := make([][]uint32, 0, len(nodeIDs))
 	for i, cmd := range cmds {
 
 		strMembers := cmd.Val()
 		if len(strMembers) == 0 { // empty slice might mean node not found.
-			potentialMissingKeys = append(potentialMissingKeys, KeyNode(nodeIDs[i]))
-			membersSlice = append(membersSlice, []uint32{})
+			potentialMissing = append(potentialMissing, KeyNode(nodeIDs[i]))
+			members = append(members, []uint32{})
 			continue
 		}
 
-		members, err := redisutils.ParseIDs(strMembers)
+		m, err := redisutils.ParseIDs(strMembers)
 		if err != nil {
 			return nil, err
 		}
 
-		membersSlice = append(membersSlice, members)
+		members = append(members, m)
 	}
 
 	// check if some of the dandling nodes where in reality not found in the DB
-	if len(potentialMissingKeys) > 0 {
-		countExists, err := DB.client.Exists(ctx, potentialMissingKeys...).Result()
+	if len(potentialMissing) > 0 {
+		countExists, err := DB.client.Exists(ctx, potentialMissing...).Result()
 		if err != nil {
 			return nil, err
 		}
 
-		if int(countExists) < len(potentialMissingKeys) {
-			return nil, fmt.Errorf("%w: some of these nodeIDs :%v", models.ErrNodeNotFoundDB, potentialMissingKeys)
+		if int(countExists) < len(potentialMissing) {
+			return nil, fmt.Errorf("%w: some of these nodeIDs :%v", models.ErrNodeNotFoundDB, potentialMissing)
 		}
 	}
 
-	return membersSlice, nil
+	return members, nil
 }
 
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
