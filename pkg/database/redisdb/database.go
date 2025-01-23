@@ -265,7 +265,7 @@ func (DB *Database) Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint3
 		return nil, err
 	}
 
-	return DB.pipelineSMembers(ctx, KeyFollowers, nodeIDs...)
+	return pipelineSMembers(ctx, DB, KeyFollowers, nodeIDs...)
 }
 
 // Follows() returns a slice containing the follows of each of the specified nodeIDs.
@@ -274,21 +274,22 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 		return nil, err
 	}
 
-	return DB.pipelineSMembers(ctx, KeyFollows, nodeIDs...)
+	return pipelineSMembers(ctx, DB, KeyFollows, nodeIDs...)
 }
 
 // The method pipelineSMembers() fetches the SMembers of the specified keys, which are:
-// KeyFunc(nodeID). If some commands return empty arrays, it checks the existance
-// of node:<nodeID> and returns an error if a node was not found.
-func (DB *Database) pipelineSMembers(
+// KeyFunc(nodeID). If some commands return empty arrays, it checks the existence
+// of KeyNode(nodeID) and returns an error if a node was not found.
+func pipelineSMembers[ID uint32 | int64 | int](
 	ctx context.Context,
-	KeyFunc func(interface{}) string,
-	nodeIDs ...uint32) ([][]uint32, error) {
+	DB *Database,
+	KeyFunc func(ID) string,
+	nodeIDs ...ID) ([][]uint32, error) {
 
 	pipe := DB.client.Pipeline()
 	cmds := make([]*redis.StringSliceCmd, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		cmds[i] = DB.client.SMembers(ctx, KeyFunc(ID))
+		cmds[i] = pipe.SMembers(ctx, KeyFunc(ID))
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
@@ -730,17 +731,17 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 }
 
 // KeyNode() returns the Redis key for the node with specified nodeID.
-func KeyNode(nodeID interface{}) string {
+func KeyNode[ID uint32 | int64 | int](nodeID ID) string {
 	return fmt.Sprintf("%v%d", KeyNodePrefix, nodeID)
 }
 
 // KeyFollows() returns the Redis key for the follows of the specified nodeID
-func KeyFollows(nodeID interface{}) string {
+func KeyFollows[ID uint32 | int64 | int](nodeID ID) string {
 	return fmt.Sprintf("%v%d", KeyFollowsPrefix, nodeID)
 }
 
 // KeyFollowers() returns the Redis key for the followers of the specified nodeID
-func KeyFollowers(nodeID interface{}) string {
+func KeyFollowers[ID uint32 | int64 | int](nodeID ID) string {
 	return fmt.Sprintf("%v%d", KeyFollowersPrefix, nodeID)
 }
 
