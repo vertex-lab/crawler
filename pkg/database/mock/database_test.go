@@ -246,12 +246,12 @@ func TestUpdate(t *testing.T) {
 			t.Errorf("expected records %v, got %v", delta.Record, DB.NodeIndex[nodeID].Records)
 		}
 
-		if !reflect.DeepEqual(DB.follows[nodeID].ToSlice(), []uint32{2}) {
-			t.Errorf("expected follows %v, got %v", []uint32{2}, DB.follows[nodeID])
+		if !reflect.DeepEqual(DB.Follow[nodeID].ToSlice(), []uint32{2}) {
+			t.Errorf("expected follows %v, got %v", []uint32{2}, DB.Follow[nodeID])
 		}
 
-		if DB.followers[1].Cardinality() != 0 {
-			t.Errorf("expected no followers of 1, got %v", DB.followers[1])
+		if DB.Follower[1].Cardinality() != 0 {
+			t.Errorf("expected no followers of 1, got %v", DB.Follower[1])
 		}
 	})
 }
@@ -377,6 +377,12 @@ func TestFollows(t *testing.T) {
 			DBType:        "nil",
 			nodeIDs:       []uint32{0},
 			expectedError: models.ErrNilDB,
+		},
+		{
+			name:            "empty nodeIDs",
+			DBType:          "one-node0",
+			nodeIDs:         []uint32{0},
+			expectedFollows: nil,
 		},
 		{
 			name:          "empty DB",

@@ -4,6 +4,7 @@ package redistore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 
@@ -78,7 +79,7 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 func NewRWSConnection(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
 
 	if cl == nil {
-		return nil, models.ErrNilClientPointer
+		return nil, ErrNilClient
 	}
 
 	cmdReturn := cl.HMGet(ctx, KeyRWS, KeyAlpha, KeyWalksPerNode)
@@ -153,7 +154,7 @@ func (RWS *RandomWalkStore) Validate() error {
 	}
 
 	if RWS.client == nil {
-		return models.ErrNilClientPointer
+		return ErrNilClient
 	}
 
 	if RWS.alpha <= 0.0 || RWS.alpha >= 1.0 {
@@ -474,7 +475,7 @@ func (RWS *RandomWalkStore) PruneGraftWalk(ctx context.Context, walkID uint32, c
 // SetupRWS returns a RandomWalkStore ready to be used in tests.
 func SetupRWS(cl *redis.Client, RWSType string) (*RandomWalkStore, error) {
 	if cl == nil {
-		return nil, models.ErrNilClientPointer
+		return nil, ErrNilClient
 	}
 
 	switch RWSType {
@@ -614,3 +615,7 @@ func GenerateRWS(cl *redis.Client, nodesNum, walksNum int) (*RandomWalkStore, er
 
 	return RWS, nil
 }
+
+//---------------------------------ERROR-CODES---------------------------------
+
+var ErrNilClient = errors.New("nil redis client pointer")

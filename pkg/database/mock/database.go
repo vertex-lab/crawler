@@ -27,8 +27,8 @@ type Database struct {
 	NodeIndex map[uint32]*models.Node
 
 	// maps that associate each nodeID with the slice of its follows/mutes...
-	follows   map[uint32]NodeSet
-	followers map[uint32]NodeSet
+	Follow   map[uint32]NodeSet
+	Follower map[uint32]NodeSet
 
 	// the next nodeID to be used. When a new node is added, this fiels is incremented by one
 	LastNodeID int
@@ -39,8 +39,8 @@ func NewDatabase() *Database {
 	return &Database{
 		KeyIndex:   make(map[string]uint32),
 		NodeIndex:  make(map[uint32]*models.Node),
-		follows:    make(map[uint32]NodeSet),
-		followers:  make(map[uint32]NodeSet),
+		Follow:     make(map[uint32]NodeSet),
+		Follower:   make(map[uint32]NodeSet),
 		LastNodeID: -1, // the first nodeID will be 0
 	}
 }
@@ -136,25 +136,25 @@ func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record mode
 func (DB *Database) updateFollows(ctx context.Context, nodeID uint32, delta *models.Delta) error {
 	_ = ctx
 	// add all added to the follows of nodeID
-	if _, exists := DB.follows[nodeID]; !exists {
-		DB.follows[nodeID] = mapset.NewSet[uint32]()
+	if _, exists := DB.Follow[nodeID]; !exists {
+		DB.Follow[nodeID] = mapset.NewSet[uint32]()
 	}
-	DB.follows[nodeID].Append(delta.Added...)
+	DB.Follow[nodeID].Append(delta.Added...)
 
 	// add nodeID to the followers of added
 	for _, ID := range delta.Added {
-		if _, exists := DB.followers[ID]; !exists {
-			DB.followers[ID] = mapset.NewSet[uint32]()
+		if _, exists := DB.Follower[ID]; !exists {
+			DB.Follower[ID] = mapset.NewSet[uint32]()
 		}
-		DB.followers[ID].Add(nodeID)
+		DB.Follower[ID].Add(nodeID)
 	}
 
 	// remove all removed to the follows of nodeID
-	DB.follows[nodeID].RemoveAll(delta.Removed...)
+	DB.Follow[nodeID].RemoveAll(delta.Removed...)
 
 	// remove nodeID to the followers of removed
 	for _, ID := range delta.Removed {
-		DB.followers[ID].Remove(nodeID)
+		DB.Follower[ID].Remove(nodeID)
 	}
 
 	DB.NodeIndex[nodeID].Records = append(DB.NodeIndex[nodeID].Records, delta.Record)
@@ -215,7 +215,7 @@ func (DB *Database) Follows(ctx context.Context, nodeIDs ...uint32) ([][]uint32,
 
 	followSlice := make([][]uint32, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		follows, exists := DB.follows[ID]
+		follows, exists := DB.Follow[ID]
 		if !exists {
 			return nil, models.ErrNodeNotFoundDB
 		}
@@ -239,7 +239,7 @@ func (DB *Database) Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint3
 
 	followerSlice := make([][]uint32, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		followers, exists := DB.followers[ID]
+		followers, exists := DB.Follower[ID]
 		if !exists {
 			return nil, models.ErrNodeNotFoundDB
 		}
@@ -363,9 +363,9 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: "1"}
 		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: "2"}
 
-		DB.follows[0] = mapset.NewSet[uint32]()
-		DB.follows[1] = mapset.NewSet[uint32](2)
-		DB.follows[2] = mapset.NewSet[uint32](1)
+		DB.Follow[0] = mapset.NewSet[uint32]()
+		DB.Follow[1] = mapset.NewSet[uint32](2)
+		DB.Follow[2] = mapset.NewSet[uint32](1)
 		return DB
 
 	case "one-node0":
@@ -373,6 +373,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex = map[string]uint32{"0": 0}
 		DB.LastNodeID = 0
 		DB.NodeIndex[0] = &models.Node{ID: 0, Pubkey: "0"}
+
+		DB.Follow[0] = mapset.NewSet[uint32]()
+		DB.Follower[0] = mapset.NewSet[uint32]()
 		return DB
 
 	case "one-node1":
@@ -380,6 +383,9 @@ func SetupDB(DBType string) *Database {
 		DB.KeyIndex = map[string]uint32{"1": 1}
 		DB.LastNodeID = 1
 		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: "1"}
+
+		DB.Follow[1] = mapset.NewSet[uint32]()
+		DB.Follower[1] = mapset.NewSet[uint32]()
 		return DB
 
 	case "triangle":
@@ -390,13 +396,13 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: "1"}
 		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: "2"}
 
-		DB.follows[0] = mapset.NewSet[uint32](1)
-		DB.follows[1] = mapset.NewSet[uint32](2)
-		DB.follows[2] = mapset.NewSet[uint32](0)
+		DB.Follow[0] = mapset.NewSet[uint32](1)
+		DB.Follow[1] = mapset.NewSet[uint32](2)
+		DB.Follow[2] = mapset.NewSet[uint32](0)
 
-		DB.followers[0] = mapset.NewSet[uint32](2)
-		DB.followers[1] = mapset.NewSet[uint32](0)
-		DB.followers[2] = mapset.NewSet[uint32](1)
+		DB.Follower[0] = mapset.NewSet[uint32](2)
+		DB.Follower[1] = mapset.NewSet[uint32](0)
+		DB.Follower[2] = mapset.NewSet[uint32](1)
 		return DB
 
 	case "simple":
@@ -407,8 +413,13 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: "1", Status: models.StatusActive}
 		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: "2", Status: models.StatusInactive}
 
-		DB.follows[0] = mapset.NewSet[uint32](1)
-		DB.followers[1] = mapset.NewSet[uint32](0)
+		DB.Follow[0] = mapset.NewSet[uint32](1)
+		DB.Follow[1] = mapset.NewSet[uint32]()
+		DB.Follow[2] = mapset.NewSet[uint32]()
+
+		DB.Follower[0] = mapset.NewSet[uint32]()
+		DB.Follower[1] = mapset.NewSet[uint32](0)
+		DB.Follower[2] = mapset.NewSet[uint32]()
 		return DB
 
 	case "simple-with-pks":
@@ -419,8 +430,13 @@ func SetupDB(DBType string) *Database {
 		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: "1", Status: models.StatusActive}
 		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: "2", Status: models.StatusInactive}
 
-		DB.follows[0] = mapset.NewSet[uint32](1)
-		DB.followers[1] = mapset.NewSet[uint32](0)
+		DB.Follow[0] = mapset.NewSet[uint32](1)
+		DB.Follow[1] = mapset.NewSet[uint32]()
+		DB.Follow[2] = mapset.NewSet[uint32]()
+
+		DB.Follower[0] = mapset.NewSet[uint32]()
+		DB.Follower[1] = mapset.NewSet[uint32](0)
+		DB.Follower[2] = mapset.NewSet[uint32]()
 		return DB
 
 	default:
@@ -460,7 +476,7 @@ func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
 			Status: models.StatusActive,
 		}
 
-		DB.follows[nodeID] = mapset.NewSet[uint32](randomFollows...)
+		DB.Follow[nodeID] = mapset.NewSet[uint32](randomFollows...)
 	}
 	return DB
 }

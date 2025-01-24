@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	mock "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
@@ -134,7 +135,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		// update the DB
 		commonFollows := []uint32{2}
-		DB.NodeIndex[nodeID].Follows = commonFollows
+		DB.Follow[nodeID] = mapset.NewSet[uint32](commonFollows...)
 
 		rng := rand.New(rand.NewSource(5))
 		expectedUpdated := 2
@@ -263,7 +264,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		// update the DB
 		currentFollows := []uint32{2}
-		DB.NodeIndex[nodeID].Follows = currentFollows
+		DB.Follow[nodeID] = mapset.NewSet[uint32](currentFollows...)
 
 		rng := rand.New(rand.NewSource(5))
 		expectedUpdated := 1
@@ -330,7 +331,7 @@ func TestUpdate(t *testing.T) {
 				nodeID:          0,
 				oldFollows:      []uint32{0},
 				currentFollows:  []uint32{1},
-				expectedError:   models.ErrNilDBPointer,
+				expectedError:   models.ErrNilDB,
 				expectedUpdated: 0,
 			},
 			{
@@ -430,11 +431,11 @@ func TestUpdate(t *testing.T) {
 
 		// update one node at the time
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			oldFollows := DB1.NodeIndex[nodeID].Follows
-			newFollows := DB2.NodeIndex[nodeID].Follows
-			DB1.NodeIndex[nodeID].Follows = newFollows
+			oldFollows := DB1.Follow[nodeID]
+			newFollows := DB2.Follow[nodeID]
+			DB1.Follow[nodeID] = newFollows
 
-			removed, common, added := sliceutils.Partition(oldFollows, newFollows)
+			removed, common, added := sliceutils.Partition(oldFollows.ToSlice(), newFollows.ToSlice())
 
 			if _, err := RWM.Update(ctx, DB1, nodeID, removed, common, added); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
