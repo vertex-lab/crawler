@@ -103,7 +103,6 @@ func ParseIDs(strIDs []string) ([]uint32, error) {
 
 // ParseUniqueIDs() parses a slice of unique IDs (no repetition), from the specified slice of string.
 func ParseUniqueIDs(strIDs []string) ([]uint32, error) {
-
 	IDs, err := ParseIDs(strIDs)
 	if err != nil {
 		return []uint32{}, nil

@@ -14,6 +14,62 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
 
+func TestParseNode(t *testing.T) {
+	testCases := []struct {
+		name          string
+		nodeMap       map[string]string
+		expectedNode  *models.Node
+		expectedError error
+	}{
+		{
+			name:    "nil map",
+			nodeMap: nil,
+		},
+		{
+			name: "valid without follow record",
+			nodeMap: map[string]string{
+				NodeID:     "19",
+				NodePubkey: "nineteen",
+				NodeStatus: models.StatusActive,
+			},
+			expectedNode: &models.Node{
+				ID:     19,
+				Pubkey: "nineteen",
+				Status: models.StatusActive,
+			},
+		},
+		{
+			name: "valid with follow record",
+			nodeMap: map[string]string{
+				NodeID:            "19",
+				NodePubkey:        "nineteen",
+				NodeStatus:        models.StatusActive,
+				NodeFollowEventID: "dsaudsaiudsa",
+				NodeFollowEventTS: "11",
+			},
+			expectedNode: &models.Node{
+				ID:      19,
+				Pubkey:  "nineteen",
+				Status:  models.StatusActive,
+				Records: []models.Record{{ID: "dsaudsaiudsa", Timestamp: 11, Type: models.Follow}},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			node, err := ParseNode(test.nodeMap)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("ParseNode(): expected %v got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(node, test.expectedNode) {
+				t.Fatalf("ParseNode(): expected node %v got %v", test.expectedNode, node)
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	cl := redisutils.SetupTestClient()
 	defer redisutils.CleanupRedis(cl)
@@ -26,12 +82,12 @@ func TestValidate(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: models.ErrNilDBPointer,
+			expectedError: models.ErrNilDB,
 		},
 		{
 			name:          "nil client",
 			DBType:        "nil-client",
-			expectedError: models.ErrNilClientPointer,
+			expectedError: ErrNilClient,
 		},
 		{
 			name:          "DB with node 0",
@@ -55,277 +111,101 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestAddFollows(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
-	nodeID := uint32(0)
-	addedFollows := []uint32{1, 2, 3}
-
-	pipe := cl.TxPipeline()
-	ctx := context.Background()
-
-	AddFollows(ctx, pipe, nodeID, addedFollows)
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Exec(): expected nil, got %v", err)
-	}
-
-	// check the follows of nodeID are correctly added
-	follows, err := cl.SMembers(ctx, KeyFollows(nodeID)).Result()
-	if err != nil {
-		t.Errorf("SMembers(): expected nil, got %v", err)
-	}
-	// parse the follows
-	followIDs := make([]uint32, 0, len(follows))
-	for _, follow := range follows {
-		followID, err := redisutils.ParseID(follow)
-		if err != nil {
-			t.Fatalf("ParseID(%v): expected nil, got %v", follow, err)
-		}
-		followIDs = append(followIDs, followID)
-	}
-
-	if !reflect.DeepEqual(followIDs, addedFollows) {
-		t.Fatalf("AddFollows(): expected %v, got %v", addedFollows, followIDs)
-	}
-
-	// check the follows have nodeID as a follower
-	for _, ID := range addedFollows {
-
-		isMember, err := cl.SIsMember(ctx, KeyFollowers(ID), redisutils.FormatID(nodeID)).Result()
-		if err != nil {
-			t.Errorf("IsMember(): expected nil, got %v", err)
-		}
-
-		if !isMember {
-			t.Fatalf("AddFollows(): expected nodeID = %d part of followers:%d", nodeID, ID)
-		}
-	}
-}
-
-func TestRemoveFollows(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
-	nodeID := uint32(0)
-	succ := []uint32{0, 1, 2}
-	removedSucc := []uint32{1, 2, 3}
-	remainingSucc := []uint32{0} // {0,1,2} - {1,2,3} = {0}
-
-	// add succ to Redis
-	pipe := cl.TxPipeline()
-	ctx := context.Background()
-	AddFollows(ctx, pipe, nodeID, succ)
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Exec(): expected nil, got %v", err)
-	}
-
-	// remove succ from Redis
-	pipe = cl.TxPipeline()
-	ctx = context.Background()
-	RemoveFollows(ctx, pipe, nodeID, removedSucc)
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Exec(): expected nil, got %v", err)
-	}
-
-	// check the follows of nodeID are correctly added
-	follows, err := cl.SMembers(ctx, KeyFollows(nodeID)).Result()
-	if err != nil {
-		t.Errorf("SMembers(): expected nil, got %v", err)
-	}
-	// parse the follows
-	followIDs := make([]uint32, 0, len(follows))
-	for _, follow := range follows {
-		followID, err := redisutils.ParseID(follow)
-		if err != nil {
-			t.Fatalf("ParseID(%v): expected nil, got %v", follow, err)
-		}
-		followIDs = append(followIDs, followID)
-	}
-
-	if !reflect.DeepEqual(followIDs, remainingSucc) {
-		t.Fatalf("RemoveFollows(): expected %v, got %v", remainingSucc, followIDs)
-	}
-
-	// check the remainingSucc have nodeID as a follower
-	for _, succ := range remainingSucc {
-		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
-		if err != nil {
-			t.Errorf("IsMember(): expected nil, got %v", err)
-		}
-
-		if !isMember {
-			t.Fatalf("RemoveFollows(): expected nodeID = %d part of followers:%d", nodeID, succ)
-		}
-	}
-
-	// check the removedSucc DON'T have nodeID as a follower
-	for _, succ := range removedSucc {
-		isMember, err := cl.SIsMember(ctx, KeyFollowers(succ), redisutils.FormatID(nodeID)).Result()
-		if err != nil {
-			t.Errorf("IsMember(): expected nil, got %v", err)
-		}
-
-		if isMember {
-			t.Fatalf("RemoveFollows(): expected nodeID = %d NOT part of followers:%d", nodeID, succ)
-		}
-	}
-}
-
-func TestAddFollowers(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
-	nodeID := uint32(0)
-	followers := []uint32{1, 2, 3}
-
-	pipe := cl.TxPipeline()
-	ctx := context.Background()
-
-	AddFollowers(ctx, pipe, nodeID, followers)
-	if _, err := pipe.Exec(ctx); err != nil {
-		t.Fatalf("Exec(): expected nil, got %v", err)
-	}
-
-	// check the followers of nodeID are correctly added
-	strIDs, err := cl.SMembers(ctx, KeyFollowers(nodeID)).Result()
-	if err != nil {
-		t.Errorf("SMembers(): expected nil, got %v", err)
-	}
-	// parse the follows
-	f := make([]uint32, 0, len(strIDs))
-	for _, strID := range strIDs {
-		ID, err := redisutils.ParseID(strID)
-		if err != nil {
-			t.Fatalf("ParseID(%v): expected nil, got %v", strID, err)
-		}
-		f = append(f, ID)
-	}
-
-	if !reflect.DeepEqual(f, followers) {
-		t.Fatalf("AddFollows(): expected %v, got %v", followers, f)
-	}
-
-	// check the pred have nodeID as a follows
-	for _, pred := range followers {
-
-		isMember, err := cl.SIsMember(ctx, KeyFollows(pred), redisutils.FormatID(nodeID)).Result()
-		if err != nil {
-			t.Errorf("IsMember(): expected nil, got %v", err)
-		}
-
-		if !isMember {
-			t.Fatalf("AddFollows(): expected nodeID = %d part of follows:%d", nodeID, pred)
-		}
-	}
-}
-
 func TestNodeByID(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
-		name             string
-		DBType           string
-		nodeID           uint32
-		expectedError    error
-		expectedNodeMeta *models.NodeMeta
+		name          string
+		DBType        string
+		nodeID        uint32
+		expectedError error
+		expectedNode  *models.Node
 	}{
 		{
-			name:             "nil DB",
-			DBType:           "nil",
-			nodeID:           0,
-			expectedNodeMeta: &models.NodeMeta{},
-			expectedError:    models.ErrNilDBPointer,
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeID:        0,
+			expectedError: models.ErrNilDB,
 		},
 		{
-			name:             "empty DB",
-			DBType:           "empty",
-			nodeID:           0,
-			expectedNodeMeta: &models.NodeMeta{},
-			expectedError:    redis.Nil,
+			name:          "empty DB",
+			DBType:        "empty",
+			nodeID:        0,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
-			name:             "pubkey not found",
-			DBType:           "one-node0",
-			nodeID:           1,
-			expectedNodeMeta: &models.NodeMeta{},
-			expectedError:    redis.Nil,
+			name:          "pubkey not found",
+			DBType:        "one-node0",
+			nodeID:        1,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:   "valid",
 			DBType: "one-node0",
 			nodeID: 0,
-			expectedNodeMeta: &models.NodeMeta{
-				ID:      0,
-				Pubkey:  "zero",
-				EventTS: 1731685733,
-				Status:  "idk",
+			expectedNode: &models.Node{
+				ID:     0,
+				Pubkey: "0",
+				Status: models.StatusInactive,
 			},
-			expectedError: nil,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeByID(context.Background(), test.nodeID)
+			nodeMeta, err := DB.NodeByID(ctx, test.nodeID)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(nodeMeta, test.expectedNodeMeta) {
-				t.Errorf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedNodeMeta, nodeMeta)
+			if !reflect.DeepEqual(nodeMeta, test.expectedNode) {
+				t.Errorf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedNode, nodeMeta)
 			}
 		})
 	}
 }
 
 func TestNodeByKey(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
-		name             string
-		DBType           string
-		pubkey           string
-		expectedError    error
-		expectedNodeMeta *models.NodeMeta
+		name          string
+		DBType        string
+		pubkey        string
+		expectedError error
+		expectedNode  *models.Node
 	}{
 		{
-			name:             "nil DB",
-			DBType:           "nil",
-			pubkey:           "zero",
-			expectedNodeMeta: &models.NodeMeta{},
-			expectedError:    models.ErrNilDBPointer,
+			name:          "nil DB",
+			DBType:        "nil",
+			pubkey:        "zero",
+			expectedError: models.ErrNilDB,
 		},
 		{
-			name:             "empty DB",
-			DBType:           "empty",
-			pubkey:           "zero",
-			expectedNodeMeta: &models.NodeMeta{},
-			expectedError:    redis.Nil,
+			name:          "empty DB",
+			DBType:        "empty",
+			pubkey:        "zero",
+			expectedError: redis.Nil,
 		},
 		{
-			name:             "pubkey not found",
-			DBType:           "one-node0",
-			pubkey:           "one",
-			expectedNodeMeta: &models.NodeMeta{},
-			expectedError:    redis.Nil,
+			name:          "pubkey not found",
+			DBType:        "one-node0",
+			pubkey:        "one",
+			expectedError: redis.Nil,
 		},
 		{
 			name:   "valid",
 			DBType: "one-node0",
-			pubkey: "zero",
-			expectedNodeMeta: &models.NodeMeta{
-				ID:      0,
-				Pubkey:  "zero",
-				EventTS: 1731685733,
-				Status:  "idk",
+			pubkey: "0",
+			expectedNode: &models.Node{
+				ID:     0,
+				Pubkey: "0",
+				Status: models.StatusInactive,
 			},
 			expectedError: nil,
 		},
@@ -333,18 +213,22 @@ func TestNodeByKey(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeByKey(context.Background(), test.pubkey)
+			nodeMeta, err := DB.NodeByKey(ctx, test.pubkey)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(nodeMeta, test.expectedNodeMeta) {
-				t.Errorf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedNodeMeta, nodeMeta)
+			if !reflect.DeepEqual(nodeMeta, test.expectedNode) {
+				t.Errorf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedNode, nodeMeta)
 			}
 		})
 	}
@@ -355,23 +239,23 @@ func TestAddNode(t *testing.T) {
 		testCases := []struct {
 			name           string
 			DBType         string
+			pubkey         string
 			expectedNodeID uint32
 			expectedError  error
-			Node           *models.Node
 		}{
 			{
 				name:           "nil DB",
 				DBType:         "nil",
+				pubkey:         "0",
 				expectedNodeID: math.MaxUint32,
-				expectedError:  models.ErrNilDBPointer,
-				Node:           &models.Node{},
+				expectedError:  models.ErrNilDB,
 			},
 			{
 				name:           "node already in the DB",
 				DBType:         "one-node0",
+				pubkey:         "0",
 				expectedNodeID: math.MaxUint32,
 				expectedError:  models.ErrNodeAlreadyInDB,
-				Node:           &models.Node{Metadata: models.NodeMeta{Pubkey: "zero"}},
 			},
 		}
 
@@ -385,46 +269,129 @@ func TestAddNode(t *testing.T) {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				nodeID, err := DB.AddNode(context.Background(), test.Node)
+				nodeID, err := DB.AddNode(context.Background(), test.pubkey)
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
+					t.Fatalf("AddNode(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
 				}
 
 				// check if nodeID has been assigned correctly
 				if nodeID != test.expectedNodeID {
-					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
+					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.pubkey, test.expectedNodeID, nodeID)
 				}
 			})
 		}
 	})
 
 	t.Run("valid", func(t *testing.T) {
+		ctx := context.Background()
+		cl := redisutils.SetupTestClient()
+		defer redisutils.CleanupRedis(cl)
+
+		pubkey := "1"
+		expectedNode := &models.Node{
+			ID:     1,
+			Pubkey: pubkey,
+			Status: models.StatusInactive,
+		}
+
+		DB, err := SetupDB(cl, "one-node0")
+		if err != nil {
+			t.Fatalf("SetupDB(): expected nil, got %v", err)
+		}
+
+		nodeID, err := DB.AddNode(ctx, pubkey)
+		if err != nil {
+			t.Fatalf("AddNode(%s): expected nil, got %v", pubkey, err)
+		}
+
+		// check if nodeID has been assigned correctly
+		if nodeID != expectedNode.ID {
+			t.Errorf("AddNode(%s): expected nodeID = %v, got %v", pubkey, expectedNode.ID, nodeID)
+		}
+
+		// check if database HASH was updated correctly
+		cmdReturnDB := cl.HMGet(ctx, KeyDatabase, KeyLastNodeID)
+		if cmdReturnDB.Err() != nil {
+			t.Errorf("HMGet(): expected nil, got %v", err)
+		}
+		var fields DatabaseFields
+		if err := cmdReturnDB.Scan(&fields); err != nil {
+			t.Errorf("Scan(): expected nil, got %v", err)
+		}
+		if fields.LastNodeID != int(expectedNode.ID) {
+			t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", pubkey, expectedNode.ID, fields.LastNodeID)
+		}
+
+		// check if the node was added to the keyIndex correctly
+		strNodeID, err := cl.HGet(ctx, KeyKeyIndex, pubkey).Result()
+		if err != nil {
+			t.Errorf("HGet(): expected nil, got %v", err)
+		}
+		LoadedNodeID, err := redisutils.ParseID(strNodeID)
+		if err != nil {
+			t.Errorf("ParseID(%v): expected nil, got %v", strNodeID, err)
+		}
+		if LoadedNodeID != expectedNode.ID {
+			t.Errorf("AddNode(%s): expected nodeID = %v, got %v", pubkey, expectedNode.ID, nodeID)
+		}
+
+		node, err := DB.NodeByKey(ctx, pubkey)
+		if err != nil {
+			t.Fatalf("NodeByKey(%s): expected nil, got %v", pubkey, err)
+		}
+
+		if !reflect.DeepEqual(node, expectedNode) {
+			t.Errorf("AddNode(): expected node %v \n got %v", expectedNode, node)
+		}
+	})
+}
+
+func TestUpdate(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
 		testCases := []struct {
-			name               string
-			DBType             string
-			Node               *models.Node
-			expectedNodeID     uint32
-			expectedLastNodeID int
-			expectedError      error
+			name          string
+			DBType        string
+			nodeID        uint32
+			delta         *models.Delta
+			expectedNode  *models.Node
+			expectedError error
 		}{
 			{
-				name:               "just Pubkey",
-				DBType:             "one-node0",
-				Node:               &models.Node{Metadata: models.NodeMeta{Pubkey: "one"}},
-				expectedNodeID:     1,
-				expectedLastNodeID: 1,
+				name:          "nil DB",
+				DBType:        "nil",
+				nodeID:        0,
+				expectedError: models.ErrNilDB,
 			},
 			{
-				name:               "all meta fields",
-				DBType:             "one-node0",
-				expectedNodeID:     1,
-				expectedLastNodeID: 1,
-				Node: &models.Node{
-					Metadata: models.NodeMeta{
-						Pubkey:  "one",
-						EventTS: 0,
-						Status:  models.StatusInactive,
-					},
+				name:          "node not found",
+				DBType:        "one-node0",
+				nodeID:        1,
+				expectedError: models.ErrNodeNotFoundDB,
+			},
+			{
+				name:   "valid promotion",
+				DBType: "simple",
+				nodeID: 0,
+				delta: &models.Delta{
+					Record: models.Record{Type: models.Promotion, Timestamp: 123},
+				},
+				expectedNode: &models.Node{
+					ID:     0,
+					Pubkey: "0",
+					Status: models.StatusActive,
+				},
+			},
+			{
+				name:   "valid demotion",
+				DBType: "simple",
+				nodeID: 0,
+				delta: &models.Delta{
+					Record: models.Record{Type: models.Promotion, Timestamp: 123},
+				},
+				expectedNode: &models.Node{
+					ID:     0,
+					Pubkey: "0",
+					Status: models.StatusActive,
 				},
 			},
 		}
@@ -440,134 +407,94 @@ func TestAddNode(t *testing.T) {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				nodeID, err := DB.AddNode(ctx, test.Node)
+				err = DB.Update(ctx, test.nodeID, test.delta)
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("AddNode(%v): expected %v, got %v", test.Node, test.expectedError, err)
+					t.Fatalf("Update(%v): expected %v, got %v", test.nodeID, test.expectedError, err)
 				}
 
-				// check if nodeID has been assigned correctly
-				if nodeID != test.expectedNodeID {
-					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
-				}
+				// check if node was updated correctly
+				if err == nil {
+					node, err := DB.NodeByID(ctx, test.nodeID)
+					if err != nil {
+						t.Fatalf("NodeByID(%d): expected nil, got %v", test.nodeID, err)
+					}
 
-				// check if database HASH was updated correctly
-				cmdReturnDB := cl.HMGet(ctx, KeyDatabase, KeyLastNodeID)
-				if cmdReturnDB.Err() != nil {
-					t.Errorf("HMGet(): expected nil, got %v", err)
-				}
-				var fields DatabaseFields
-				if err := cmdReturnDB.Scan(&fields); err != nil {
-					t.Errorf("Scan(): expected nil, got %v", err)
-				}
-				if fields.LastNodeID != test.expectedLastNodeID {
-					t.Errorf("AddNode(%v): expected LastNodeID = %v, got %v", test.Node, test.expectedLastNodeID, fields.LastNodeID)
-				}
-
-				// check if the node was added to the keyIndex correctly
-				strNodeID, err := cl.HGet(ctx, KeyKeyIndex, test.Node.Metadata.Pubkey).Result()
-				if err != nil {
-					t.Errorf("HGet(): expected nil, got %v", err)
-				}
-				LoadedNodeID, err := redisutils.ParseID(strNodeID)
-				if err != nil {
-					t.Errorf("ParseID(%v): expected nil, got %v", strNodeID, err)
-				}
-				if LoadedNodeID != test.expectedNodeID {
-					t.Errorf("AddNode(%v): expected nodeID = %v, got %v", test.Node, test.expectedNodeID, nodeID)
-				}
-
-				// check if node HASH was added correctly
-				cmdReturnNode := cl.HGetAll(ctx, KeyNode(test.expectedNodeID))
-				if cmdReturnNode.Err() != nil {
-					t.Errorf("HGetAll(): expected nil, got %v", err)
-				}
-				var nodeMeta models.NodeMeta
-				if err := cmdReturnNode.Scan(&nodeMeta); err != nil {
-					t.Errorf("Scan(): expected nil, got %v", err)
-				}
-				if !reflect.DeepEqual(nodeMeta, test.Node.Metadata) {
-					t.Errorf("AddNode(): expected node %v \n got %v", test.Node.Metadata, nodeMeta)
+					if !reflect.DeepEqual(node, test.expectedNode) {
+						t.Errorf("Update(): expected node %v \n got %v", test.expectedNode, &node)
+					}
 				}
 			})
 		}
 	})
-}
 
-func TestUpdateNode(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
+	t.Run("valid follows", func(t *testing.T) {
+		ctx := context.Background()
+		cl := redisutils.SetupTestClient()
+		defer redisutils.CleanupRedis(cl)
 
-	testCases := []struct {
-		name             string
-		DBType           string
-		nodeID           uint32
-		nodeDiff         *models.NodeDiff
-		expectedNodeMeta *models.NodeMeta
-		expectedError    error
-	}{
-		{
-			name:          "nil DB",
-			DBType:        "nil",
-			nodeID:        0,
-			expectedError: models.ErrNilDBPointer,
-		},
-		{
-			name:          "node not found",
-			DBType:        "one-node0",
-			nodeID:        1,
-			expectedError: models.ErrNodeNotFoundDB,
-		},
-		{
-			name:   "valid",
-			DBType: "one-node0",
-			nodeID: 0,
-			nodeDiff: &models.NodeDiff{
-				Metadata: models.NodeMeta{EventTS: 11}},
-			expectedNodeMeta: &models.NodeMeta{
-				Pubkey:  "zero",
-				EventTS: 11, // the only field that changes
-				Status:  "idk",
-			},
-		},
-	}
+		DB, err := SetupDB(cl, "simple")
+		if err != nil {
+			t.Fatalf("SetupDB(): expected nil, got %v", err)
+		}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-			DB, err := SetupDB(cl, test.DBType)
-			if err != nil {
-				t.Fatalf("SetupDB(): expected nil, got %v", err)
-			}
+		var nodeID uint32
+		delta := &models.Delta{
+			Record:  models.Record{Type: models.Follow, Timestamp: 123, ID: "abc"},
+			Removed: []uint32{1},
+			Added:   []uint32{2},
+		}
 
-			err = DB.UpdateNode(ctx, test.nodeID, test.nodeDiff)
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("UpdateNode(%v): expected %v, got %v", test.nodeDiff, test.expectedError, err)
-			}
+		if err := DB.Update(ctx, nodeID, delta); err != nil {
+			t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
+		}
 
-			// check if node was updated correctly
-			if err == nil {
-				cmdReturn := cl.HGetAll(ctx, KeyNode(test.nodeID))
-				if cmdReturn.Err() != nil {
-					t.Errorf("HGetAll(): expected nil, got %v", err)
-				}
+		// check that the follow record changed
+		expectedNode := &models.Node{
+			ID:      0,
+			Pubkey:  "0",
+			Status:  models.StatusInactive,
+			Records: []models.Record{delta.Record},
+		}
 
-				var nodeMeta models.NodeMeta
-				if err := cmdReturn.Scan(&nodeMeta); err != nil {
-					t.Errorf("Scan(): expected nil, got %v", err)
-				}
+		node, err := DB.NodeByID(ctx, nodeID)
+		if err != nil {
+			t.Fatalf("NodeByID(%d) expected nil, got %v", nodeID, err)
+		}
 
-				if !reflect.DeepEqual(&nodeMeta, test.expectedNodeMeta) {
-					t.Errorf("UpdateNode(): expected node %v \n got %v", test.expectedNodeMeta, &nodeMeta)
-				}
-			}
-		})
-	}
+		if !reflect.DeepEqual(node, expectedNode) {
+			t.Fatalf("expected node %v, got %v", expectedNode, node)
+		}
+
+		// check the follows of nodeID
+		follows, err := DB.client.SMembers(ctx, KeyFollows(nodeID)).Result()
+		if err != nil {
+			t.Fatalf("SMembers(%s) expected nil got %v", KeyFollows(nodeID), err)
+		}
+		if !reflect.DeepEqual(follows, []string{"2"}) {
+			t.Fatalf("Expected follows %v, got %v", []string{"2"}, follows)
+		}
+
+		// check the followers of 1
+		followers, err := DB.client.SMembers(ctx, KeyFollowers(1)).Result()
+		if err != nil {
+			t.Fatalf("SMembers(%s) expected nil got %v", KeyFollowers(1), err)
+		}
+		if !reflect.DeepEqual(followers, []string{}) {
+			t.Fatalf("Expected follows %v, got %v", []string{"2"}, follows)
+		}
+
+		// check the followers of 2
+		followers, err = DB.client.SMembers(ctx, KeyFollowers(2)).Result()
+		if err != nil {
+			t.Fatalf("SMembers(%s) expected nil got %v", KeyFollowers(2), err)
+		}
+		if !reflect.DeepEqual(followers, []string{"0"}) {
+			t.Fatalf("Expected follows %v, got %v", []string{"0"}, follows)
+		}
+	})
 }
 
 func TestContainsNode(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
 		name             string
 		DBType           string
@@ -602,12 +529,16 @@ func TestContainsNode(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			contains := DB.ContainsNode(context.Background(), test.nodeID)
+			contains := DB.ContainsNode(ctx, test.nodeID)
 			if contains != test.expectedContains {
 				t.Errorf("ContainsNode(%d): expected %v, got %v", test.nodeID, test.expectedContains, contains)
 			}
@@ -624,39 +555,34 @@ func TestFollows(t *testing.T) {
 		expectedFollows [][]uint32
 	}{
 		{
-			name:            "nil DB",
-			DBType:          "nil",
-			nodeIDs:         []uint32{0},
-			expectedFollows: nil,
-			expectedError:   models.ErrNilDBPointer,
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilDB,
 		},
 		{
-			name:            "empty DB",
-			DBType:          "empty",
-			nodeIDs:         []uint32{0},
-			expectedFollows: nil,
-			expectedError:   models.ErrNodeNotFoundDB,
+			name:          "empty DB",
+			DBType:        "empty",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
-			name:            "node not found",
-			DBType:          "triangle",
-			nodeIDs:         []uint32{69, 2},
-			expectedFollows: nil,
-			expectedError:   models.ErrNodeNotFoundDB,
+			name:          "node not found",
+			DBType:        "one-node0",
+			nodeIDs:       []uint32{69, 0},
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:            "dandling node",
-			DBType:          "dandling",
+			DBType:          "one-node0",
 			nodeIDs:         []uint32{0},
 			expectedFollows: [][]uint32{{}},
-			expectedError:   nil,
 		},
 		{
 			name:            "valid",
-			DBType:          "triangle",
+			DBType:          "simple",
 			nodeIDs:         []uint32{0, 1},
-			expectedFollows: [][]uint32{{1}, {2}},
-			expectedError:   nil,
+			expectedFollows: [][]uint32{{1}, {}},
 		},
 	}
 
@@ -691,39 +617,34 @@ func TestFollowers(t *testing.T) {
 		expectedFollowers [][]uint32
 	}{
 		{
-			name:              "nil DB",
-			DBType:            "nil",
-			nodeIDs:           []uint32{0},
-			expectedFollowers: nil,
-			expectedError:     models.ErrNilDBPointer,
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilDB,
 		},
 		{
-			name:              "empty DB",
-			DBType:            "empty",
-			nodeIDs:           []uint32{0},
-			expectedFollowers: nil,
-			expectedError:     models.ErrNodeNotFoundDB,
+			name:          "empty DB",
+			DBType:        "empty",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
-			name:              "node not found",
-			DBType:            "triangle",
-			nodeIDs:           []uint32{69, 2},
-			expectedFollowers: nil,
-			expectedError:     models.ErrNodeNotFoundDB,
+			name:          "node not found",
+			DBType:        "one-node0",
+			nodeIDs:       []uint32{69, 0},
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:              "dandling node",
-			DBType:            "dandling",
+			DBType:            "one-node0",
 			nodeIDs:           []uint32{0},
 			expectedFollowers: [][]uint32{{}},
-			expectedError:     nil,
 		},
 		{
 			name:              "valid",
-			DBType:            "triangle",
+			DBType:            "simple",
 			nodeIDs:           []uint32{0, 1},
-			expectedFollowers: [][]uint32{{2}, {0}},
-			expectedError:     nil,
+			expectedFollowers: [][]uint32{{}, {0}},
 		},
 	}
 
@@ -750,9 +671,6 @@ func TestFollowers(t *testing.T) {
 }
 
 func TestNodeIDs(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
 		name            string
 		DBType          string
@@ -763,32 +681,40 @@ func TestNodeIDs(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: models.ErrNilDBPointer,
+			expectedError: models.ErrNilDB,
 		},
 		{
 			name:            "one pubkey not found DB",
 			DBType:          "one-node0",
-			pubkeys:         []string{"four"},
-			expectedError:   nil,
+			pubkeys:         []string{"69"},
 			expectedNodeIDs: []*uint32{nil},
 		},
 		{
 			name:            "one pubkey found DB",
 			DBType:          "one-node0",
-			pubkeys:         []string{"zero"},
-			expectedError:   nil,
+			pubkeys:         []string{"0"},
 			expectedNodeIDs: []*uint32{new(uint32)},
+		},
+		{
+			name:            "valid",
+			DBType:          "simple",
+			pubkeys:         []string{"0", "1"},
+			expectedNodeIDs: []*uint32{&[]uint32{0}[0], &[]uint32{1}[0]},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeIDs, err := DB.NodeIDs(context.Background(), test.pubkeys...)
+			nodeIDs, err := DB.NodeIDs(ctx, test.pubkeys...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeIDs(): expected %v, got %v", test.expectedError, err)
 			}
@@ -801,9 +727,6 @@ func TestNodeIDs(t *testing.T) {
 }
 
 func TestPubkeys(t *testing.T) {
-	cl := redisutils.SetupTestClient()
-	defer redisutils.CleanupRedis(cl)
-
 	testCases := []struct {
 		name            string
 		DBType          string
@@ -814,13 +737,12 @@ func TestPubkeys(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: models.ErrNilDBPointer,
+			expectedError: models.ErrNilDB,
 		},
 		{
 			name:            "one pubkey not found DB",
 			DBType:          "one-node0",
 			nodeIDs:         []uint32{4},
-			expectedError:   nil,
 			expectedPubkeys: []*string{nil},
 		},
 		{
@@ -828,18 +750,29 @@ func TestPubkeys(t *testing.T) {
 			DBType:          "one-node0",
 			nodeIDs:         []uint32{0},
 			expectedError:   nil,
-			expectedPubkeys: []*string{&[]string{"zero"}[0]}, // a trick to add a pointer to "zero" inline
+			expectedPubkeys: []*string{&[]string{"0"}[0]}, // a trick to add a pointer to "zero" inline
+		},
+		{
+			name:            "valid",
+			DBType:          "simple",
+			nodeIDs:         []uint32{0, 1},
+			expectedError:   nil,
+			expectedPubkeys: []*string{&[]string{"0"}[0], &[]string{"1"}[0]}, // a trick to add a pointer to "zero" inline
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
 			DB, err := SetupDB(cl, test.DBType)
 			if err != nil {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			pubkeys, err := DB.Pubkeys(context.Background(), test.nodeIDs...)
+			pubkeys, err := DB.Pubkeys(ctx, test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Pubkeys(): expected %v, got %v", test.expectedError, err)
 			}
@@ -864,7 +797,7 @@ func TestAllNodes(t *testing.T) {
 		{
 			name:          "nil DB",
 			DBType:        "nil",
-			expectedError: models.ErrNilDBPointer,
+			expectedError: models.ErrNilDB,
 		},
 		{
 			name:          "empty DB",
@@ -916,7 +849,7 @@ func TestScanNodes(t *testing.T) {
 				name:          "nil DB",
 				DBType:        "nil",
 				limit:         100,
-				expectedError: models.ErrNilDBPointer,
+				expectedError: models.ErrNilDB,
 			},
 		}
 

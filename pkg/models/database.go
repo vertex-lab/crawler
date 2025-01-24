@@ -18,9 +18,6 @@ import (
 )
 
 const (
-	KeyID          string = "id"
-	KeyPubkey      string = "pubkey"
-	KeyStatus      string = "status"
 	StatusActive   string = "active" // meaning, we generate random walks for this node
 	StatusInactive string = "inactive"
 
@@ -31,13 +28,12 @@ const (
 	Demotion  string = "demotion"
 )
 
-// Node contains the metadata about a node, meaning everything that is not a relationship.
-// Records stores a collection of Record, which store when a node was added, promoted, ...
+// Node contains the metadata about a node, including a collection of Records.
 type Node struct {
-	ID      uint32 `redis:"id,omitempty"`
-	Pubkey  string `redis:"pubkey,omitempty"`
-	Status  string `redis:"status,omitempty"`
-	Records []Record
+	ID      uint32
+	Pubkey  string
+	Status  string   // either active or inactive
+	Records []Record // not all Records will be necesserely returned from the DB
 }
 
 // Record encapsulates data around an update that involved a Node. For example an update to its follow-list, or its promotion/demotion.
@@ -106,7 +102,6 @@ type PagerankMap map[uint32]float64
 //--------------------------------ERROR-CODES-----------------------------------
 
 var (
-	ErrNilClient       error = errors.New("nil client pointer")
 	ErrNilDB           error = errors.New("database pointer is nil")
 	ErrNilDelta        error = errors.New("nil delta pointer")
 	ErrEmptyDB         error = errors.New("database is empty")

@@ -113,7 +113,7 @@ func (DB *Database) Update(ctx context.Context, nodeID uint32, delta *models.Del
 	return nil
 }
 
-// updatePromotion updates the status of nodeID to active, and adds a record.
+// updateStatus updates the status of nodeID
 func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record models.Record) error {
 	_ = ctx
 
