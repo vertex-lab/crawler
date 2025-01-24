@@ -2,8 +2,8 @@
 The models package defines the fundamental structures and interfaces used in this project.
 Interfaces:
 
-Database:
-The Database interface abstracts the basic database functionalities, allowing for
+Graph:
+The Graph interface abstracts the basic database functionalities, allowing for
 multiple implementations.
 
 RandomWalkStore:
@@ -18,44 +18,43 @@ import (
 )
 
 const (
-	KeyID      string = "id"
-	KeyPubkey  string = "pubkey"
-	KeyEventTS string = "event_timestamp"
-	KeyStatus  string = "status"
-
+	KeyID          string = "id"
+	KeyPubkey      string = "pubkey"
+	KeyStatus      string = "status"
 	StatusActive   string = "active" // meaning, we generate random walks for this node
 	StatusInactive string = "inactive"
+
+	// types of Records
+	Added     string = "added"
+	Follow    string = "follows"
+	Promotion string = "promotion"
+	Demotion  string = "demotion"
 )
 
-// NodeMeta contains the metadata about a node, meaning everything that is not a relationship
-type NodeMeta struct {
+// Node contains the metadata about a node, meaning everything that is not a relationship.
+// Records stores a collection of Record, which store when a node was added, promoted, ...
+type Node struct {
 	ID      uint32 `redis:"id,omitempty"`
 	Pubkey  string `redis:"pubkey,omitempty"`
-	EventTS int64  `redis:"event_timestamp,omitempty"`
 	Status  string `redis:"status,omitempty"`
+	Records []Record
 }
 
-// Node represent the basic structure of a node in the graph
-type Node struct {
-	Metadata  NodeMeta
-	Follows   []uint32
-	Followers []uint32
+// Record encapsulates data around an update that involved a Node. For example an update to its follow-list, or its promotion/demotion.
+type Record struct {
+	ID        string // e.g. the kind:3 eventID
+	Timestamp int64  // e.g. the kind:3 timestamp
+	Type      string // e.g. "follows", "promotion"...
 }
 
-// NodeDiff represent the updates to do for a specified node.
-type NodeDiff struct {
-
-	// Only the specified metadata fields will be changed; the others will mantain the old value thanks to "omitempty".
-	Metadata NodeMeta
-
-	// The slice of nodeIDs to be added to the node's successors
-	AddedFollows []uint32
-
-	// The slice of nodeIDs to be removed from the node's successors
-	RemovedFollows []uint32
+// Delta represent the updates to do for a specified node. Added and Removed represent respectively the
+// added and removed relationship (e.g. a Node added 0,11 and removed 12 from its follow-list)
+type Delta struct {
+	Record
+	Removed []uint32
+	Added   []uint32
 }
 
-// The Database interface abstracts the DB basic functions
 type Database interface {
 	// Size() returns the number of nodes in the DB (ignores errors).
 	Size(ctx context.Context) int
@@ -67,16 +66,16 @@ type Database interface {
 	Validate() error
 
 	// NodeByID() retrieves a node by its nodeID.
-	NodeByID(ctx context.Context, nodeID uint32) (*NodeMeta, error)
+	NodeByID(ctx context.Context, nodeID uint32) (*Node, error)
 
 	// NodeByKey() retrieves a node by its pubkey.
-	NodeByKey(ctx context.Context, pubkey string) (*NodeMeta, error)
+	NodeByKey(ctx context.Context, pubkey string) (*Node, error)
 
 	// AddNode() adds a node to the database and returns its assigned nodeID
-	AddNode(ctx context.Context, node *Node) (uint32, error)
+	AddNode(ctx context.Context, pubkey string) (uint32, error)
 
-	// UpdateNode() updates the nodeID using the new values inside node.
-	UpdateNode(ctx context.Context, nodeID uint32, nodeDiff *NodeDiff) error
+	// Update() applies the delta to nodeID
+	Update(ctx context.Context, nodeID uint32, delta *Delta) error
 
 	// Followers() returns a slice that contains the followers of each nodeID.
 	Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error)
@@ -107,10 +106,11 @@ type PagerankMap map[uint32]float64
 //--------------------------------ERROR-CODES-----------------------------------
 
 var (
-	ErrNilClientPointer error = errors.New("nil client pointer")
-	ErrNilDBPointer     error = errors.New("database pointer is nil")
-	ErrEmptyDB          error = errors.New("database is empty")
-	ErrNonEmptyDB       error = errors.New("database is NOT empty")
-	ErrNodeNotFoundDB   error = errors.New("node not found in the database")
-	ErrNodeAlreadyInDB  error = errors.New("node already in the database")
+	ErrNilClient       error = errors.New("nil client pointer")
+	ErrNilDB           error = errors.New("database pointer is nil")
+	ErrNilDelta        error = errors.New("nil delta pointer")
+	ErrEmptyDB         error = errors.New("database is empty")
+	ErrNonEmptyDB      error = errors.New("database is NOT empty")
+	ErrNodeNotFoundDB  error = errors.New("node not found in the database")
+	ErrNodeAlreadyInDB error = errors.New("node already in the database")
 )
