@@ -99,7 +99,7 @@ func TestCheckInputs(t *testing.T) {
 			RWSType:       "one-node0",
 			nodeID:        0,
 			topK:          5,
-			expectedError: models.ErrNilDBPointer,
+			expectedError: models.ErrNilDB,
 		},
 		{
 			name:          "nil RWS",
@@ -382,7 +382,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				RWSType:       "one-node0",
 				nodeID:        0,
 				topK:          5,
-				expectedError: models.ErrNilDBPointer,
+				expectedError: models.ErrNilDB,
 			},
 			{
 				name:          "empty DB",

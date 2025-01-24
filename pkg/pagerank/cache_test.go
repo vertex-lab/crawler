@@ -35,7 +35,7 @@ func TestFollows(t *testing.T) {
 				DBType:          "nil",
 				FCType:          "empty",
 				expectedFollows: []uint32{},
-				expectedError:   models.ErrNilDBPointer,
+				expectedError:   models.ErrNilDB,
 			},
 			{
 				name:            "node not found FC and DB",
@@ -102,7 +102,7 @@ func TestFCLoad(t *testing.T) {
 				name:          "nil DB",
 				DBType:        "nil",
 				FCType:        "empty",
-				expectedError: models.ErrNilDBPointer,
+				expectedError: models.ErrNilDB,
 			},
 			{
 				name:          "one node not found FC and DB",
