@@ -150,11 +150,15 @@ func (DB *Database) updateFollows(ctx context.Context, delta *models.Delta) erro
 	}
 
 	// remove all removed to the follows of nodeID
-	DB.Follow[delta.NodeID].RemoveAll(delta.Removed...)
+	if _, exists := DB.Follow[delta.NodeID]; exists {
+		DB.Follow[delta.NodeID].RemoveAll(delta.Removed...)
+	}
 
 	// remove nodeID to the followers of removed
 	for _, ID := range delta.Removed {
-		DB.Follower[ID].Remove(delta.NodeID)
+		if _, exists := DB.Follower[ID]; exists {
+			DB.Follower[ID].Remove(delta.NodeID)
+		}
 	}
 
 	DB.NodeIndex[delta.NodeID].Records = append(DB.NodeIndex[delta.NodeID].Records, delta.Record)
