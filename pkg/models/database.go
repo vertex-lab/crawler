@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	// types of status
 	StatusActive   string = "active" // meaning, we generate random walks for this node
 	StatusInactive string = "inactive"
 
@@ -40,7 +41,7 @@ type Node struct {
 type Record struct {
 	ID        string // e.g. the kind:3 eventID
 	Timestamp int64  // e.g. the kind:3 timestamp
-	Type      string // e.g. "follows", "promotion"...
+	Type      string // e.g. "follows", "mutes", "promotion"...
 }
 
 // Delta represent the updates to do for a specified node. Added and Removed represent respectively the

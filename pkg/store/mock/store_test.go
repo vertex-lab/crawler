@@ -68,8 +68,8 @@ func TestValidate(t *testing.T) {
 		RWS := SetupRWS("nil")
 		err := RWS.Validate()
 
-		if !errors.Is(err, models.ErrNilRWSPointer) {
-			t.Errorf("Validate(): expected %v, got %v", models.ErrNilRWSPointer, err)
+		if !errors.Is(err, models.ErrNilRWS) {
+			t.Errorf("Validate(): expected %v, got %v", models.ErrNilRWS, err)
 		}
 	})
 
@@ -111,7 +111,7 @@ func TestVisitCounts(t *testing.T) {
 			RWSType:        "nil",
 			nodeIDs:        []uint32{0},
 			expectedVisits: []int{},
-			expectedError:  models.ErrNilRWSPointer,
+			expectedError:  models.ErrNilRWS,
 		},
 		{
 			name:           "empty RWS",
@@ -171,7 +171,7 @@ func TestWalks(t *testing.T) {
 			name:          "nil RWS",
 			RWSType:       "nil",
 			walkIDs:       []uint32{0},
-			expectedError: models.ErrNilRWSPointer,
+			expectedError: models.ErrNilRWS,
 		},
 		{
 			name:          "empty RWS",
@@ -229,7 +229,7 @@ func TestWalksVisiting(t *testing.T) {
 			RWSType:       "nil",
 			limit:         1,
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNilRWSPointer,
+			expectedError: models.ErrNilRWS,
 		},
 		{
 			name:          "empty RWS",
@@ -291,7 +291,7 @@ func TestWalksVisitingAll(t *testing.T) {
 			name:          "nil RWS",
 			RWSType:       "nil",
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNilRWSPointer,
+			expectedError: models.ErrNilRWS,
 		},
 		{
 			name:          "empty RWS",
@@ -346,7 +346,7 @@ func TestAddWalks(t *testing.T) {
 			{
 				name:          "nil RWS",
 				RWSType:       "nil",
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 			{
 				name:          "nil walks",
@@ -364,7 +364,7 @@ func TestAddWalks(t *testing.T) {
 				name:          "one nil walk",
 				RWSType:       "empty",
 				walks:         []models.RandomWalk{{0, 1}, nil},
-				expectedError: models.ErrNilWalkPointer,
+				expectedError: models.ErrNilWalk,
 			},
 			{
 				name:          "one empty walk",
@@ -428,7 +428,7 @@ func TestRemoveWalks(t *testing.T) {
 			{
 				name:          "nil RWS",
 				RWSType:       "nil",
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 			{
 				name:          "walk node found",
@@ -495,7 +495,7 @@ func TestPruneWalk(t *testing.T) {
 				name:          "nil RWS",
 				RWSType:       "nil",
 				walkID:        0,
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 			{
 				name:          "empty RWS",
@@ -576,7 +576,7 @@ func TestGraftWalk(t *testing.T) {
 				name:          "nil RWS",
 				RWSType:       "nil",
 				walkID:        0,
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 			{
 				name:          "empty RWS",

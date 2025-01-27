@@ -220,7 +220,7 @@ func TestGenerate(t *testing.T) {
 		// 	name:          "nil RWM",
 		// 	DBType:        "one-node0",
 		// 	RWMType:       "nil",
-		// 	expectedError: models.ErrNilRWSPointer,
+		// 	expectedError: models.ErrNilRWS,
 		// },
 		{
 			name:          "valid",
@@ -291,7 +291,7 @@ func TestGenerateAll(t *testing.T) {
 				name:          "nil RWM",
 				DBType:        "one-node0",
 				RWMType:       "nil",
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 		}
 
@@ -390,7 +390,7 @@ func TestRemove(t *testing.T) {
 		{
 			name:          "nil RWM",
 			RWMType:       "nil",
-			expectedError: models.ErrNilRWSPointer,
+			expectedError: models.ErrNilRWS,
 			expectedWalks: nil,
 		},
 		{

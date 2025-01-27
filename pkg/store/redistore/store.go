@@ -150,7 +150,7 @@ func (RWS *RandomWalkStore) TotalVisits(ctx context.Context) int {
 func (RWS *RandomWalkStore) Validate() error {
 
 	if RWS == nil {
-		return models.ErrNilRWSPointer
+		return models.ErrNilRWS
 	}
 
 	if RWS.client == nil {

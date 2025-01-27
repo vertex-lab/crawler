@@ -81,7 +81,7 @@ func (RWS *RandomWalkStore) TotalVisits(ctx context.Context) int {
 func (RWS *RandomWalkStore) Validate() error {
 
 	if RWS == nil {
-		return models.ErrNilRWSPointer
+		return models.ErrNilRWS
 	}
 
 	if RWS.alpha <= 0.0 || RWS.alpha >= 1.0 {
@@ -100,7 +100,7 @@ func (RWS *RandomWalkStore) Validate() error {
 func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
 	_ = ctx
 	if RWS == nil || RWS.walksVisiting == nil {
-		return []int{}, models.ErrNilRWSPointer
+		return []int{}, models.ErrNilRWS
 	}
 
 	if len(nodeIDs) == 0 {
@@ -225,7 +225,7 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.RandomWalk) error {
 	_ = ctx
 	if RWS == nil {
-		return models.ErrNilRWSPointer
+		return models.ErrNilRWS
 	}
 
 	if len(walks) == 0 {

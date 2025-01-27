@@ -11,7 +11,7 @@ type RandomWalk []uint32
 // Validate returns the appropriate error if the RandomWalk is empty or nil.
 func Validate(walk RandomWalk) error {
 	if walk == nil {
-		return ErrNilWalkPointer
+		return ErrNilWalk
 	}
 	if len(walk) == 0 {
 		return ErrEmptyWalk
@@ -70,7 +70,7 @@ type RandomWalkStore interface {
 
 var (
 	// RandomWalk errors
-	ErrNilWalkPointer   error = errors.New("nil RandomWalk pointer")
+	ErrNilWalk          error = errors.New("nil RandomWalk pointer")
 	ErrEmptyWalk        error = errors.New("RandomWalk is empty")
 	ErrWalkNotFound     error = errors.New("RandomWalk not found in RWS")
 	ErrInvalidWalkIndex error = errors.New("the index is bigger than the lenght of the walk")
@@ -78,7 +78,7 @@ var (
 	// RWS errors
 	ErrInvalidAlpha        error = errors.New("alpha should be a number between 0 and 1 (excluded)")
 	ErrInvalidWalksPerNode error = errors.New("walksPerNode should be greater than zero")
-	ErrNilRWSPointer       error = errors.New("nil RWS pointer")
+	ErrNilRWS              error = errors.New("nil RWS pointer")
 	ErrEmptyRWS            error = errors.New("RWS is empty")
 	ErrNonEmptyRWS         error = errors.New("the RWS is NOT empty")
 	ErrNodeNotFoundRWS     error = errors.New("nodeID not found in the RWS")

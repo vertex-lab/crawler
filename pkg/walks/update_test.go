@@ -79,7 +79,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 				DBType:          "one-node0",
 				RWMType:         "nil",
 				removed:         []uint32{0},
-				expectedError:   models.ErrNilRWSPointer,
+				expectedError:   models.ErrNilRWS,
 				expectedUpdated: 0,
 			},
 			{
@@ -206,7 +206,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 				RWMType:         "nil",
 				addedFollows:    []uint32{3},
 				newOutDegree:    1,
-				expectedError:   models.ErrNilRWSPointer,
+				expectedError:   models.ErrNilRWS,
 				expectedUpdated: 0,
 			},
 			{
@@ -351,7 +351,7 @@ func TestUpdate(t *testing.T) {
 				nodeID:          0,
 				oldFollows:      []uint32{0},
 				currentFollows:  []uint32{1},
-				expectedError:   models.ErrNilRWSPointer,
+				expectedError:   models.ErrNilRWS,
 				expectedUpdated: 0,
 			},
 			{
