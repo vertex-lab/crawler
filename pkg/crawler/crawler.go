@@ -93,12 +93,12 @@ func Firehose(
 			continue // If the node is not found (err != nil), skip
 		}
 
-		if event.CreatedAt.Time().Unix() < node.EventTS {
+		// if the author is an inactive node, skip
+		if node.Status == models.StatusInactive {
 			continue
 		}
 
-		// if the author is an inactive node, skip
-		if node.Status == models.StatusInactive {
+		if event.CreatedAt.Time().Unix() < LatestEventTimestamp(node, event.Kind) {
 			continue
 		}
 
@@ -154,7 +154,7 @@ func QueryPubkeys(
 		case <-timer:
 
 			if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
-				logger.Error("QueryPubkeys queue handler: %v", err)
+				logger.Error("QueryPubkeys(): %w", err)
 				continue
 			}
 
@@ -181,14 +181,14 @@ func QueryPubkeyBatch(
 	ctx, cancel := context.WithTimeout(ctx, time.Second*15)
 	defer cancel()
 
-	filters := nostr.Filters{{
+	filter := nostr.Filter{
 		Kinds:   RelevantKinds,
 		Authors: pubkeys,
-	}}
+	}
 
-	// a map that associates each pubkey with the newest follow list
-	newest := make(map[string]*nostr.Event, len(pubkeys))
-	for event := range pool.SubManyEose(ctx, relays, filters) {
+	// a map that associates each pair (pubkey,kind) with the latest event of that kind.
+	latest := make(map[string]*nostr.Event, len(pubkeys)*len(filter.Kinds))
+	for event := range pool.SubManyEose(ctx, relays, nostr.Filters{filter}) {
 
 		if event.Event == nil {
 			continue
@@ -202,25 +202,61 @@ func QueryPubkeyBatch(
 			continue
 		}
 
-		newestEvent, exists := newest[event.PubKey]
+		key := KeyPubkeyKind(event.PubKey, event.Kind)
+		e, exists := latest[key]
 		if !exists {
-			newest[event.PubKey] = event.Event
+			latest[key] = event.Event
 			continue
 		}
 
-		if event.CreatedAt.Time().Unix() > newestEvent.CreatedAt.Time().Unix() {
-			newest[event.PubKey] = event.Event
+		if event.CreatedAt.Time().Unix() > e.CreatedAt.Time().Unix() {
+			latest[key] = event.Event
 		}
 	}
 
 	// send only the newest events to the queue.
-	for _, event := range newest {
+	for _, event := range latest {
 		if err := queueHandler(event); err != nil {
-			return err
+			return fmt.Errorf("queueHandler(): %w", err)
 		}
 	}
 
 	return nil
+}
+
+// ------------------------------------HELPERS----------------------------------
+
+// LatestEventTimestamp() returns the timestamp of the latest event of node for the specified kind.
+// For example, it returns the timestamp of the latest follow-list of a node.
+func LatestEventTimestamp(node *models.Node, kind int) int64 {
+	if node == nil || node.Records == nil {
+		return 0
+	}
+
+	var filterType = KindToRecordType(kind)
+	var newest int64
+	for _, rec := range node.Records {
+		if rec.Type != filterType {
+			continue
+		}
+
+		if rec.Timestamp > newest {
+			newest = rec.Timestamp
+		}
+	}
+
+	return newest
+}
+
+// KindToRecordType() returns the appropriate record type for the specified event kind.
+func KindToRecordType(kind int) string {
+	switch kind {
+	case nostr.KindFollowList:
+		return models.Follow
+
+	default:
+		return ""
+	}
 }
 
 // Close() iterates over the relays in the pool and closes all connections.
@@ -230,6 +266,11 @@ func close(logger *logger.Aggregate, pool *nostr.SimplePool, funcName string) {
 		relay.Close()
 		return true
 	})
+}
+
+// KeyPubkeyKind() returns the string "<pubkey>:<kind>", useful as a key in maps that need to associates one value to the pair (pubkey, kind).
+func KeyPubkeyKind(pubkey string, kind int) string {
+	return fmt.Sprintf("%s:%d", pubkey, kind)
 }
 
 // PrintEvent() is a simple function that prints the event ID, PubKey and Timestamp.
