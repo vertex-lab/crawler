@@ -76,7 +76,7 @@ func ProcessFollowList(
 		return fmt.Errorf("failed to fetch node by key %v: %w", event.PubKey, err)
 	}
 
-	if event.CreatedAt.Time().Unix() <= LatestEventTimestamp(author, event.Kind) {
+	if IsEventOutdated(author, event) {
 		return nil
 	}
 

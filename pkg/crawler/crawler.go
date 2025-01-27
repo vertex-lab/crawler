@@ -98,7 +98,7 @@ func Firehose(
 			continue
 		}
 
-		if event.CreatedAt.Time().Unix() <= LatestEventTimestamp(node, event.Kind) {
+		if IsEventOutdated(node, event.Event) {
 			continue
 		}
 
@@ -202,19 +202,19 @@ func QueryPubkeyBatch(
 			continue
 		}
 
-		key := KeyPubkeyKind(event.PubKey, event.Kind)
+		key := fmt.Sprintf("%s:%d", event.PubKey, event.Kind) // "<pubkey>:<kind>"" represent the pair (pubkey, kind)
 		e, exists := latest[key]
 		if !exists {
 			latest[key] = event.Event
 			continue
 		}
 
-		if event.CreatedAt.Time().Unix() > e.CreatedAt.Time().Unix() {
+		if event.CreatedAt > e.CreatedAt {
 			latest[key] = event.Event
 		}
 	}
 
-	// send only the newest events to the queue.
+	// send only the latest events to the queue.
 	for _, event := range latest {
 		if err := queueHandler(event); err != nil {
 			return fmt.Errorf("queueHandler(): %w", err)
@@ -226,26 +226,26 @@ func QueryPubkeyBatch(
 
 // ------------------------------------HELPERS----------------------------------
 
-// LatestEventTimestamp() returns the timestamp of the latest event of node for the specified kind.
-// For example, it returns the timestamp of the latest follow-list of a node.
-func LatestEventTimestamp(node *models.Node, kind int) int64 {
+// IsEventOutdated() returns whether it exists a record of node that is newer than the specified event.
+// e.g. event is a follow-list that is older than the latest follow list we processed for node, and should therefore be ignored.
+func IsEventOutdated(node *models.Node, event *nostr.Event) bool {
 	if node == nil || node.Records == nil {
-		return 0
+		return false
 	}
 
-	var filterType = KindToRecordType(kind)
-	var newest int64
+	var filterType = KindToRecordType(event.Kind)
+	var latest int64
 	for _, rec := range node.Records {
 		if rec.Type != filterType {
 			continue
 		}
 
-		if rec.Timestamp > newest {
-			newest = rec.Timestamp
+		if rec.Timestamp > latest {
+			latest = rec.Timestamp
 		}
 	}
 
-	return newest
+	return latest >= event.CreatedAt.Time().Unix()
 }
 
 // KindToRecordType() returns the appropriate record type for the specified event kind.
@@ -266,11 +266,6 @@ func close(logger *logger.Aggregate, pool *nostr.SimplePool, funcName string) {
 		relay.Close()
 		return true
 	})
-}
-
-// KeyPubkeyKind() returns the string "<pubkey>:<kind>", useful as a key in maps that need to associates one value to the pair (pubkey, kind).
-func KeyPubkeyKind(pubkey string, kind int) string {
-	return fmt.Sprintf("%s:%d", pubkey, kind)
 }
 
 // PrintEvent() is a simple function that prints the event ID, PubKey and Timestamp.
