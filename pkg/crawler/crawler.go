@@ -98,7 +98,7 @@ func Firehose(
 			continue
 		}
 
-		if event.CreatedAt.Time().Unix() < LatestEventTimestamp(node, event.Kind) {
+		if event.CreatedAt.Time().Unix() <= LatestEventTimestamp(node, event.Kind) {
 			continue
 		}
 
@@ -154,7 +154,7 @@ func QueryPubkeys(
 		case <-timer:
 
 			if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
-				logger.Error("QueryPubkeys(): %w", err)
+				logger.Error("QueryPubkeys(): %v", err)
 				continue
 			}
 

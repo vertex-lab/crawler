@@ -22,7 +22,7 @@ func TestFirehose(t *testing.T) {
 }
 
 func TestQueryPubkeys(t *testing.T) {
-
+	// These two tests should print the same 4 events, as the only difference is the triggering factor.
 	t.Run("batchSize", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
@@ -37,7 +37,7 @@ func TestQueryPubkeys(t *testing.T) {
 		}
 
 		// the channel contains enough pubkeys, so it should query immediately and then print.
-		QueryPubkeys(ctx, logger, Relays, pubkeyChan, 3, 30*time.Second, PrintEvent)
+		QueryPubkeys(ctx, logger, Relays, pubkeyChan, 4, 30*time.Second, PrintEvent)
 	})
 
 	t.Run("timer", func(t *testing.T) {

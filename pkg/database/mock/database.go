@@ -71,6 +71,10 @@ func (DB *Database) AddNode(ctx context.Context, pubkey string) (uint32, error) 
 	nodeID := uint32(DB.LastNodeID)
 	DB.KeyIndex[pubkey] = nodeID
 
+	// add follows and followers of the node
+	DB.Follow[nodeID] = mapset.NewSet[uint32]()
+	DB.Follower[nodeID] = mapset.NewSet[uint32]()
+
 	// add the node to the NodeIndex
 	DB.NodeIndex[nodeID] = &models.Node{
 		ID:      nodeID,
@@ -430,9 +434,9 @@ func SetupDB(DBType string) *Database {
 		DB := NewDatabase()
 		DB.KeyIndex = map[string]uint32{odell: 0, calle: 1, pip: 2}
 		DB.LastNodeID = 2
-		DB.NodeIndex[0] = &models.Node{ID: 0, Pubkey: "0", Status: models.StatusInactive}
-		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: "1", Status: models.StatusActive}
-		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: "2", Status: models.StatusInactive}
+		DB.NodeIndex[0] = &models.Node{ID: 0, Pubkey: odell, Status: models.StatusInactive}
+		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: calle, Status: models.StatusActive}
+		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: pip, Status: models.StatusInactive}
 
 		DB.Follow[0] = mapset.NewSet[uint32](1)
 		DB.Follow[1] = mapset.NewSet[uint32]()
@@ -441,6 +445,14 @@ func SetupDB(DBType string) *Database {
 		DB.Follower[0] = mapset.NewSet[uint32]()
 		DB.Follower[1] = mapset.NewSet[uint32](0)
 		DB.Follower[2] = mapset.NewSet[uint32]()
+		return DB
+
+	case "pip":
+		DB := NewDatabase()
+		DB.KeyIndex = map[string]uint32{pip: 0}
+		DB.LastNodeID = 0
+		DB.NodeIndex[0] = &models.Node{ID: 0, Pubkey: pip, Status: models.StatusActive}
+		DB.Follow[0] = mapset.NewSet[uint32]()
 		return DB
 
 	default:

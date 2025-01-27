@@ -48,7 +48,6 @@ type Record struct {
 // added and removed relationship (e.g. a Node added 0,11 and removed 12 from its follow-list)
 type Delta struct {
 	Record
-
 	NodeID  uint32
 	Removed []uint32
 	Added   []uint32
