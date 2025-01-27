@@ -234,18 +234,17 @@ func IsEventOutdated(node *models.Node, event *nostr.Event) bool {
 	}
 
 	var filterType = KindToRecordType(event.Kind)
-	var latest int64
 	for _, rec := range node.Records {
 		if rec.Type != filterType {
 			continue
 		}
 
-		if rec.Timestamp > latest {
-			latest = rec.Timestamp
+		if rec.Timestamp >= event.CreatedAt.Time().Unix() {
+			return true
 		}
 	}
 
-	return latest >= event.CreatedAt.Time().Unix()
+	return false
 }
 
 // KindToRecordType() returns the appropriate record type for the specified event kind.
