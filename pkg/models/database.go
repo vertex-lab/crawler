@@ -34,7 +34,7 @@ type Node struct {
 	ID      uint32
 	Pubkey  string
 	Status  string   // either active or inactive
-	Records []Record // not all Records will be necesserely returned from the DB
+	Records []Record // not all Records will be necessarily returned from the DB
 }
 
 // Record encapsulates data around an update that involved a Node. For example an update to its follow-list, or its promotion/demotion.
