@@ -2,10 +2,11 @@ package stochastictest
 
 import (
 	"context"
+	"math/rand/v2"
 	"testing"
 
+	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
-	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
@@ -16,52 +17,51 @@ func TestPagerankStatic(t *testing.T) {
 	const walkPerNode = 5000
 
 	tests := []struct {
-		name      string
-		graphType string
+		name  string
+		setup func() (StaticSetup, []*models.Delta)
 	}{
 		{
-			name:      "static Pagerank, all dandling nodes",
-			graphType: "dandlings",
+			name:  "static Pagerank, all dandling nodes",
+			setup: Dandlings,
 		},
 		{
-			name:      "static Pagerank, triangle graph",
-			graphType: "triangle",
+			name:  "static Pagerank, triangle graph",
+			setup: Triangle,
 		},
 		{
-			name:      "static Pagerank, cyclic graph 1",
-			graphType: "cyclic1",
+			name:  "static Pagerank, triangle plus one",
+			setup: TrianglePlusOne,
 		},
 		{
-			name:      "static Pagerank, acyclic graph 1",
-			graphType: "acyclic1",
+			name:  "static Pagerank, acyclic graph 1",
+			setup: Acyclic1,
 		},
 		{
-			name:      "static Pagerank, acyclic graph 2",
-			graphType: "acyclic2",
+			name:  "static Pagerank, acyclic graph 2",
+			setup: Acyclic2,
 		},
 		{
-			name:      "static Pagerank, acyclic graph 3",
-			graphType: "acyclic3",
+			name:  "static Pagerank, acyclic graph 3",
+			setup: Acyclic3,
 		},
 		{
-			name:      "static Pagerank, acyclic graph 4",
-			graphType: "acyclic4",
+			name:  "static Pagerank, acyclic graph 4",
+			setup: Acyclic4,
 		},
 		{
-			name:      "static Pagerank, single cycle long 30",
-			graphType: "cyclicLong50",
+			name:  "static Pagerank, single cycle long 30",
+			setup: CyclicLong50,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			setup := SetupGraph(test.graphType)
-			DB := setup.DB
-			expectedPR := setup.ExpectedPR
+			setup, _ := test.setup()
+			DB, expectedGlobal := setup.DB, setup.expectedGlobal
 
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
 			if err := RWM.GenerateAll(ctx, DB); err != nil {
-				t.Fatalf("GenerateAll: expected nil, pr %v", err)
+				t.Fatalf("GenerateAll: expected nil, got %v", err)
 			}
 
 			nodeIDs, err := DB.AllNodes(ctx)
@@ -74,10 +74,10 @@ func TestPagerankStatic(t *testing.T) {
 				t.Errorf("Global(): expected nil, pr %v", err)
 			}
 
-			distance := pagerank.Distance(expectedPR, pr)
+			distance := pagerank.Distance(expectedGlobal, pr)
 			if distance > maxExpectedDistance {
 				t.Errorf("Global(): expected distance %v, pr %v\n", maxExpectedDistance, distance)
-				t.Errorf("expected %v \npr %v", expectedPR, pr)
+				t.Errorf("expected %v \npr %v", expectedGlobal, pr)
 			}
 		})
 	}
@@ -97,55 +97,61 @@ func TestPagerankDynamic(t *testing.T) {
 	const walkPerNode = 5000
 
 	tests := []struct {
-		name      string
-		graphType string
+		name  string
+		setup func() (StaticSetup, []*models.Delta)
 	}{
 		{
-			name:      "dynamic Pagerank, all dandling nodes",
-			graphType: "dandlings",
+			name:  "dynamic Pagerank, all dandling nodes",
+			setup: Dandlings,
 		},
 		{
-			name:      "dynamic Pagerank, acyclic graph 1",
-			graphType: "acyclic1",
+			name:  "dynamic Pagerank, acyclic graph 1",
+			setup: Acyclic1,
 		},
 		{
-			name:      "dynamic Pagerank, acyclic graph 2",
-			graphType: "acyclic2",
+			name:  "dynamic Pagerank, acyclic graph 2",
+			setup: Acyclic2,
 		},
 		{
-			name:      "dynamic Pagerank, acyclic graph 3",
-			graphType: "acyclic3",
+			name:  "dynamic Pagerank, acyclic graph 3",
+			setup: Acyclic3,
 		},
 		{
-			name:      "dynamic Pagerank, acyclic graph 4",
-			graphType: "acyclic4",
+			name:  "dynamic Pagerank, acyclic graph 4",
+			setup: Acyclic4,
 		},
 		{
-			name:      "dynamic Pagerank, single cycle long 30",
-			graphType: "cyclicLong50",
+			name:  "dynamic Pagerank, single cycle long 30",
+			setup: CyclicLong50,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			setup := SetupGraph(test.graphType)
-			DB := setup.DB
-			expectedPR := setup.ExpectedPR
-			changes := setup.PotentialChanges
+			setup, deltas := test.setup()
+			DB, expectedGlobal := setup.DB, setup.expectedGlobal
 
-			nodeID, oldFollows, currentFollows := SetupOldState(DB, changes)
-			DB.NodeIndex[nodeID].Follows = oldFollows
+			// randomly select one of the deltas
+			index := rand.IntN(len(deltas))
+			delta := deltas[index]
+
+			if err := DB.Update(ctx, delta); err != nil {
+				t.Fatalf("Update(%v): expected nil, got %v", delta, err)
+			}
 
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			err := RWM.GenerateAll(ctx, DB)
-			if err != nil {
+			if err := RWM.GenerateAll(ctx, DB); err != nil {
 				t.Fatalf("GenerateAll: expected nil, pr %v", err)
 			}
 
-			// update the graph to the current state
-			DB.NodeIndex[nodeID].Follows = currentFollows
-			removed, common, added := sliceutils.Partition(oldFollows, currentFollows)
-			if _, err = RWM.Update(ctx, DB, nodeID, removed, common, added); err != nil {
+			// make the DB return to the initial state
+			inverse := Inverse(delta)
+			common := Unchanged(DB, inverse)
+			if err := DB.Update(ctx, inverse); err != nil {
+				t.Fatalf("Update(%v): expected nil, got %v", delta, err)
+			}
+
+			if _, err := RWM.Update(ctx, DB, inverse.NodeID, inverse.Removed, common, inverse.Added); err != nil {
 				t.Fatalf("Update: expected nil, pr %v", err)
 			}
 
@@ -159,14 +165,11 @@ func TestPagerankDynamic(t *testing.T) {
 				t.Errorf("Global(): expected nil, pr %v", err)
 			}
 
-			distance := pagerank.Distance(expectedPR, pr)
+			distance := pagerank.Distance(expectedGlobal, pr)
 			if distance > maxExpectedDistance {
 				t.Errorf("Global(): expected distance %v, pr %v\n\n", maxExpectedDistance, distance)
-				t.Errorf("expected %v\n; pr %v\n\n", expectedPR, pr)
-
-				t.Errorf("nodeID: %v", nodeID)
-				t.Errorf("oldSucc: %v", oldFollows)
-				t.Errorf("currentSucc: %v", currentFollows)
+				t.Errorf("expected %v\n; pr %v\n\n", expectedGlobal, pr)
+				t.Errorf("delta: %v", delta)
 			}
 		})
 	}
@@ -181,56 +184,54 @@ func TestPersonalizedPagerank(t *testing.T) {
 	const topk = 200
 
 	tests := []struct {
-		name      string
-		graphType string
+		name  string
+		setup func() (StaticSetup, []*models.Delta)
 	}{
 		{
-			name:      "Personalized Pagerank, all dandling nodes",
-			graphType: "dandlings",
+			name:  "Personalized Pagerank, all dandling nodes",
+			setup: Dandlings,
 		},
 		{
-			name:      "Personalized Pagerank, acyclic graph 1",
-			graphType: "acyclic1",
+			name:  "Personalized Pagerank, acyclic graph 1",
+			setup: Acyclic1,
 		},
 		{
-			name:      "Personalized Pagerank, acyclic graph 2",
-			graphType: "acyclic2",
+			name:  "Personalized Pagerank, acyclic graph 2",
+			setup: Acyclic2,
 		},
 		{
-			name:      "Personalized Pagerank, acyclic graph 3",
-			graphType: "acyclic3",
+			name:  "Personalized Pagerank, acyclic graph 3",
+			setup: Acyclic3,
 		},
 		{
-			name:      "Personalized Pagerank, acyclic graph 4",
-			graphType: "acyclic4",
+			name:  "Personalized Pagerank, acyclic graph 4",
+			setup: Acyclic4,
 		},
 		{
-			name:      "Personalized Pagerank, single cycle long 30",
-			graphType: "cyclicLong50",
+			name:  "Personalized Pagerank, single cycle long 30",
+			setup: CyclicLong50,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			setup := SetupGraph(test.graphType)
-			DB := setup.DB
-			expectedPPR0 := setup.ExpectedPPR0
+			setup, _ := test.setup()
+			DB, expectedPersonalized0 := setup.DB, setup.expectedPersonalized0
 
 			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			err := RWM.GenerateAll(ctx, DB)
-			if err != nil {
+			if err := RWM.GenerateAll(ctx, DB); err != nil {
 				t.Fatalf("GenerateAll: expected nil, got %v", err)
 			}
 
-			got, err := pagerank.Personalized(ctx, DB, RWM.Store, nodeID, topk)
+			pp, err := pagerank.Personalized(ctx, DB, RWM.Store, nodeID, topk)
 			if err != nil {
 				t.Errorf("Personalized(): expected nil, got %v", err)
 			}
 
-			distance := pagerank.Distance(expectedPPR0, got)
+			distance := pagerank.Distance(expectedPersonalized0, pp)
 			if distance > maxExpectedDistance {
 				t.Errorf("Personalized(): expected distance %v, got %v\n", maxExpectedDistance, distance)
-				t.Errorf("expected %v \ngot %v", expectedPPR0, got)
+				t.Errorf("expected %v \ngot %v", expectedPersonalized0, pp)
 			}
 		})
 	}

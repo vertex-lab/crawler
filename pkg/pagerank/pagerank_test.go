@@ -26,7 +26,7 @@ func TestGlobal(t *testing.T) {
 			name:          "nil RWS",
 			RWSType:       "nil",
 			nodeIDs:       []uint32{0},
-			expectedError: models.ErrNilRWSPointer,
+			expectedError: models.ErrNilRWS,
 		},
 		{
 			name:          "empty RWS",
@@ -107,7 +107,7 @@ func TestCheckInputs(t *testing.T) {
 			RWSType:       "nil",
 			nodeID:        0,
 			topK:          5,
-			expectedError: models.ErrNilRWSPointer,
+			expectedError: models.ErrNilRWS,
 		},
 		{
 			name:          "node not in DB",
@@ -398,7 +398,7 @@ func TestPersonalizedPagerank(t *testing.T) {
 				RWSType:       "nil",
 				nodeID:        0,
 				topK:          5,
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 			{
 				name:          "empty RWS",

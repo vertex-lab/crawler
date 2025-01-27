@@ -222,7 +222,7 @@ func TestWCLoad(t *testing.T) {
 				RWSType:       "nil",
 				limit:         1,
 				nodeIDs:       []uint32{0},
-				expectedError: models.ErrNilRWSPointer,
+				expectedError: models.ErrNilRWS,
 			},
 			{
 				name:          "empty RWS",
