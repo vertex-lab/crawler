@@ -83,7 +83,7 @@ func (DB *Database) AddNode(ctx context.Context, pubkey string) (uint32, error) 
 }
 
 // Update() applies the delta to nodeID.
-func (DB *Database) Update(ctx context.Context, nodeID uint32, delta *models.Delta) error {
+func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	_ = ctx
 	var err error
 	if err = DB.Validate(); err != nil {
@@ -94,16 +94,16 @@ func (DB *Database) Update(ctx context.Context, nodeID uint32, delta *models.Del
 		return models.ErrNilDelta
 	}
 
-	if _, exist := DB.NodeIndex[nodeID]; !exist {
+	if _, exist := DB.NodeIndex[delta.NodeID]; !exist {
 		return models.ErrNodeNotFoundDB
 	}
 
 	switch delta.Type {
 	case models.Promotion, models.Demotion:
-		err = DB.updateStatus(ctx, nodeID, delta.Record)
+		err = DB.updateStatus(ctx, delta.NodeID, delta.Record)
 
 	case models.Follow:
-		err = DB.updateFollows(ctx, nodeID, delta)
+		err = DB.updateFollows(ctx, delta)
 	}
 
 	if err != nil {
@@ -133,31 +133,31 @@ func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record mode
 }
 
 // updateFollows adds and removed follow relationships, and adds a record.
-func (DB *Database) updateFollows(ctx context.Context, nodeID uint32, delta *models.Delta) error {
+func (DB *Database) updateFollows(ctx context.Context, delta *models.Delta) error {
 	_ = ctx
 	// add all added to the follows of nodeID
-	if _, exists := DB.Follow[nodeID]; !exists {
-		DB.Follow[nodeID] = mapset.NewSet[uint32]()
+	if _, exists := DB.Follow[delta.NodeID]; !exists {
+		DB.Follow[delta.NodeID] = mapset.NewSet[uint32]()
 	}
-	DB.Follow[nodeID].Append(delta.Added...)
+	DB.Follow[delta.NodeID].Append(delta.Added...)
 
 	// add nodeID to the followers of added
 	for _, ID := range delta.Added {
 		if _, exists := DB.Follower[ID]; !exists {
 			DB.Follower[ID] = mapset.NewSet[uint32]()
 		}
-		DB.Follower[ID].Add(nodeID)
+		DB.Follower[ID].Add(delta.NodeID)
 	}
 
 	// remove all removed to the follows of nodeID
-	DB.Follow[nodeID].RemoveAll(delta.Removed...)
+	DB.Follow[delta.NodeID].RemoveAll(delta.Removed...)
 
 	// remove nodeID to the followers of removed
 	for _, ID := range delta.Removed {
-		DB.Follower[ID].Remove(nodeID)
+		DB.Follower[ID].Remove(delta.NodeID)
 	}
 
-	DB.NodeIndex[nodeID].Records = append(DB.NodeIndex[nodeID].Records, delta.Record)
+	DB.NodeIndex[delta.NodeID].Records = append(DB.NodeIndex[delta.NodeID].Records, delta.Record)
 	return nil
 }
 

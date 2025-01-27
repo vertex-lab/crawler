@@ -208,26 +208,30 @@ func (DB *Database) AddNode(ctx context.Context, pubkey string) (uint32, error) 
 }
 
 // UpdateNode() updates the nodeID using the new values inside the nodeDiff.
-func (DB *Database) Update(ctx context.Context, nodeID uint32, delta *models.Delta) error {
+func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	if err := DB.Validate(); err != nil {
 		return err
 	}
 
+	if delta == nil {
+		return models.ErrNilDelta
+	}
+
 	// check if nodeID exists
-	exists, err := DB.client.Exists(ctx, KeyNode(nodeID)).Result()
+	exists, err := DB.client.Exists(ctx, KeyNode(delta.NodeID)).Result()
 	if err != nil {
-		return fmt.Errorf("failed to check for the existance of nodeID %v: %w", nodeID, err)
+		return fmt.Errorf("failed to check for the existance of nodeID %v: %w", delta.NodeID, err)
 	}
 	if exists <= 0 {
-		return fmt.Errorf("%w with ID %d", models.ErrNodeNotFoundDB, nodeID)
+		return fmt.Errorf("%w with ID %d", models.ErrNodeNotFoundDB, delta.NodeID)
 	}
 
 	switch delta.Type {
 	case models.Promotion, models.Demotion:
-		err = DB.updateStatus(ctx, nodeID, delta.Record)
+		err = DB.updateStatus(ctx, delta.NodeID, delta.Record)
 
 	case models.Follow:
-		err = DB.updateFollows(ctx, nodeID, delta)
+		err = DB.updateFollows(ctx, delta)
 	}
 
 	if err != nil {
@@ -252,31 +256,31 @@ func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record mode
 }
 
 // updateFollows adds and removed follow relationships
-func (DB *Database) updateFollows(ctx context.Context, nodeID uint32, delta *models.Delta) error {
+func (DB *Database) updateFollows(ctx context.Context, delta *models.Delta) error {
 	pipe := DB.client.TxPipeline()
 
 	if len(delta.Added) > 0 {
 		// add all to the follows of nodeID
-		pipe.SAdd(ctx, KeyFollows(nodeID), redisutils.FormatIDs(delta.Added))
+		pipe.SAdd(ctx, KeyFollows(delta.NodeID), redisutils.FormatIDs(delta.Added))
 
 		// add nodeID to the followers of all
 		for _, ID := range delta.Added {
-			pipe.SAdd(ctx, KeyFollowers(ID), nodeID)
+			pipe.SAdd(ctx, KeyFollowers(ID), delta.NodeID)
 		}
 	}
 
 	if len(delta.Removed) > 0 {
 		// remove all from the follows of nodeID
-		pipe.SRem(ctx, KeyFollows(nodeID), redisutils.FormatIDs(delta.Removed))
+		pipe.SRem(ctx, KeyFollows(delta.NodeID), redisutils.FormatIDs(delta.Removed))
 
 		// remove nodeID from the followers of all
 		for _, ID := range delta.Removed {
-			pipe.SRem(ctx, KeyFollowers(ID), nodeID)
+			pipe.SRem(ctx, KeyFollowers(ID), delta.NodeID)
 		}
 	}
 
 	// updating FollowRecord
-	pipe.HSet(ctx, KeyNode(nodeID), NodeFollowEventID, delta.ID, NodeFollowEventTS, delta.Timestamp)
+	pipe.HSet(ctx, KeyNode(delta.NodeID), NodeFollowEventID, delta.ID, NodeFollowEventTS, delta.Timestamp)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -775,11 +779,12 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 		}
 
 		delta := &models.Delta{
+			NodeID: nodeID,
 			Record: models.Record{Type: models.Follow},
 			Added:  randomFollows,
 		}
 
-		if err := DB.Update(ctx, nodeID, delta); err != nil {
+		if err := DB.Update(ctx, delta); err != nil {
 			return nil, err
 		}
 	}

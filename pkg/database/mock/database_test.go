@@ -151,7 +151,6 @@ func TestUpdate(t *testing.T) {
 		testCases := []struct {
 			name          string
 			DBType        string
-			nodeID        uint32
 			delta         *models.Delta
 			expectedNode  *models.Node
 			expectedError error
@@ -159,28 +158,25 @@ func TestUpdate(t *testing.T) {
 			{
 				name:          "nil DB",
 				DBType:        "nil",
-				nodeID:        0,
 				expectedError: models.ErrNilDB,
 			},
 			{
 				name:          "nil delta",
 				DBType:        "one-node0",
-				nodeID:        0,
 				delta:         nil,
 				expectedError: models.ErrNilDelta,
 			},
 			{
 				name:          "node not found",
 				DBType:        "one-node0",
-				nodeID:        1,
-				delta:         &models.Delta{},
+				delta:         &models.Delta{NodeID: 1},
 				expectedError: models.ErrNodeNotFoundDB,
 			},
 			{
 				name:   "valid promotion",
 				DBType: "simple",
-				nodeID: 0,
 				delta: &models.Delta{
+					NodeID: 0,
 					Record: models.Record{Timestamp: 111, Type: models.Promotion},
 				},
 
@@ -194,8 +190,8 @@ func TestUpdate(t *testing.T) {
 			{
 				name:   "valid demotion",
 				DBType: "simple",
-				nodeID: 1,
 				delta: &models.Delta{
+					NodeID: 1,
 					Record: models.Record{Timestamp: 111, Type: models.Demotion},
 				},
 
@@ -212,17 +208,17 @@ func TestUpdate(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := SetupDB(test.DBType)
 
-				err := DB.Update(context.Background(), test.nodeID, test.delta)
+				err := DB.Update(context.Background(), test.delta)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("Update(%v): expected %v, got %v", test.delta, test.expectedError, err)
 				}
 
 				// check if node was updated correctly
 				if err == nil {
-					node := DB.NodeIndex[test.nodeID]
+					node := DB.NodeIndex[test.delta.NodeID]
 
 					if !reflect.DeepEqual(node, test.expectedNode) {
-						t.Errorf("UpdateNode(%v): expected node %v \n got %v", test.nodeID, test.expectedNode, node)
+						t.Errorf("UpdateNode(%v): expected node %v \n got %v", test.delta.NodeID, test.expectedNode, node)
 					}
 				}
 			})
@@ -231,23 +227,23 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("valid follows", func(t *testing.T) {
 		DB := SetupDB("simple")
-		var nodeID uint32 = 0
 		delta := &models.Delta{
+			NodeID:  0,
 			Record:  models.Record{ID: "xxx", Timestamp: 111, Type: models.Follow},
 			Removed: []uint32{1},
 			Added:   []uint32{2},
 		}
 
-		if err := DB.Update(context.Background(), nodeID, delta); err != nil {
-			t.Fatalf("Update(%d): expected nil got %v", nodeID, err)
+		if err := DB.Update(context.Background(), delta); err != nil {
+			t.Fatalf("Update(%d): expected nil got %v", delta.NodeID, err)
 		}
 
-		if !reflect.DeepEqual(DB.NodeIndex[nodeID].Records, []models.Record{delta.Record}) {
-			t.Errorf("expected records %v, got %v", delta.Record, DB.NodeIndex[nodeID].Records)
+		if !reflect.DeepEqual(DB.NodeIndex[delta.NodeID].Records, []models.Record{delta.Record}) {
+			t.Errorf("expected records %v, got %v", delta.Record, DB.NodeIndex[delta.NodeID].Records)
 		}
 
-		if !reflect.DeepEqual(DB.Follow[nodeID].ToSlice(), []uint32{2}) {
-			t.Errorf("expected follows %v, got %v", []uint32{2}, DB.Follow[nodeID])
+		if !reflect.DeepEqual(DB.Follow[delta.NodeID].ToSlice(), []uint32{2}) {
+			t.Errorf("expected follows %v, got %v", []uint32{2}, DB.Follow[delta.NodeID])
 		}
 
 		if DB.Follower[1].Cardinality() != 0 {
@@ -382,7 +378,7 @@ func TestFollows(t *testing.T) {
 			name:            "empty nodeIDs",
 			DBType:          "one-node0",
 			nodeIDs:         []uint32{0},
-			expectedFollows: nil,
+			expectedFollows: [][]uint32{{}},
 		},
 		{
 			name:          "empty DB",

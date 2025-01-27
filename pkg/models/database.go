@@ -44,10 +44,12 @@ type Record struct {
 	Type      string // e.g. "follows", "mutes", "promotion"...
 }
 
-// Delta represent the updates to do for a specified node. Added and Removed represent respectively the
+// Delta represent the updates to do for a specified NodeID. Added and Removed represent respectively the
 // added and removed relationship (e.g. a Node added 0,11 and removed 12 from its follow-list)
 type Delta struct {
 	Record
+
+	NodeID  uint32
 	Removed []uint32
 	Added   []uint32
 }
@@ -71,8 +73,8 @@ type Database interface {
 	// AddNode() adds a node to the database and returns its assigned nodeID
 	AddNode(ctx context.Context, pubkey string) (uint32, error)
 
-	// Update() applies the delta to nodeID
-	Update(ctx context.Context, nodeID uint32, delta *Delta) error
+	// Update() applies the delta to the database.
+	Update(ctx context.Context, delta *Delta) error
 
 	// Followers() returns a slice that contains the followers of each nodeID.
 	Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint32, error)

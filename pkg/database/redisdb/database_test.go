@@ -351,7 +351,6 @@ func TestUpdate(t *testing.T) {
 		testCases := []struct {
 			name          string
 			DBType        string
-			nodeID        uint32
 			delta         *models.Delta
 			expectedNode  *models.Node
 			expectedError error
@@ -359,20 +358,19 @@ func TestUpdate(t *testing.T) {
 			{
 				name:          "nil DB",
 				DBType:        "nil",
-				nodeID:        0,
 				expectedError: models.ErrNilDB,
 			},
 			{
 				name:          "node not found",
 				DBType:        "one-node0",
-				nodeID:        1,
+				delta:         &models.Delta{NodeID: 1},
 				expectedError: models.ErrNodeNotFoundDB,
 			},
 			{
 				name:   "valid promotion",
 				DBType: "simple",
-				nodeID: 0,
 				delta: &models.Delta{
+					NodeID: 0,
 					Record: models.Record{Type: models.Promotion, Timestamp: 123},
 				},
 				expectedNode: &models.Node{
@@ -384,8 +382,8 @@ func TestUpdate(t *testing.T) {
 			{
 				name:   "valid demotion",
 				DBType: "simple",
-				nodeID: 0,
 				delta: &models.Delta{
+					NodeID: 0,
 					Record: models.Record{Type: models.Promotion, Timestamp: 123},
 				},
 				expectedNode: &models.Node{
@@ -407,16 +405,16 @@ func TestUpdate(t *testing.T) {
 					t.Fatalf("SetupDB(): expected nil, got %v", err)
 				}
 
-				err = DB.Update(ctx, test.nodeID, test.delta)
+				err = DB.Update(ctx, test.delta)
 				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("Update(%v): expected %v, got %v", test.nodeID, test.expectedError, err)
+					t.Fatalf("Update(%v): expected %v, got %v", test.delta.NodeID, test.expectedError, err)
 				}
 
 				// check if node was updated correctly
 				if err == nil {
-					node, err := DB.NodeByID(ctx, test.nodeID)
+					node, err := DB.NodeByID(ctx, test.delta.NodeID)
 					if err != nil {
-						t.Fatalf("NodeByID(%d): expected nil, got %v", test.nodeID, err)
+						t.Fatalf("NodeByID(%d): expected nil, got %v", test.delta.NodeID, err)
 					}
 
 					if !reflect.DeepEqual(node, test.expectedNode) {
@@ -437,15 +435,15 @@ func TestUpdate(t *testing.T) {
 			t.Fatalf("SetupDB(): expected nil, got %v", err)
 		}
 
-		var nodeID uint32
 		delta := &models.Delta{
+			NodeID:  0,
 			Record:  models.Record{Type: models.Follow, Timestamp: 123, ID: "abc"},
 			Removed: []uint32{1},
 			Added:   []uint32{2},
 		}
 
-		if err := DB.Update(ctx, nodeID, delta); err != nil {
-			t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
+		if err := DB.Update(ctx, delta); err != nil {
+			t.Fatalf("Update(%d): expected nil, got %v", delta.NodeID, err)
 		}
 
 		// check that the follow record changed
@@ -456,9 +454,9 @@ func TestUpdate(t *testing.T) {
 			Records: []models.Record{delta.Record},
 		}
 
-		node, err := DB.NodeByID(ctx, nodeID)
+		node, err := DB.NodeByID(ctx, delta.NodeID)
 		if err != nil {
-			t.Fatalf("NodeByID(%d) expected nil, got %v", nodeID, err)
+			t.Fatalf("NodeByID(%d) expected nil, got %v", delta.NodeID, err)
 		}
 
 		if !reflect.DeepEqual(node, expectedNode) {
@@ -466,9 +464,9 @@ func TestUpdate(t *testing.T) {
 		}
 
 		// check the follows of nodeID
-		follows, err := DB.client.SMembers(ctx, KeyFollows(nodeID)).Result()
+		follows, err := DB.client.SMembers(ctx, KeyFollows(delta.NodeID)).Result()
 		if err != nil {
-			t.Fatalf("SMembers(%s) expected nil got %v", KeyFollows(nodeID), err)
+			t.Fatalf("SMembers(%s) expected nil got %v", KeyFollows(delta.NodeID), err)
 		}
 		if !reflect.DeepEqual(follows, []string{"2"}) {
 			t.Fatalf("Expected follows %v, got %v", []string{"2"}, follows)
