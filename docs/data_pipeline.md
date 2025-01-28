@@ -2,15 +2,17 @@
 
 ![data_pipeline.png](/home/filippo/Documents/Code/Nostrcrawler/docs/data_pipeline.png)
 
-# Scenarios
+# Definitions
 
 **Active node**: A node is said to be active if we generate random walks starting from that node. This implies that such node is contributing to the pagerank distribution with its view of the network. To be active, a node needs to acquire sufficient pagerank mass, higher than the threshold.
 
 **Inactive node**: A node is said to be inactive if we DON'T generate random walks starting from that node. This implies that such node is NOT contributing to the pagerank distribution with its view of the network.
 
+**Our Goal**: Our goal is to have a good enough balance between active and inactive nodes. It's important to note that these two sets are only going to influence our internal system dynamics and global pagerank, NOT personalized pagerank which solely depends on the source node.
+
 ---
 
-## Scenarios
+# Scenarios
 
 - [x] **New event from an active node.**
   Firehose --> Event Channel --> Process Events
