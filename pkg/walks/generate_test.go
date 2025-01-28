@@ -451,6 +451,7 @@ func BenchmarkRNGChaCha(b *testing.B) {
 
 func BenchmarkRNGPCG(b *testing.B) {
 	rng := randv2.New(randv2.NewPCG(1, 2))
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		rng.IntN(1000)
 	}

@@ -18,7 +18,7 @@ func NodeArbiter(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	walksChanged *atomic.Uint32,
 	startThreshold, promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) {
@@ -36,11 +36,11 @@ func NodeArbiter(
 			return
 
 		case <-ticker.C:
-			totalWalks = float64(RWM.Store.TotalVisits(ctx)) * float64(1-RWM.Store.Alpha(ctx)) // on average a walk is 1/(1-alpha) steps long (roughly)
+			totalWalks = float64(RWS.TotalVisits(ctx)) * float64(1-RWS.Alpha(ctx)) // on average a walk is 1/(1-alpha) steps long (roughly)
 			changeRatio = float64(walksChanged.Load()) / totalWalks
 
 			if changeRatio >= startThreshold {
-				promoted, demoted, err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler)
+				promoted, demoted, err := ArbiterScan(ctx, DB, RWS, promotionMultiplier, demotionMultiplier, queueHandler)
 				if err != nil {
 					logger.Error("%v", err)
 					continue
@@ -58,7 +58,7 @@ func NodeArbiter(
 func ArbiterScan(
 	ctx context.Context,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) (promoted, demoted int, err error) {
 
@@ -81,12 +81,12 @@ func ArbiterScan(
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): ScanNodes: %w", err)
 		}
 
-		visits, err := RWM.Store.VisitCounts(ctx, nodeIDs...)
+		visits, err := RWS.VisitCounts(ctx, nodeIDs...)
 		if err != nil {
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): visits: %w", err)
 		}
 
-		walksPerNode := float64(RWM.Store.WalksPerNode(ctx))
+		walksPerNode := float64(RWS.WalksPerNode(ctx))
 		promotionThreshold := int(promotionMultiplier*walksPerNode + 0.5)
 		demotionThreshold := int(demotionMultiplier*walksPerNode + 0.5)
 
@@ -105,7 +105,7 @@ func ArbiterScan(
 				switch {
 				// Active --> Inactive
 				case node.Status == models.StatusActive && visits[i] < demotionThreshold:
-					if err := DemoteNode(opCtx, DB, RWM, ID); err != nil {
+					if err := DemoteNode(opCtx, DB, RWS, ID); err != nil {
 						return fmt.Errorf("failed to demote node %d: %w", ID, err)
 					}
 
@@ -113,7 +113,7 @@ func ArbiterScan(
 
 				// Inactive --> Active
 				case node.Status == models.StatusInactive && visits[i] >= promotionThreshold:
-					if err := PromoteNode(opCtx, DB, RWM, ID); err != nil {
+					if err := PromoteNode(opCtx, DB, RWS, ID); err != nil {
 						return fmt.Errorf("failed to promote node %d: %w", ID, err)
 					}
 
@@ -146,10 +146,10 @@ func ArbiterScan(
 func PromoteNode(
 	ctx context.Context,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	nodeID uint32) error {
 
-	if err := RWM.Generate(ctx, DB, nodeID); err != nil {
+	if err := walks.Generate(ctx, DB, RWS, nodeID); err != nil {
 		return fmt.Errorf("PromoteNode(): %w", err)
 	}
 
@@ -170,10 +170,10 @@ func PromoteNode(
 func DemoteNode(
 	ctx context.Context,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	nodeID uint32) error {
 
-	if err := RWM.Remove(ctx, nodeID); err != nil {
+	if err := walks.Remove(ctx, RWS, nodeID); err != nil {
 		return fmt.Errorf("DemoteNode(): %w", err)
 	}
 

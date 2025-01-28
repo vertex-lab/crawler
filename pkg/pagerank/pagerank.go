@@ -12,7 +12,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
-// Global() computes the global pagerank score for the specified nodes in the DB.
+// Global() computes the global pagerank score for the specified nodeIDs.
 func Global(
 	ctx context.Context,
 	RWS models.RandomWalkStore,
@@ -102,22 +102,6 @@ Personalized() computes the personalized pagerank of nodeID by simulating a
 long random walk starting at and resetting to itself. This long walk is generated
 from the random walks stored in the RandomWalkStore.
 
-# INPUTS
-
-	> DB models.Database
-	The interface of the graph database
-
-	> RWS models.RandomWalkStore
-	The interface of the store where random walks are stored.
-
-	> nodeID uint32
-	The ID of the node we are going to compute the personalized pagerank
-
-	> topK uint16
-	The number of nodes with the highest personalized pagerank that the
-	algorithm aims to identify and converge on. Increasing this parameter
-	improves the precision for all nodes but increases the computational cost.
-
 # REFERENCES
 
 [1] B. Bahmani, A. Chowdhury, A. Goel; "Fast Incremental and Personalized PageRank"
@@ -135,17 +119,17 @@ func Personalized(
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return personalized(ctx, DB, RWS, nodeID, topK, rng)
+	return personalized(ctx, rng, DB, RWS, nodeID, topK)
 }
 
 // The personalized() function implements the internal logic of the Personalized Pagerank algorithm
 func personalized(
 	ctx context.Context,
+	rng *rand.Rand,
 	DB models.Database,
 	RWS models.RandomWalkStore,
 	nodeID uint32,
-	topK uint16,
-	rng *rand.Rand) (models.PagerankMap, error) {
+	topK uint16) (models.PagerankMap, error) {
 
 	followSlice, err := DB.Follows(ctx, nodeID)
 	if err != nil {
@@ -171,7 +155,7 @@ func personalized(
 		return nil, err
 	}
 
-	walk, err := personalizedWalk(ctx, FC, WC, nodeID, lenght, alpha, rng)
+	walk, err := personalizedWalk(ctx, rng, FC, WC, nodeID, lenght, alpha)
 	if err != nil {
 		return nil, err
 	}
@@ -184,12 +168,12 @@ func personalized(
 // WalkCache are used to speed up the computation.
 func personalizedWalk(
 	ctx context.Context,
+	rng *rand.Rand,
 	FC *FollowCache,
 	WC *WalkCache,
 	nodeID uint32,
 	targetLength int,
-	alpha float32,
-	rng *rand.Rand) (models.RandomWalk, error) {
+	alpha float32) (models.RandomWalk, error) {
 
 	walk := NewPersonalizedWalk(nodeID, targetLength)
 
@@ -211,7 +195,7 @@ func personalizedWalk(
 				return nil, err
 			}
 
-			nextID, shouldStop := walks.WalkStep(follows, walk.current, rng)
+			nextID, shouldStop := walks.WalkStep(rng, follows, walk.current)
 			if shouldStop {
 				walk.Reset()
 				continue
@@ -236,7 +220,7 @@ func personalizedWalk(
 func countAndNormalize(walk models.RandomWalk) models.PagerankMap {
 	lenght := len(walk)
 	if lenght == 0 {
-		return models.PagerankMap{}
+		return nil
 	}
 
 	freq := 1.0 / float64(lenght)
@@ -275,7 +259,7 @@ func requiredLenght(topK uint16, alpha float32) int {
 	return int(math.Round(res))
 }
 
-// Distance() returns the L1 distance between two maps.
+// Distance() returns the L1 distance between two maps, that are supposed to have the same lenght.
 func Distance(map1, map2 models.PagerankMap) float64 {
 	var distance float64
 	for key := range map1 {

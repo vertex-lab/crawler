@@ -353,7 +353,7 @@ func TestPersonalizedWalk(t *testing.T) {
 			WC := SetupWC(test.WCType)
 			rng := rand.New(rand.NewSource(42))
 
-			walk, err := personalizedWalk(ctx, FC, WC, test.startID, test.requiredLenght, 0.85, rng)
+			walk, err := personalizedWalk(ctx, rng, FC, WC, test.startID, test.requiredLenght, 0.85)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("personalizedWalk(): expected %v, got %v", test.expectedError, err)
 			}
@@ -366,7 +366,6 @@ func TestPersonalizedWalk(t *testing.T) {
 }
 
 func TestPersonalizedPagerank(t *testing.T) {
-	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name          string
@@ -428,10 +427,11 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
+				ctx := context.Background()
 				DB := mockdb.SetupDB(test.DBType)
 				RWS := mockstore.SetupRWS(test.RWSType)
-				_, err := Personalized(ctx, DB, RWS, test.nodeID, test.topK)
 
+				_, err := Personalized(ctx, DB, RWS, test.nodeID, test.topK)
 				if !errors.Is(err, test.expectedError) {
 					t.Errorf("Personalized(): expected %v, got %v", test.expectedError, err)
 				}
@@ -440,20 +440,24 @@ func TestPersonalizedPagerank(t *testing.T) {
 	})
 
 	t.Run("fuzzy test", func(t *testing.T) {
+		ctx := context.Background()
 		nodesNum := 200
 		edgesPerNode := 20
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 		DB := mockdb.GenerateDB(nodesNum, edgesPerNode, rng)
-		RWM, _ := walks.NewMockRWM(0.85, 10)
-		RWM.GenerateAll(ctx, DB)
+		RWS, _ := mockstore.NewRWS(0.85, 10)
 
-		if _, err := Personalized(ctx, DB, RWM.Store, 0, 5); err != nil {
+		if err := walks.GenerateAll(ctx, DB, RWS); err != nil {
+			t.Fatalf("GenerateAll(): expected nil, got %v", err)
+		}
+
+		if _, err := Personalized(ctx, DB, RWS, 0, 5); err != nil {
 			t.Fatalf("Personalized() expected nil, got %v", err)
 		}
 
 		// doing it two times to check that it donesn't change the DB or RWS
-		if _, err := Personalized(ctx, DB, RWM.Store, 0, 5); err != nil {
+		if _, err := Personalized(ctx, DB, RWS, 0, 5); err != nil {
 			t.Errorf("Personalized() expected nil, got %v", err)
 		}
 	})

@@ -19,7 +19,7 @@ func ProcessEvents(
 	ctx context.Context,
 	logger *logger.Aggregate,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	eventChan <-chan *nostr.Event,
 	eventCounter, walksChanged *atomic.Uint32) {
 
@@ -42,7 +42,7 @@ func ProcessEvents(
 
 			switch KindToRecordType(event.Kind) {
 			case models.Follow:
-				if err := ProcessFollowList(DB, RWM, event, walksChanged); err != nil {
+				if err := ProcessFollowList(DB, RWS, event, walksChanged); err != nil {
 					logger.Error("Error processing follow list with eventID %v: %v", event.ID, err)
 				}
 
@@ -62,7 +62,7 @@ func ProcessEvents(
 // It updates the node metadata of the author, and updates the random walks.
 func ProcessFollowList(
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	event *nostr.Event,
 	walksChanged *atomic.Uint32) error {
 
@@ -104,7 +104,7 @@ func ProcessFollowList(
 		return fmt.Errorf("failed to update nodeID %d: %w", author.ID, err)
 	}
 
-	updated, err := RWM.Update(ctx, DB, author.ID, removed, common, added)
+	updated, err := walks.Update(ctx, DB, RWS, author.ID, removed, common, added)
 	if err != nil {
 		return err
 	}

@@ -190,10 +190,10 @@ func TestProcessFollowList(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
-				RWM := walks.SetupMockRWM(test.RWSType)
+				RWS := mockstore.SetupRWS(test.RWSType)
 				walksCounter := atomic.Uint32{}
 
-				err := ProcessFollowList(DB, RWM, &validEvent, &walksCounter)
+				err := ProcessFollowList(DB, RWS, &validEvent, &walksCounter)
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
@@ -215,10 +215,7 @@ func TestProcessFollowList(t *testing.T) {
 			t.Fatalf("NewRWS(): expected nil, got %v", err)
 		}
 
-		RWM := &walks.RandomWalkManager{
-			Store: RWS,
-		}
-		if err := RWM.GenerateAll(ctx, DB); err != nil {
+		if err := walks.GenerateAll(ctx, DB, RWS); err != nil {
 			t.Fatalf("GenerateAll(): expected nil, got %v", err)
 		}
 
@@ -261,7 +258,7 @@ func TestProcessFollowList(t *testing.T) {
 
 		walksCounter := atomic.Uint32{}
 		for i, event := range events {
-			if err := ProcessFollowList(DB, RWM, event, &walksCounter); err != nil {
+			if err := ProcessFollowList(DB, RWS, event, &walksCounter); err != nil {
 				t.Fatalf("ProcessFollowList(event%d): expected nil, got %v", i, err)
 			}
 

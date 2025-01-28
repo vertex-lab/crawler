@@ -7,11 +7,11 @@ import (
 
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/pagerank"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestPagerankStatic(t *testing.T) {
-	ctx := context.Background()
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
 	const walkPerNode = 5000
@@ -56,11 +56,12 @@ func TestPagerankStatic(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			setup, _ := test.setup()
 			DB, expectedGlobal := setup.DB, setup.expectedGlobal
 
-			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			if err := RWM.GenerateAll(ctx, DB); err != nil {
+			RWS, _ := mockstore.NewRWS(alpha, walkPerNode)
+			if err := walks.GenerateAll(ctx, DB, RWS); err != nil {
 				t.Fatalf("GenerateAll: expected nil, got %v", err)
 			}
 
@@ -69,7 +70,7 @@ func TestPagerankStatic(t *testing.T) {
 				t.Fatalf("AllNodes: expected nil, pr %v", err)
 			}
 
-			pr, err := pagerank.Global(ctx, RWM.Store, nodeIDs...)
+			pr, err := pagerank.Global(ctx, RWS, nodeIDs...)
 			if err != nil {
 				t.Errorf("Global(): expected nil, pr %v", err)
 			}
@@ -91,7 +92,6 @@ Therefore, test only with acyclic graphs, or graphs large enough that the
 probability of such cycles is very low.
 */
 func TestPagerankDynamic(t *testing.T) {
-	ctx := context.Background()
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
 	const walkPerNode = 5000
@@ -128,6 +128,7 @@ func TestPagerankDynamic(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			setup, deltas := test.setup()
 			DB, expectedGlobal := setup.DB, setup.expectedGlobal
 
@@ -139,8 +140,8 @@ func TestPagerankDynamic(t *testing.T) {
 				t.Fatalf("Update(%v): expected nil, got %v", delta, err)
 			}
 
-			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			if err := RWM.GenerateAll(ctx, DB); err != nil {
+			RWS, _ := mockstore.NewRWS(alpha, walkPerNode)
+			if err := walks.GenerateAll(ctx, DB, RWS); err != nil {
 				t.Fatalf("GenerateAll: expected nil, pr %v", err)
 			}
 
@@ -151,7 +152,7 @@ func TestPagerankDynamic(t *testing.T) {
 				t.Fatalf("Update(%v): expected nil, got %v", delta, err)
 			}
 
-			if _, err := RWM.Update(ctx, DB, inverse.NodeID, inverse.Removed, common, inverse.Added); err != nil {
+			if _, err := walks.Update(ctx, DB, RWS, inverse.NodeID, inverse.Removed, common, inverse.Added); err != nil {
 				t.Fatalf("Update: expected nil, pr %v", err)
 			}
 
@@ -160,7 +161,7 @@ func TestPagerankDynamic(t *testing.T) {
 				t.Fatalf("AllNodes: expected nil, pr %v", err)
 			}
 
-			pr, err := pagerank.Global(ctx, RWM.Store, nodeIDs...)
+			pr, err := pagerank.Global(ctx, RWS, nodeIDs...)
 			if err != nil {
 				t.Errorf("Global(): expected nil, pr %v", err)
 			}
@@ -176,7 +177,6 @@ func TestPagerankDynamic(t *testing.T) {
 }
 
 func TestPersonalizedPagerank(t *testing.T) {
-	ctx := context.Background()
 	const nodeID = 0
 	const maxExpectedDistance = 0.01
 	const alpha = 0.85
@@ -215,15 +215,16 @@ func TestPersonalizedPagerank(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			setup, _ := test.setup()
 			DB, expectedPersonalized0 := setup.DB, setup.expectedPersonalized0
 
-			RWM, _ := walks.NewMockRWM(alpha, walkPerNode)
-			if err := RWM.GenerateAll(ctx, DB); err != nil {
+			RWS, _ := mockstore.NewRWS(alpha, walkPerNode)
+			if err := walks.GenerateAll(ctx, DB, RWS); err != nil {
 				t.Fatalf("GenerateAll: expected nil, got %v", err)
 			}
 
-			pp, err := pagerank.Personalized(ctx, DB, RWM.Store, nodeID, topk)
+			pp, err := pagerank.Personalized(ctx, DB, RWS, nodeID, topk)
 			if err != nil {
 				t.Errorf("Personalized(): expected nil, got %v", err)
 			}

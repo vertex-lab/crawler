@@ -15,6 +15,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/crawler"
 	"github.com/vertex-lab/crawler/pkg/database/redisdb"
 	"github.com/vertex-lab/crawler/pkg/models"
+	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	var DB models.Database
-	var RWM *walks.RandomWalkManager
+	var RWS models.RandomWalkStore
 
 	switch size {
 	case 0:
@@ -56,12 +57,12 @@ func main() {
 			panic(err)
 		}
 
-		RWM, err = walks.NewRWM(ctx, redis, 0.85, 100)
+		RWS, err = redistore.NewRWS(ctx, redis, 0.85, 100)
 		if err != nil {
 			panic(err)
 		}
 
-		if err = RWM.GenerateAll(ctx, DB); err != nil {
+		if err = walks.GenerateAll(ctx, DB, RWS); err != nil {
 			panic(err)
 		}
 
@@ -71,7 +72,7 @@ func main() {
 			panic(err)
 		}
 
-		RWM, err = walks.NewRWMConnection(ctx, redis)
+		RWS, err = redistore.NewRWSConnection(ctx, redis)
 		if err != nil {
 			panic(err)
 		}
@@ -117,7 +118,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWM, walksChanged, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, logger, DB, RWS, walksChanged, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
 			select {
 			case pubkeyChan <- pubkey:
 			default:
@@ -128,11 +129,11 @@ func main() {
 	}()
 
 	if config.DisplayStats {
-		go DisplayStats(ctx, DB, RWM, eventChan, pubkeyChan, eventCounter, walksChanged)
+		go DisplayStats(ctx, DB, RWS, eventChan, pubkeyChan, eventCounter, walksChanged)
 	}
 
 	logger.Info("ready to process events")
-	crawler.ProcessEvents(ctx, logger, DB, RWM, eventChan, eventCounter, walksChanged)
+	crawler.ProcessEvents(ctx, logger, DB, RWS, eventChan, eventCounter, walksChanged)
 	wg.Wait()
 }
 
@@ -141,7 +142,7 @@ func main() {
 func DisplayStats(
 	ctx context.Context,
 	DB models.Database,
-	RWM *walks.RandomWalkManager,
+	RWS models.RandomWalkStore,
 	eventChan <-chan *nostr.Event,
 	pubkeyChan <-chan string,
 	eventCounter, walksChanged *atomic.Uint32) {

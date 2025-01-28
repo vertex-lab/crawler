@@ -11,15 +11,15 @@ import (
 
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
-	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 func TestArbiterScan(t *testing.T) {
 	type testCases struct {
 		name          string
 		DBType        string
-		RWMType       string
+		RWSType       string
 		expectedError error
 	}
 
@@ -28,13 +28,13 @@ func TestArbiterScan(t *testing.T) {
 			{
 				name:          "nil DB",
 				DBType:        "nil",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				expectedError: models.ErrNilDB,
 			},
 			{
 				name:          "valid",
 				DBType:        "one-node0",
-				RWMType:       "one-node0",
+				RWSType:       "one-node0",
 				expectedError: nil,
 			},
 		}
@@ -42,9 +42,9 @@ func TestArbiterScan(t *testing.T) {
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
-				RWM := walks.SetupMockRWM(test.RWMType)
+				RWS := mockstore.SetupRWS(test.RWSType)
 
-				_, _, err := ArbiterScan(context.Background(), DB, RWM, 0, 0, func(pk string) error {
+				_, _, err := ArbiterScan(context.Background(), DB, RWS, 0, 0, func(pk string) error {
 					return nil
 				})
 
@@ -60,9 +60,9 @@ func TestArbiterScan(t *testing.T) {
 			// calle will be demoted to inactive, because the demotion threshold is unattainable.
 			ctx := context.Background()
 			DB := mockdb.SetupDB("simple-with-pks")
-			RWM := walks.SetupMockRWM("one-node1")
+			RWS := mockstore.SetupRWS("one-node1")
 
-			_, _, err := ArbiterScan(ctx, DB, RWM, 2.0, 2.0, func(pk string) error {
+			_, _, err := ArbiterScan(ctx, DB, RWS, 2.0, 2.0, func(pk string) error {
 				return nil
 			})
 			if err != nil {
@@ -80,7 +80,7 @@ func TestArbiterScan(t *testing.T) {
 			}
 
 			// check the only walk (from calle) has been removed
-			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, 1)
+			walkIDs, err := RWS.WalksVisiting(ctx, -1, 1)
 			if err != nil {
 				t.Errorf("WalksVisiting(): expected nil, got %v", err)
 			}
@@ -94,10 +94,10 @@ func TestArbiterScan(t *testing.T) {
 			// pip and odell will be promoted from inactive to active, because the promotion threshold is 0 * 1/1  = 0
 			ctx := context.Background()
 			DB := mockdb.SetupDB("simple-with-pks")
-			RWM := walks.SetupMockRWM("one-node1")
+			RWS := mockstore.SetupRWS("one-node1")
 			queue := []string{}
 
-			_, _, err := ArbiterScan(ctx, DB, RWM, 0, 0, func(pk string) error {
+			_, _, err := ArbiterScan(ctx, DB, RWS, 0, 0, func(pk string) error {
 				queue = append(queue, pk)
 				return nil
 			})
@@ -127,7 +127,7 @@ func TestArbiterScan(t *testing.T) {
 
 			// check that walks for pip and odell have been generated.
 			for _, nodeID := range []uint32{0, 2} {
-				walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+				walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 				if err != nil {
 					t.Fatalf("Walks(%d): expected nil, got %v", 0, err)
 				}
@@ -148,9 +148,9 @@ func TestNodeArbiter(t *testing.T) {
 	go HandleSignals(cancel, logger)
 
 	DB := mockdb.SetupDB("one-node0")
-	RWM := walks.SetupMockRWM("one-node0")
+	RWS := mockstore.SetupRWS("one-node0")
 	walksCounter := &atomic.Uint32{}
-	NodeArbiter(ctx, logger, DB, RWM, walksCounter, 0, 0, 0, func(pk string) error {
+	NodeArbiter(ctx, logger, DB, RWS, walksCounter, 0, 0, 0, func(pk string) error {
 		return nil
 	})
 }
