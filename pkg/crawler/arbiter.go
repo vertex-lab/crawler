@@ -41,8 +41,6 @@ func NodeArbiter(
 
 			if changeRatio >= startThreshold {
 				promoted, demoted, err := ArbiterScan(ctx, DB, RWM, promotionMultiplier, demotionMultiplier, queueHandler)
-				logger.Info("promoted %d, demoted %d", promoted, demoted)
-
 				if err != nil {
 					logger.Error("%v", err)
 					continue
@@ -50,7 +48,7 @@ func NodeArbiter(
 
 				// resetting the walksChanged since the last recomputation
 				walksChanged.Store(0)
-				logger.Info("NodeArbiter: scan completed")
+				logger.Info("NodeArbiter scan completed: promoted %d, demoted %d", promoted, demoted)
 			}
 		}
 	}
