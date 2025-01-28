@@ -10,8 +10,9 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	mock "github.com/vertex-lab/crawler/pkg/database/mock"
+	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
+	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 )
 
@@ -110,10 +111,11 @@ func TestUpdateRemovedNodes(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				DB := mock.SetupDB(test.DBType)
-				RWM := SetupMockRWM(test.RWMType)
+				ctx := context.Background()
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-				updated, err := RWM.updateRemovedNodes(ctx, DB, 0, test.removed, []uint32{2}, rng)
+				DB := mockdb.SetupDB(test.DBType)
+				RWS := mockstore.SetupRWS(test.RWMType)
+				updated, err := updateRemovedNodes(ctx, rng, DB, RWS, 0, test.removed, []uint32{2})
 
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
@@ -127,8 +129,8 @@ func TestUpdateRemovedNodes(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-		DB := mock.SetupDB("triangle")
-		RWM := SetupMockRWM("triangle")
+		DB := mockdb.SetupDB("triangle")
+		RWS := mockstore.SetupRWS("triangle")
 
 		nodeID := uint32(0)
 		removeFollows := []uint32{1}
@@ -155,7 +157,7 @@ func TestUpdateRemovedNodes(t *testing.T) {
 			},
 		}
 
-		updated, err := RWM.updateRemovedNodes(ctx, DB, nodeID, removeFollows, commonFollows, rng)
+		updated, err := updateRemovedNodes(ctx, rng, DB, RWS, nodeID, removeFollows, commonFollows)
 		if err != nil {
 			t.Fatalf("updateRemovedNodes(): expected nil, got %v", err)
 		}
@@ -165,12 +167,12 @@ func TestUpdateRemovedNodes(t *testing.T) {
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
-			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+			walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 			if err != nil {
 				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
 			}
 
-			walks, err := RWM.Store.Walks(ctx, walkIDs...)
+			walks, err := RWS.Walks(ctx, walkIDs...)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -189,7 +191,6 @@ func TestUpdateRemovedNodes(t *testing.T) {
 }
 
 func TestUpdateAddedNodes(t *testing.T) {
-	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name            string
@@ -240,11 +241,12 @@ func TestUpdateAddedNodes(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				DB := mock.SetupDB(test.DBType)
-				RWM := SetupMockRWM(test.RWMType)
+				ctx := context.Background()
 				rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+				DB := mockdb.SetupDB(test.DBType)
+				RWS := mockstore.SetupRWS(test.RWMType)
 
-				updated, err := RWM.updateAddedNodes(ctx, DB, 0, test.addedFollows, test.newOutDegree, rng)
+				updated, err := updateAddedNodes(ctx, rng, DB, RWS, 0, test.addedFollows, test.newOutDegree)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("updateRemovedNodes(): expected %v, got %v", test.expectedError, err)
 				}
@@ -257,8 +259,10 @@ func TestUpdateAddedNodes(t *testing.T) {
 	})
 
 	t.Run("valid", func(t *testing.T) {
-		DB := mock.SetupDB("simple")
-		RWM := SetupMockRWM("simple")
+		ctx := context.Background()
+		rng := rand.New(rand.NewSource(5))
+		DB := mockdb.SetupDB("simple")
+		RWS := mockstore.SetupRWS("simple")
 		nodeID := uint32(0)
 		addedFollows := []uint32{2}
 
@@ -266,7 +270,6 @@ func TestUpdateAddedNodes(t *testing.T) {
 		currentFollows := []uint32{2}
 		DB.Follow[nodeID] = mapset.NewSet[uint32](currentFollows...)
 
-		rng := rand.New(rand.NewSource(5))
 		expectedUpdated := 1
 		expectedWalks := map[uint32]map[uint32]models.RandomWalk{
 			0: {
@@ -278,7 +281,7 @@ func TestUpdateAddedNodes(t *testing.T) {
 			},
 		}
 
-		updated, err := RWM.updateAddedNodes(ctx, DB, nodeID, addedFollows, len(currentFollows), rng)
+		updated, err := updateAddedNodes(ctx, rng, DB, RWS, nodeID, addedFollows, len(currentFollows))
 		if err != nil {
 			t.Fatalf("updateAddedNodes(): expected nil, got %v", err)
 		}
@@ -288,12 +291,12 @@ func TestUpdateAddedNodes(t *testing.T) {
 		}
 
 		for nodeID, expectedWalk := range expectedWalks {
-			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+			walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 			if err != nil {
 				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
 			}
 
-			walks, err := RWM.Store.Walks(ctx, walkIDs...)
+			walks, err := RWS.Walks(ctx, walkIDs...)
 			if err != nil {
 				t.Fatalf("Walks(%d): expected nil, got %v", nodeID, err)
 			}
@@ -312,7 +315,6 @@ func TestUpdateAddedNodes(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	ctx := context.Background()
 	t.Run("simple errors", func(t *testing.T) {
 		testCases := []struct {
 			name            string
@@ -398,12 +400,12 @@ func TestUpdate(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				DB := mock.SetupDB(test.DBType)
-				RWM := SetupMockRWM(test.RWMType)
+				ctx := context.Background()
+				DB := mockdb.SetupDB(test.DBType)
+				RWS := mockstore.SetupRWS(test.RWMType)
 
 				removed, common, added := sliceutils.Partition(test.oldFollows, test.currentFollows)
-
-				updated, err := RWM.Update(ctx, DB, test.nodeID, removed, common, added)
+				updated, err := Update(ctx, DB, RWS, test.nodeID, removed, common, added)
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("Update(): expected %v, got %v", test.expectedError, err)
 				}
@@ -416,18 +418,22 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("fuzzy test", func(t *testing.T) {
+		ctx := context.Background()
 		nodesNum := 200
 		edgesPerNode := 20
 
 		// generate the first DB
 		rng1 := rand.New(rand.NewSource(time.Now().UnixNano()))
-		DB1 := mock.GenerateDB(nodesNum, edgesPerNode, rng1)
-		RWM, _ := NewMockRWM(0.85, 10)
-		RWM.GenerateAll(ctx, DB1)
+		DB1 := mockdb.GenerateDB(nodesNum, edgesPerNode, rng1)
+		RWS, _ := mockstore.NewRWS(0.85, 10)
+
+		if err := GenerateAll(ctx, DB1, RWS); err != nil {
+			t.Fatalf("GenerateAll(): expected nil got %v", err)
+		}
 
 		// generate another DB
 		rng2 := rand.New(rand.NewSource(time.Now().UnixNano()))
-		DB2 := mock.GenerateDB(nodesNum, edgesPerNode, rng2)
+		DB2 := mockdb.GenerateDB(nodesNum, edgesPerNode, rng2)
 
 		// update one node at the time
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
@@ -437,19 +443,19 @@ func TestUpdate(t *testing.T) {
 
 			removed, common, added := sliceutils.Partition(oldFollows.ToSlice(), newFollows.ToSlice())
 
-			if _, err := RWM.Update(ctx, DB1, nodeID, removed, common, added); err != nil {
+			if _, err := Update(ctx, DB1, RWS, nodeID, removed, common, added); err != nil {
 				t.Fatalf("Update(%d): expected nil, got %v", nodeID, err)
 			}
 		}
 
 		// check that each walk in the Walks of nodeID contains nodeID
 		for nodeID := uint32(0); nodeID < uint32(nodesNum); nodeID++ {
-			walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+			walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 			if err != nil {
 				t.Fatalf("WalksVisiting(%d): expected nil, got %v", nodeID, err)
 			}
 
-			walks, err := RWM.Store.Walks(ctx, walkIDs...)
+			walks, err := RWS.Walks(ctx, walkIDs...)
 			if err != nil {
 				t.Fatalf("Walks(): expected nil, got %v", err)
 			}
@@ -458,87 +464,6 @@ func TestUpdate(t *testing.T) {
 				if !slices.Contains(walk, nodeID) {
 					t.Fatalf("walk %v should contain nodeID = %d", walk, nodeID)
 				}
-			}
-		}
-	})
-}
-
-// ---------------------------------BENCHMARKS---------------------------------
-
-func BenchmarkUpdateAddedNodes(b *testing.B) {
-	ctx := context.Background()
-	nodesSize := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
-	RWM, _ := NewMockRWM(0.85, 10)
-	RWM.GenerateAll(ctx, DB)
-
-	removedMap := make(map[uint32][]uint32, nodesSize)
-	addedMap := make(map[uint32][]uint32, nodesSize)
-	commonMap := make(map[uint32][]uint32, nodesSize)
-	b.Run("Update(), 10% new successors", func(b *testing.B) {
-		// prepare the graph changes
-		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
-			oldFollows, _ := DB.Follows(ctx, nodeID)
-			currentFollows := make([]uint32, len(oldFollows))
-			copy(currentFollows, oldFollows[0])
-
-			// add 10% new nodes
-			for i := 0; i < edgesPerNode/10; i++ {
-				newNode := uint32(rng.Intn(nodesSize))
-				addedMap[nodeID] = append(addedMap[nodeID], newNode)
-			}
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			nodeID := uint32(i % nodesSize)
-
-			if _, err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID]); err != nil {
-				b.Fatalf("Update() failed: %v", err)
-			}
-		}
-	})
-}
-
-/*
-!IMPORTANT!
-
-run this benchmark with:
-
-> -benchtime=<nodesSize>x
-
-each node should only be updated once. Each subsequent update will be
-much cheaper because no walk will need an update, thus compromizing the measurement
-*/
-func BenchmarkUpdateRemovedNodes(b *testing.B) {
-	ctx := context.Background()
-	nodesSize := 2000
-	edgesPerNode := 100
-	rng := rand.New(rand.NewSource(69))
-	DB := mock.GenerateDB(nodesSize, edgesPerNode, rng)
-	RWM, _ := NewMockRWM(0.85, 10)
-	RWM.GenerateAll(ctx, DB)
-
-	b.Run("Update(), 10% removed successors", func(b *testing.B) {
-		removedMap := make(map[uint32][]uint32, nodesSize)
-		addedMap := make(map[uint32][]uint32, nodesSize)
-		commonMap := make(map[uint32][]uint32, nodesSize)
-
-		for nodeID := uint32(0); nodeID < uint32(nodesSize); nodeID++ {
-			oldFollows, _ := DB.Follows(ctx, nodeID)
-
-			// remove 10% of the nodes
-			removedMap[nodeID] = oldFollows[0][edgesPerNode/10:]
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			nodeID := uint32(i % nodesSize)
-
-			if _, err := RWM.Update(ctx, DB, nodeID, removedMap[nodeID], commonMap[nodeID], addedMap[nodeID]); err != nil {
-				b.Fatalf("Update() failed: %v", err)
 			}
 		}
 	})

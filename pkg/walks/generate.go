@@ -15,21 +15,22 @@ import (
 Generate() generates `walksPerNode` random walks for a single node using dampening
 factor `alpha`. The walks are added to the RandomWalkStore.
 */
-func (RWM *RandomWalkManager) Generate(
+func Generate(
 	ctx context.Context,
 	DB models.Database,
+	RWS models.RandomWalkStore,
 	nodeID uint32) error {
 
 	if err := DB.Validate(); err != nil {
 		return fmt.Errorf("Generate(): %w", err)
 	}
 
-	if err := RWM.Store.Validate(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return fmt.Errorf("Generate(): %w", err)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return RWM.generateWalks(ctx, DB, []uint32{nodeID}, rng)
+	return generateWalks(ctx, rng, DB, RWS, nodeID)
 }
 
 /*
@@ -44,12 +45,15 @@ there should always be random walks, so we should not re-do them from scratch,
 but just update them when necessary (e.g. when there is a graph update), using
 the Update() method.
 */
-func (RWM *RandomWalkManager) GenerateAll(ctx context.Context, DB models.Database) error {
+func GenerateAll(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore) error {
 	if err := DB.Validate(); err != nil {
 		return fmt.Errorf("GenerateAll(): %w", err)
 	}
 
-	if err := RWM.Store.Validate(); err != nil {
+	if err := RWS.Validate(); err != nil {
 		return fmt.Errorf("GenerateAll(): %w", err)
 	}
 
@@ -63,7 +67,7 @@ func (RWM *RandomWalkManager) GenerateAll(ctx context.Context, DB models.Databas
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return RWM.generateWalks(ctx, DB, nodeIDs, rng)
+	return generateWalks(ctx, rng, DB, RWS, nodeIDs...)
 }
 
 /*
@@ -72,15 +76,19 @@ starting from each node in the slice nodeIDs. The walks are added to the RandomW
 
 It accepts a random number generator for reproducibility in tests.
 */
-func (RWM *RandomWalkManager) generateWalks(ctx context.Context,
-	DB models.Database, nodeIDs []uint32, rng *rand.Rand) error {
+func generateWalks(
+	ctx context.Context,
+	rng *rand.Rand,
+	DB models.Database,
+	RWS models.RandomWalkStore,
+	nodeIDs ...uint32) error {
 
 	if len(nodeIDs) == 0 {
 		return nil
 	}
 
-	alpha := RWM.Store.Alpha(ctx)
-	walksPerNode := RWM.Store.WalksPerNode(ctx)
+	alpha := RWS.Alpha(ctx)
+	walksPerNode := RWS.WalksPerNode(ctx)
 
 	// for each node, perform `walksPerNode` walks and add them to the RWS
 	for _, ID := range nodeIDs {
@@ -90,7 +98,7 @@ func (RWM *RandomWalkManager) generateWalks(ctx context.Context,
 
 		walks := make([]models.RandomWalk, walksPerNode)
 		for i := uint16(0); i < walksPerNode; i++ {
-			walk, err := generateWalk(ctx, DB, ID, alpha, rng)
+			walk, err := generateWalk(ctx, rng, DB, ID, alpha)
 			if err != nil {
 				return fmt.Errorf("generateWalks(): %w", err)
 			}
@@ -98,7 +106,7 @@ func (RWM *RandomWalkManager) generateWalks(ctx context.Context,
 			walks[i] = walk
 		}
 
-		if err := RWM.Store.AddWalks(ctx, walks...); err != nil {
+		if err := RWS.AddWalks(ctx, walks...); err != nil {
 			return fmt.Errorf("generateWalks(): %w", err)
 		}
 	}
@@ -126,10 +134,10 @@ URL: http://snap.stanford.edu/class/cs224w-readings/bahmani10pagerank.pdf
 */
 func generateWalk(
 	ctx context.Context,
+	rng *rand.Rand,
 	DB models.Database,
 	startingID uint32,
-	alpha float32,
-	rng *rand.Rand) (models.RandomWalk, error) {
+	alpha float32) (models.RandomWalk, error) {
 
 	var shouldBreak bool
 	currentID := startingID
@@ -146,7 +154,7 @@ func generateWalk(
 			return nil, fmt.Errorf("generateWalk(): %w", err)
 		}
 
-		currentID, shouldBreak = WalkStep(follows[0], walk, rng)
+		currentID, shouldBreak = WalkStep(rng, follows[0], walk)
 		if shouldBreak {
 			break
 		}
@@ -168,7 +176,7 @@ performs a walk step nodeID --> nextID in successorIDs and returns
 - nextNodeID was already visited in one of the previous steps (walk). In other
 words, when a cycle is found.
 */
-func WalkStep(follows, walk []uint32, rng *rand.Rand) (nextID uint32, stop bool) {
+func WalkStep(rng *rand.Rand, follows, walk []uint32) (nextID uint32, stop bool) {
 
 	// if it's a dandling node, stop
 	followSize := len(follows)
@@ -188,32 +196,29 @@ func WalkStep(follows, walk []uint32, rng *rand.Rand) (nextID uint32, stop bool)
 }
 
 // Remove() removes all the walks that originated from nodeID.
-func (RWM *RandomWalkManager) Remove(ctx context.Context, nodeID uint32) error {
-
-	if err := RWM.Store.Validate(); err != nil {
+func Remove(ctx context.Context, RWS models.RandomWalkStore, nodeID uint32) error {
+	if err := RWS.Validate(); err != nil {
 		return fmt.Errorf("Remove(): %w", err)
 	}
 
-	walkIDs, err := RWM.Store.WalksVisiting(ctx, -1, nodeID)
+	walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 	if err != nil {
 		return fmt.Errorf("Remove(): %w", err)
 	}
 
-	walks, err := RWM.Store.Walks(ctx, walkIDs...)
+	walks, err := RWS.Walks(ctx, walkIDs...)
 	if err != nil {
 		return fmt.Errorf("Remove(): %w", err)
 	}
 
-	walksToRemove := make([]uint32, 0, RWM.Store.WalksPerNode(ctx))
+	walksToRemove := make([]uint32, 0, RWS.WalksPerNode(ctx))
 	for i, ID := range walkIDs {
-		if !startsWith(walks[i], nodeID) {
-			continue
+		if startsWith(walks[i], nodeID) {
+			walksToRemove = append(walksToRemove, ID)
 		}
-
-		walksToRemove = append(walksToRemove, ID)
 	}
 
-	return RWM.Store.RemoveWalks(ctx, walksToRemove...)
+	return RWS.RemoveWalks(ctx, walksToRemove...)
 }
 
 // startsWith() returns whether walk starts with nodeID.
