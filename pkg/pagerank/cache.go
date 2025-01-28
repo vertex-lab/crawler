@@ -85,11 +85,7 @@ func (WC *WalkCache) Next(nodeID uint32) (models.RandomWalk, bool) {
 	}
 
 	positions, exists := WC.positions[nodeID]
-	if !exists {
-		return nil, false
-	}
-
-	if len(positions) == 0 {
+	if !exists || len(positions) == 0 {
 		return nil, false
 	}
 
@@ -97,15 +93,15 @@ func (WC *WalkCache) Next(nodeID uint32) (models.RandomWalk, bool) {
 		if len(WC.walks[pos]) == 0 {
 			continue
 		}
-
 		walk := WC.walks[pos]
-		WC.walks[pos] = nil // zeroing the walk, so it can't be reused by other nodes
-		WC.positions[nodeID] = positions[i+1:]
+
+		WC.walks[pos] = nil                    // zeroing the walk, so it can't be reused by other nodes
+		WC.positions[nodeID] = positions[i+1:] // reslicing positions to avoid traversing nilled elements next time
 		return walk, true
 	}
 
-	// all walks where nil, hence zero the positions
-	WC.positions[nodeID] = []int{}
+	// all walks where nil, hence nil the positions
+	WC.positions[nodeID] = nil
 	return nil, false
 }
 
