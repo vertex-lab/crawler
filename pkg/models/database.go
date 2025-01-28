@@ -1,14 +1,14 @@
 /*
-The models package defines the fundamental structures and interfaces used in this project.
+The models package defines the fundamental interfaces used in this project.
 Interfaces:
 
-Graph:
-The Graph interface abstracts the basic database functionalities, allowing for
-multiple implementations.
+Database:
+The Database interface abstracts the basic CRUD database functionalities.
 
 RandomWalkStore:
 The RandomWalkStore interface abstracts atomic operations to create, update, and
-remove RandomWalks. These walks are then utilized in the pagerank package.
+remove RandomWalks. These walks are then utilized in the pagerank package to
+efficiently compute global and personalized pageranks.
 */
 package models
 
