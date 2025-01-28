@@ -213,25 +213,25 @@ func TestVisitCounts(t *testing.T) {
 		expectedError  error
 	}{
 		{
-			name:           "nil RWS",
-			RWSType:        "nil",
-			nodeIDs:        []uint32{0},
-			expectedVisits: []int{},
-			expectedError:  models.ErrNilRWS,
+			name:          "nil RWS",
+			RWSType:       "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilRWS,
 		},
 		{
 			name:           "empty RWS",
 			RWSType:        "empty",
 			nodeIDs:        []uint32{0},
 			expectedVisits: []int{0},
-			expectedError:  nil,
 		},
 		{
-			name:           "empty nodeIDs",
-			RWSType:        "one-node0",
-			nodeIDs:        []uint32{},
-			expectedVisits: []int{},
-			expectedError:  nil,
+			name:    "nil nodeIDs",
+			RWSType: "one-node0",
+		},
+		{
+			name:    "empty nodeIDs",
+			RWSType: "one-node0",
+			nodeIDs: []uint32{},
 		},
 		{
 			name:           "one node RWS",

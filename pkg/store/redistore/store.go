@@ -168,11 +168,11 @@ func (RWS *RandomWalkStore) Validate() error {
 // VisitCounts() returns a slice containing the number of times each node was visited by a walk.
 func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
 	if err := RWS.Validate(); err != nil {
-		return []int{}, err
+		return nil, err
 	}
 
 	if len(nodeIDs) == 0 {
-		return []int{}, nil
+		return nil, nil
 	}
 
 	pipe := RWS.client.Pipeline()
@@ -182,7 +182,7 @@ func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) 
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
-		return []int{}, err
+		return nil, err
 	}
 
 	visits := make([]int, len(nodeIDs))
