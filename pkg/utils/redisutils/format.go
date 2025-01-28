@@ -22,7 +22,7 @@ func FormatWalk(walk models.RandomWalk) string {
 func ParseWalk(strWalk string) (models.RandomWalk, error) {
 
 	if len(strWalk) == 0 {
-		return models.RandomWalk{}, nil
+		return nil, nil
 	}
 
 	strVals := strings.Split(strWalk, ",")
@@ -42,14 +42,14 @@ func ParseWalk(strWalk string) (models.RandomWalk, error) {
 // ParseWalks() parses a slice of strings to a slice of random walks
 func ParseWalks(strWalks []string) ([]models.RandomWalk, error) {
 	if len(strWalks) == 0 {
-		return []models.RandomWalk{}, nil
+		return nil, nil
 	}
 
 	walks := make([]models.RandomWalk, 0, len(strWalks))
 	for _, strWalk := range strWalks {
 		walk, err := ParseWalk(strWalk)
 		if err != nil {
-			return []models.RandomWalk{}, err
+			return nil, err
 		}
 
 		walks = append(walks, walk)
@@ -58,9 +58,10 @@ func ParseWalks(strWalks []string) ([]models.RandomWalk, error) {
 	return walks, nil
 }
 
-// FormatID() formats an ID into a string
-func FormatID(ID uint32) string {
-	return strconv.FormatUint(uint64(ID), 10)
+// FormatID() formats a POSITIVE ID into a string.
+// Warning: don't pass negative IDs, or they will be converted incorrectly.
+func FormatID[ID uint32 | int64 | int](id ID) string {
+	return strconv.FormatUint(uint64(id), 10)
 }
 
 // ParseID() parses a nodeID or walkID (uint32) from the specified string
@@ -69,8 +70,9 @@ func ParseID(strID string) (uint32, error) {
 	return uint32(ID), err
 }
 
-// FormatIDs() formats a slice of IDs into a slice of string.
-func FormatIDs(IDs []uint32) []string {
+// FormatIDs() formats a slice of POSITIVE IDs into a slice of string.
+// Warning: don't pass negative IDs, or they will be converted incorrectly.
+func FormatIDs[ID uint32 | int64 | int](IDs []ID) []string {
 	if len(IDs) == 0 {
 		return []string{}
 	}
@@ -86,14 +88,14 @@ func FormatIDs(IDs []uint32) []string {
 // ParseIDs() parses a slice of IDs from the specified slice of string.
 func ParseIDs(strIDs []string) ([]uint32, error) {
 	if len(strIDs) == 0 {
-		return []uint32{}, nil
+		return nil, nil
 	}
 
 	IDs := make([]uint32, 0, len(strIDs))
 	for _, strID := range strIDs {
 		ID, err := ParseID(strID)
 		if err != nil {
-			return []uint32{}, nil
+			return nil, nil
 		}
 
 		IDs = append(IDs, ID)
@@ -105,7 +107,7 @@ func ParseIDs(strIDs []string) ([]uint32, error) {
 func ParseUniqueIDs(strIDs []string) ([]uint32, error) {
 	IDs, err := ParseIDs(strIDs)
 	if err != nil {
-		return []uint32{}, nil
+		return nil, nil
 	}
 
 	return sliceutils.Unique(IDs), nil
@@ -113,8 +115,7 @@ func ParseUniqueIDs(strIDs []string) ([]uint32, error) {
 
 // ParseInt64() parses an int from the specified string
 func ParseInt64(strVal string) (int64, error) {
-	parsedVal, err := strconv.ParseInt(strVal, 10, 64)
-	return parsedVal, err
+	return strconv.ParseInt(strVal, 10, 64)
 }
 
 // ParseUint16() parses an uint16 from the specified string
@@ -131,6 +132,5 @@ func ParseFloat32(strVal string) (float32, error) {
 
 // ParseFloat64() parses a float64 from the specified string
 func ParseFloat64(strVal string) (float64, error) {
-	parsedVal, err := strconv.ParseFloat(strVal, 64)
-	return parsedVal, err
+	return strconv.ParseFloat(strVal, 64)
 }

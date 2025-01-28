@@ -347,27 +347,20 @@ func TestWalksVisiting(t *testing.T) {
 			expectedError: models.ErrNilRWS,
 		},
 		{
-			name:          "nil nodeIDs",
-			RWSType:       "one-node0",
-			nodeIDs:       nil,
-			expectedError: nil,
-			expectedIDs:   nil,
+			name:    "nil nodeIDs",
+			RWSType: "one-node0",
 		},
 		{
-			name:          "empty RWS",
-			RWSType:       "empty",
-			limit:         1,
-			nodeIDs:       []uint32{0},
-			expectedError: nil,
-			expectedIDs:   []uint32{},
+			name:    "empty RWS",
+			RWSType: "empty",
+			limit:   1,
+			nodeIDs: []uint32{0},
 		},
 		{
-			name:          "nodeID not found in RWS",
-			RWSType:       "one-node0",
-			limit:         1,
-			nodeIDs:       []uint32{1},
-			expectedError: nil,
-			expectedIDs:   []uint32{},
+			name:    "nodeID not found in RWS",
+			RWSType: "one-node0",
+			limit:   1,
+			nodeIDs: []uint32{1},
 		},
 		{
 			name:        "one nodeID",
@@ -422,25 +415,18 @@ func TestWalksVisitingAll(t *testing.T) {
 			expectedError: models.ErrNilRWS,
 		},
 		{
-			name:          "nil nodeIDs",
-			RWSType:       "one-node0",
-			nodeIDs:       nil,
-			expectedError: nil,
-			expectedIDs:   nil,
+			name:    "nil nodeIDs",
+			RWSType: "one-node0",
 		},
 		{
-			name:          "empty RWS",
-			RWSType:       "empty",
-			nodeIDs:       []uint32{0},
-			expectedError: nil,
-			expectedIDs:   []uint32{},
+			name:    "empty RWS",
+			RWSType: "empty",
+			nodeIDs: []uint32{0},
 		},
 		{
-			name:          "nodeID not found in RWS",
-			RWSType:       "one-node0",
-			nodeIDs:       []uint32{1},
-			expectedError: nil,
-			expectedIDs:   []uint32{},
+			name:    "nodeID not found in RWS",
+			RWSType: "one-node0",
+			nodeIDs: []uint32{1},
 		},
 		{
 			name:        "one nodeID",
@@ -573,7 +559,7 @@ func TestAddWalks(t *testing.T) {
 
 		// check if the loaded walks match the originals
 		for i, walk := range walks {
-			walkID := redisutils.FormatID(uint32(i))
+			walkID := redisutils.FormatID(i)
 			strWalk, err := RWS.client.HGet(context.Background(), KeyWalks, walkID).Result()
 			if err != nil {
 				t.Fatalf("Get(): expected nil, got %v", err)

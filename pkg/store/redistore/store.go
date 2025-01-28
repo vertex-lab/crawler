@@ -26,7 +26,7 @@ const (
 
 // KeyWalksVisiting() returns the Redis key for the nodeWalkIDs with specified nodeID
 func KeyWalksVisiting(nodeID uint32) string {
-	return fmt.Sprintf("%v%d", KeyWalksVisitingPrefix, nodeID)
+	return fmt.Sprintf("%s%d", KeyWalksVisitingPrefix, nodeID)
 }
 
 // RandomWalkStore implements the omonimus interface defined in models.
@@ -47,7 +47,6 @@ type RWSFields struct {
 // NewRWS creates a new instance of RandomWalkStore using the provided Redis client,
 // and overwrites alpha, walksPerNode, nextNodeID, and nextWalkID in a Redis hash named "rws".
 func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode uint16) (*RandomWalkStore, error) {
-
 	// Validate input parameters
 	if alpha <= 0 || alpha >= 1 {
 		return nil, models.ErrInvalidAlpha
@@ -77,7 +76,6 @@ func NewRWS(ctx context.Context, cl *redis.Client, alpha float32, walksPerNode u
 
 // NewRWSConnection() loads the instance of RandomWalkStore using the provided Redis client
 func NewRWSConnection(ctx context.Context, cl *redis.Client) (*RandomWalkStore, error) {
-
 	if cl == nil {
 		return nil, ErrNilClient
 	}
@@ -148,7 +146,6 @@ func (RWS *RandomWalkStore) TotalVisits(ctx context.Context) int {
 
 // Validate() checks the fields of the RWS struct and returns the appropriate error.
 func (RWS *RandomWalkStore) Validate() error {
-
 	if RWS == nil {
 		return models.ErrNilRWS
 	}
@@ -170,7 +167,6 @@ func (RWS *RandomWalkStore) Validate() error {
 
 // VisitCounts() returns a slice containing the number of times each node was visited by a walk.
 func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
-
 	if err := RWS.Validate(); err != nil {
 		return []int{}, err
 	}
@@ -199,7 +195,6 @@ func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) 
 
 // Walks() returns the walks associated with the walkIDs.
 func (RWS *RandomWalkStore) Walks(ctx context.Context, walkIDs ...uint32) ([]models.RandomWalk, error) {
-
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
@@ -246,7 +241,6 @@ Note:
 - If limit = -1, all walks for all nodes are returned (USE WITH CAUTION).
 */
 func (RWS *RandomWalkStore) WalksVisiting(ctx context.Context, limit int, nodeIDs ...uint32) ([]uint32, error) {
-
 	if err := RWS.Validate(); err != nil {
 		return nil, err
 	}
@@ -319,7 +313,6 @@ func (RWS *RandomWalkStore) WalksVisitingAll(ctx context.Context, nodeIDs ...uin
 // AddWalks() adds all the specified walks to the RWS. If at least one of the walks
 // is invalid, no walk gets added.
 func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.RandomWalk) error {
-
 	if err := RWS.Validate(); err != nil {
 		return err
 	}
@@ -344,7 +337,7 @@ func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.Random
 	pipe := RWS.client.TxPipeline()
 	var newVisits int64 = 0
 	for i, walk := range walks {
-		walkID := uint32(int(lastID) - len(walks) + i + 1) // assigning IDs in the same order
+		walkID := int(lastID) - len(walks) + i + 1 // assigning IDs in the same order
 
 		pipe.HSet(ctx, KeyWalks, redisutils.FormatID(walkID), redisutils.FormatWalk(walk))
 
@@ -367,7 +360,6 @@ func (RWS *RandomWalkStore) AddWalks(ctx context.Context, walks ...models.Random
 // RemoveWalks() removes all the specified walks from the RWS. If one walkID
 // is not found, no walk gets removed.
 func (RWS *RandomWalkStore) RemoveWalks(ctx context.Context, walkIDs ...uint32) error {
-
 	if err := RWS.Validate(); err != nil {
 		return err
 	}

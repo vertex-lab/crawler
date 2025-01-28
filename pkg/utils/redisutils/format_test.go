@@ -51,28 +51,23 @@ func TestParseWalk(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:          "empty strWalk",
-			strWalk:       "",
-			expectedWalk:  models.RandomWalk{},
-			expectedError: nil,
+			name:    "empty strWalk",
+			strWalk: "",
 		},
 		{
 			name:          "invalid strWalk",
 			strWalk:       "0.33,11.0,1",
-			expectedWalk:  nil,
 			expectedError: strconv.ErrSyntax,
 		},
 		{
-			name:          "valid strWalk",
-			strWalk:       "0,1,2,3,5",
-			expectedWalk:  models.RandomWalk{0, 1, 2, 3, 5},
-			expectedError: nil,
+			name:         "valid strWalk",
+			strWalk:      "0,1,2,3,5",
+			expectedWalk: models.RandomWalk{0, 1, 2, 3, 5},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-
 			walk, err := ParseWalk(test.strWalk)
 
 			if !errors.Is(err, test.expectedError) {
@@ -80,7 +75,7 @@ func TestParseWalk(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(walk, test.expectedWalk) {
-				t.Errorf("FormatWalk(): expected %v, got %v", test.expectedWalk, walk)
+				t.Errorf("ParseWalk(): expected %v, got %v", test.expectedWalk, walk)
 			}
 		})
 	}
