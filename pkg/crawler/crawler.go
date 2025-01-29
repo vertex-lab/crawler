@@ -50,6 +50,17 @@ var (
 	}
 )
 
+// KindToRecordType() returns the appropriate record type for the specified event kind.
+func KindToRecordType(kind int) string {
+	switch kind {
+	case nostr.KindFollowList:
+		return models.Follow
+
+	default:
+		return ""
+	}
+}
+
 /*
 Firehose connects to a list of relays and pulls kind:3 events that are newer than the current time.
 It efficiently filters events based on the pubkey "spamminess", determined by our
@@ -245,17 +256,6 @@ func IsEventOutdated(node *models.Node, event *nostr.Event) bool {
 	}
 
 	return false
-}
-
-// KindToRecordType() returns the appropriate record type for the specified event kind.
-func KindToRecordType(kind int) string {
-	switch kind {
-	case nostr.KindFollowList:
-		return models.Follow
-
-	default:
-		return ""
-	}
 }
 
 // Close() iterates over the relays in the pool and closes all connections.

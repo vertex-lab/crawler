@@ -51,7 +51,7 @@ func ProcessEvents(
 			}
 
 			eventCounter.Add(1)
-			if eventCounter.Load()%1000 == 0 {
+			if eventCounter.Load()%5000 == 0 {
 				logger.Info("processed %d events", eventCounter.Load())
 			}
 		}

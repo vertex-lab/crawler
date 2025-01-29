@@ -79,13 +79,13 @@ func main() {
 	}
 
 	eventCounter := &atomic.Uint32{} // tracks the number of events processed
-	walksChanged := &atomic.Uint32{} // tracks the pagerank mass accumulated since the last scan of NodeArbiter.
+	walksChanged := &atomic.Uint32{} // tracks the number of walks updated since the last scan of NodeArbiter
 	walksChanged.Add(1000000)        // to make NodeArbiter activate immediately
 
-	eventChan := make(chan *nostr.Event, config.EventChanCapacity)
-	pubkeyChan := make(chan string, config.PubkeyChanCapacity)
+	eventQueue := make(chan *nostr.Event, config.EventChanCapacity)
+	pubkeyQueue := make(chan string, config.PubkeyChanCapacity)
 	for _, pk := range config.InitPubkeys { // send the initialization pubkeys to the queue (if any)
-		pubkeyChan <- pk
+		pubkeyQueue <- pk
 	}
 
 	// spawn the Firehose, the QueryPubkeys and NodeArbiter as three goroutines.
@@ -96,7 +96,7 @@ func main() {
 		defer wg.Done()
 		crawler.Firehose(ctx, logger, DB, crawler.Relays, func(event *nostr.Event) error {
 			select {
-			case eventChan <- event:
+			case eventQueue <- event:
 			default:
 				logger.Warn("Firehose: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 			}
@@ -106,9 +106,9 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyChan, config.QueryBatchSize, config.QueryInterval, func(event *nostr.Event) error {
+		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyQueue, config.QueryBatchSize, config.QueryInterval, func(event *nostr.Event) error {
 			select {
-			case eventChan <- event:
+			case eventQueue <- event:
 			default:
 				logger.Warn("QueryPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 			}
@@ -120,7 +120,7 @@ func main() {
 		defer wg.Done()
 		crawler.NodeArbiter(ctx, logger, DB, RWS, walksChanged, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
 			select {
-			case pubkeyChan <- pubkey:
+			case pubkeyQueue <- pubkey:
 			default:
 				logger.Warn("NodeArbiter: Channel is full, dropping pubkey: %v", pubkey)
 			}
@@ -129,11 +129,11 @@ func main() {
 	}()
 
 	if config.DisplayStats {
-		go DisplayStats(ctx, DB, RWS, eventChan, pubkeyChan, eventCounter, walksChanged)
+		go DisplayStats(ctx, DB, RWS, eventQueue, pubkeyQueue, eventCounter, walksChanged)
 	}
 
 	logger.Info("ready to process events")
-	crawler.ProcessEvents(ctx, logger, DB, RWS, eventChan, eventCounter, walksChanged)
+	crawler.ProcessEvents(ctx, logger, DB, RWS, eventQueue, eventCounter, walksChanged)
 	wg.Wait()
 }
 
@@ -143,14 +143,14 @@ func DisplayStats(
 	ctx context.Context,
 	DB models.Database,
 	RWS models.RandomWalkStore,
-	eventChan <-chan *nostr.Event,
-	pubkeyChan <-chan string,
+	eventQueue <-chan *nostr.Event,
+	pubkeyQueue <-chan string,
 	eventCounter, walksChanged *atomic.Uint32) {
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	const statsLines = 10
+	const statsLines = 11
 	firstDisplay := true
 	clearStats := func() {
 		if !firstDisplay {
@@ -167,10 +167,10 @@ func DisplayStats(
 			return
 
 		case <-ticker.C:
-			eventChanLen := len(eventChan)
-			eventChanCap := cap(eventChan)
-			pubkeyChanLen := len(pubkeyChan)
-			pubkeyChanCap := cap(pubkeyChan)
+			eventQueueLen := len(eventQueue)
+			eventQueueCap := cap(eventQueue)
+			pubkeyQueueLen := len(pubkeyQueue)
+			pubkeyQueueCap := cap(pubkeyQueue)
 			goroutines := runtime.NumGoroutine()
 			memStats := new(runtime.MemStats)
 			runtime.ReadMemStats(memStats)
@@ -178,10 +178,11 @@ func DisplayStats(
 			clearStats()
 			fmt.Printf("\n------------ System Stats -------------\n")
 			fmt.Printf("Database Size: %d nodes\n", DB.Size(ctx))
-			fmt.Printf("Event Channel: %d/%d\n", eventChanLen, eventChanCap)
-			fmt.Printf("Pubkey Channel: %d/%d\n", pubkeyChanLen, pubkeyChanCap)
+			fmt.Printf("Event Queue: %d/%d\n", eventQueueLen, eventQueueCap)
+			fmt.Printf("Pubkey Queue: %d/%d\n", pubkeyQueueLen, pubkeyQueueCap)
 			fmt.Printf("Processed Events: %d\n", eventCounter.Load())
 			fmt.Printf("Walks changed since last scan: %v\n", walksChanged.Load())
+			fmt.Printf("Total walks: %v\n", walksChanged.Load())
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
 			fmt.Println("---------------------------------------")
