@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
@@ -190,13 +189,13 @@ func TestNodeByKey(t *testing.T) {
 			name:          "empty DB",
 			DBType:        "empty",
 			pubkey:        "zero",
-			expectedError: redis.Nil,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:          "pubkey not found",
 			DBType:        "one-node0",
 			pubkey:        "one",
-			expectedError: redis.Nil,
+			expectedError: models.ErrNodeNotFoundDB,
 		},
 		{
 			name:   "valid",

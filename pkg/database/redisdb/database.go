@@ -156,17 +156,17 @@ func (DB *Database) NodeByKey(ctx context.Context, pubkey string) (*models.Node,
 
 	// get the nodeID associated with the pubkey
 	strID, err := DB.client.HGet(ctx, KeyKeyIndex, pubkey).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil, fmt.Errorf("%w with pubkey %s", models.ErrNodeNotFoundDB, pubkey)
+	}
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch node with pubkey %s: %w", pubkey, err)
 	}
 
 	nodeMap, err := DB.client.HGetAll(ctx, KeyNodePrefix+strID).Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch node with pubkey %v: %w", pubkey, err)
-	}
-
-	if len(nodeMap) == 0 {
-		return nil, fmt.Errorf("%w with pubkey %s", models.ErrNodeNotFoundDB, pubkey)
+	if err != nil || len(nodeMap) == 0 {
+		return nil, fmt.Errorf("failed to fetch node with pubkey %s: %w", pubkey, err)
 	}
 
 	return ParseNode(nodeMap)
