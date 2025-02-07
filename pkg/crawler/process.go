@@ -3,7 +3,6 @@ package crawler
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync/atomic"
 	"time"
 
@@ -113,7 +112,7 @@ func ProcessFollowList(
 	return nil
 }
 
-// AssignNodeIDs() returns the nodeIDs of the specified pubkeys. If a pubkey isn't found in the database, it gets added.
+// AssignNodeIDs() returns the nodeIDs of the specified pubkeys. If a pubkey isn't found in the database, it gets added as a new node.
 func AssignNodeIDs(
 	ctx context.Context,
 	DB models.Database,
@@ -153,7 +152,7 @@ func ParsePubkeys(event *nostr.Event) []string {
 
 	// if it's empty or very big, skip
 	if event == nil || len(event.Tags) == 0 || len(event.Tags) > 100000 {
-		return []string{}
+		return nil
 	}
 
 	pubkeys := make([]string, 0, len(event.Tags))
@@ -172,11 +171,6 @@ func ParsePubkeys(event *nostr.Event) []string {
 			continue
 		}
 
-		// pubkeys should be unique in the follow list; TODO, this is inefficient.
-		if slices.Contains(pubkeys, pubkey) {
-			continue
-		}
-
 		if !nostr.IsValidPublicKey(pubkey) {
 			continue
 		}
@@ -184,5 +178,5 @@ func ParsePubkeys(event *nostr.Event) []string {
 		pubkeys = append(pubkeys, pubkey)
 	}
 
-	return pubkeys
+	return sliceutils.Unique(pubkeys)
 }

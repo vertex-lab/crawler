@@ -2,6 +2,7 @@
 package sliceutils
 
 import (
+	"cmp"
 	"slices"
 	"sort"
 
@@ -9,13 +10,13 @@ import (
 )
 
 // Unique() returns a slice of unique elements of the input slice.
-func Unique(slice []uint32) []uint32 {
+func Unique[S ~[]E, E cmp.Ordered](slice S) S {
 	if len(slice) == 0 {
-		return []uint32{}
+		return nil
 	}
 
 	slices.Sort(slice)
-	unique := make([]uint32, 0, len(slice))
+	unique := make(S, 0, len(slice))
 	unique = append(unique, slice[0])
 
 	for i := 1; i < len(slice); i++ {
@@ -27,40 +28,6 @@ func Unique(slice []uint32) []uint32 {
 	return unique
 }
 
-// SplitSlice splits a slice into a slice of slices with a maximum size of batchSize
-func SplitSlice(slice []string, batchSize int) [][]string {
-	if len(slice) == 0 {
-		return [][]string{}
-	}
-
-	split := make([][]string, 0, len(slice)/batchSize)
-	for batchSize < len(slice) {
-		split, slice = append(split, slice[:batchSize]), slice[batchSize:]
-	}
-	return append(split, slice)
-}
-
-// EqualElements() returns whether slice1 and slice2 are equal if they have
-// the same elements (possibly in different positions).
-// Empty and nil slices are considered equal.
-// Time complexity is O(n * logn + m * logm)  where n and m are the lengths of the slices.
-func EqualElements(slice1, slice2 []uint32) bool {
-	if len(slice1) != len(slice2) {
-		return false
-	}
-
-	slices.Sort(slice1)
-	slices.Sort(slice2)
-
-	for i := range slice1 {
-		if slice1[i] != slice2[i] {
-			return false
-		}
-	}
-
-	return true
-}
-
 /*
 Difference() returns the difference between slice1 and slice2; in set notation:
 
@@ -69,14 +36,14 @@ Difference() returns the difference between slice1 and slice2; in set notation:
 Time complexity O(n * logn + m * logm), where n and m are the lengths of the slices.
 This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
 */
-func Difference(slice1, slice2 []uint32) []uint32 {
+func Difference[S ~[]E, E cmp.Ordered](slice1, slice2 S) S {
 	slices.Sort(slice1)
 	slices.Sort(slice2)
-	difference := []uint32{}
+	len1, len2 := len(slice1), len(slice2)
 
-	i, j := 0, 0
-	lenOld, lenNew := len(slice1), len(slice2)
-	for i < lenOld && j < lenNew {
+	var difference S
+	var i, j int
+	for i < len1 && j < len2 {
 		if slice1[i] < slice2[j] {
 			// the element is in slice1 but not in slice2
 			difference = append(difference, slice1[i])
@@ -104,7 +71,7 @@ added = slice2 - slice1
 Time complexity O(n * logn + m * logm), where n and m are the lengths of the slices.
 This function is much faster than converting to sets for sizes (n, m) smaller than ~10^6.
 */
-func Partition(slice1, slice2 []uint32) (removed, common, added []uint32) {
+func Partition[S ~[]E, E cmp.Ordered](slice1, slice2 S) (removed, common, added S) {
 	slices.Sort(slice1)
 	slices.Sort(slice2)
 
@@ -135,6 +102,19 @@ func Partition(slice1, slice2 []uint32) (removed, common, added []uint32) {
 	removed = append(removed, slice1[i:]...)
 	added = append(added, slice2[j:]...)
 	return removed, common, added
+}
+
+// SplitSlice splits a slice into a slice of slices, each with a maximum size of batchSize
+func SplitSlice(slice []string, batchSize int) [][]string {
+	if len(slice) == 0 {
+		return nil
+	}
+
+	split := make([][]string, 0, len(slice)/batchSize)
+	for batchSize < len(slice) {
+		split, slice = append(split, slice[:batchSize]), slice[batchSize:]
+	}
+	return append(split, slice)
 }
 
 /*

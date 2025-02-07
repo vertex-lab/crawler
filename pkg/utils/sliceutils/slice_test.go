@@ -1,11 +1,11 @@
 package sliceutils
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
@@ -16,14 +16,12 @@ func TestUnique(t *testing.T) {
 		expectedSlice []uint32
 	}{
 		{
-			name:          "nil slice",
-			slice:         nil,
-			expectedSlice: []uint32{},
+			name:  "nil slice",
+			slice: nil,
 		},
 		{
-			name:          "empty slice",
-			slice:         []uint32{},
-			expectedSlice: []uint32{},
+			name:  "empty slice",
+			slice: []uint32{},
 		},
 		{
 			name:          "already unique",
@@ -42,7 +40,7 @@ func TestUnique(t *testing.T) {
 
 			unique := Unique(test.slice)
 			if !reflect.DeepEqual(unique, test.expectedSlice) {
-				t.Errorf("Partition(): expected %v, got %v", test.expectedSlice, unique)
+				t.Errorf("Unique(): expected %v, got %v", test.expectedSlice, unique)
 			}
 		})
 	}
@@ -56,16 +54,14 @@ func TestSplitSlice(t *testing.T) {
 		expectedSplit [][]string
 	}{
 		{
-			name:          "nil slice",
-			slice:         nil,
-			batchSize:     1,
-			expectedSplit: [][]string{},
+			name:      "nil slice",
+			slice:     nil,
+			batchSize: 1,
 		},
 		{
-			name:          "empty slice",
-			slice:         []string{},
-			batchSize:     1,
-			expectedSplit: [][]string{},
+			name:      "empty slice",
+			slice:     []string{},
+			batchSize: 1,
 		},
 		{
 			name:          "valid slice",
@@ -85,49 +81,6 @@ func TestSplitSlice(t *testing.T) {
 	}
 }
 
-func TestEqualElements(t *testing.T) {
-	testCases := []struct {
-		name          string
-		slice1        []uint32
-		slice2        []uint32
-		expectedEqual bool
-	}{
-		{
-			name:          "both nil",
-			slice1:        nil,
-			slice2:        []uint32{},
-			expectedEqual: true,
-		},
-		{
-			name:          "both empty",
-			slice1:        []uint32{},
-			slice2:        []uint32{},
-			expectedEqual: true,
-		},
-		{
-			name:          "one nil, one empty",
-			slice1:        nil,
-			slice2:        []uint32{},
-			expectedEqual: true,
-		},
-		{
-			name:          "same elements",
-			slice1:        []uint32{0, 2, 1},
-			slice2:        []uint32{1, 0, 2},
-			expectedEqual: true,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			equal := EqualElements(test.slice1, test.slice2)
-			if equal != test.expectedEqual {
-				t.Fatalf("EqualElements(): expected %v, got %v", test.expectedEqual, equal)
-			}
-		})
-	}
-}
-
 func TestDifference(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -136,11 +89,9 @@ func TestDifference(t *testing.T) {
 		expectedSlice []uint32
 	}{
 		{
-			name:          "empty slices",
-			slice1:        []uint32{},
-			slice2:        []uint32{},
-			expectedSlice: []uint32{},
-		},
+			name:   "empty slices",
+			slice1: []uint32{},
+			slice2: []uint32{}},
 		{
 			name:          "normal",
 			slice1:        []uint32{0, 1, 2, 4},
@@ -262,7 +213,6 @@ func TestTrimCycles(t *testing.T) {
 }
 
 func TestDeleteCyclesInPlace(t *testing.T) {
-
 	testCases := []struct {
 		name         string
 		oldWalk      []uint32
@@ -388,79 +338,43 @@ func BenchmarkSplitSlice(b *testing.B) {
 }
 
 func BenchmarkDifference(b *testing.B) {
-	const size int32 = 1000000
-	slice1 := make([]uint32, 0, size)
-	slice2 := make([]uint32, 0, size)
+	sizes := []int{1000, 10000, 100000, 1000000}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("size %d", size), func(b *testing.B) {
+			slice1 := make([]uint32, 0, size)
+			slice2 := make([]uint32, 0, size)
 
-	// setup up the two slices
-	for i := int32(0); i < size; i++ {
-		element1 := uint32(rand.Int31n(size * 2))
-		element2 := uint32(rand.Int31n(size * 2))
-		slice1 = append(slice1, element1)
-		slice2 = append(slice2, element2)
-	}
+			// setup up the two slices
+			for i := 0; i < size; i++ {
+				slice1 = append(slice1, rand.Uint32()%uint32(size))
+				slice2 = append(slice2, rand.Uint32()%uint32(size))
+			}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		Difference(slice1, slice2)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Difference(slice1, slice2)
+			}
+		})
 	}
 }
 
 func BenchmarkPartition(b *testing.B) {
-	const size int32 = 1000000
-	slice1 := make([]uint32, 0, size)
-	slice2 := make([]uint32, 0, size)
+	sizes := []int{1000, 10000, 100000, 1000000}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("size %d", size), func(b *testing.B) {
+			slice1 := make([]uint32, 0, size)
+			slice2 := make([]uint32, 0, size)
 
-	// setup up the two slices
-	for i := int32(0); i < size; i++ {
-		element1 := uint32(rand.Int31n(size * 2))
-		element2 := uint32(rand.Int31n(size * 2))
-		slice1 = append(slice1, element1)
-		slice2 = append(slice2, element2)
-	}
+			// setup up the two slices
+			for i := 0; i < size; i++ {
+				slice1 = append(slice1, rand.Uint32()%uint32(size))
+				slice2 = append(slice2, rand.Uint32()%uint32(size))
+			}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		Partition(slice1, slice2)
-	}
-}
-
-func BenchmarkSetDifference(b *testing.B) {
-
-	size := int32(1000)
-	set1 := mapset.NewSetWithSize[uint32](int(size))
-	set2 := mapset.NewSetWithSize[uint32](int(size))
-
-	// setup up the two sets
-	for i := int32(0); i < size; i++ {
-
-		element1 := uint32(rand.Int31n(size * 2))
-		element2 := uint32(rand.Int31n(size * 2))
-
-		set1.Add(element1)
-		set2.Add(element2)
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		set1.Difference(set2)
-	}
-}
-
-func BenchmarkSetToSlice(b *testing.B) {
-
-	size := int32(1000)
-	set := mapset.NewSetWithSize[uint32](int(size))
-
-	for i := int32(0); i < size; i++ {
-		element := uint32(rand.Int31n(size * 2))
-		set.Add(element)
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		set.ToSlice()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Partition(slice1, slice2)
+			}
+		})
 	}
 }

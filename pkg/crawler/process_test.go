@@ -3,8 +3,8 @@ package crawler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
-	"math/rand/v2"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -22,42 +22,6 @@ const calle = "50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63"
 const pip = "f683e87035f7ad4f44e0b98cfbd9537e16455a92cd38cefc4cb31db7557f5ef2"
 const gigi = "6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93"
 
-// A list of fake events used for testing.
-var badlyFormattedEvent = nostr.Event{
-	PubKey:    odell,
-	Kind:      3,
-	CreatedAt: nostr.Timestamp(1713083262),
-	Tags: nostr.Tags{
-		nostr.Tag{"p", gigi},
-		nostr.Tag{"e", calle},       // not a p tag
-		nostr.Tag{"p", pip + "xxx"}, // pubkey not valid
-	},
-}
-var multipleFollowEvent = nostr.Event{
-	PubKey:    odell,
-	Kind:      3,
-	CreatedAt: nostr.Timestamp(11),
-	Tags: nostr.Tags{
-		nostr.Tag{"p", pip},
-		nostr.Tag{"p", pip}}, // added two times
-}
-var autoFollowEvent = nostr.Event{
-	PubKey:    odell,
-	Kind:      3,
-	CreatedAt: nostr.Timestamp(11),
-	Tags: nostr.Tags{
-		nostr.Tag{"p", odell}, // autofollow event
-		nostr.Tag{"p", pip}},
-}
-var validEvent = nostr.Event{
-	PubKey:    calle,
-	Kind:      3,
-	CreatedAt: nostr.Timestamp(11),
-	Tags: nostr.Tags{
-		nostr.Tag{"p", gigi},
-		nostr.Tag{"p", odell}},
-}
-
 func TestParsePubkeys(t *testing.T) {
 	testCases := []struct {
 		name            string
@@ -65,39 +29,65 @@ func TestParsePubkeys(t *testing.T) {
 		expectedPubkeys []string
 	}{
 		{
-			name:            "nil tags",
-			event:           nil,
-			expectedPubkeys: []string{},
+			name:  "nil tags",
+			event: nil,
 		},
 		{
-			name:            "nil event",
-			event:           nil,
-			expectedPubkeys: []string{},
+			name:  "nil event",
+			event: nil,
 		},
 		{
-			name:            "empty tags",
-			event:           &nostr.Event{Tags: nostr.Tags{}},
-			expectedPubkeys: []string{},
+			name:  "empty tags",
+			event: &nostr.Event{Tags: nostr.Tags{}},
 		},
 		{
-			name:            "badly formatted tags",
-			event:           &badlyFormattedEvent,
+			name: "badly formatted tags",
+			event: &nostr.Event{
+				PubKey:    odell,
+				Kind:      3,
+				CreatedAt: nostr.Timestamp(1713083262),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", gigi},
+					nostr.Tag{"e", calle},       // not a p tag
+					nostr.Tag{"p", pip + "xxx"}, // pubkey not valid
+				}},
 			expectedPubkeys: []string{gigi},
 		},
 		{
-			name:            "multiple follow tags",
-			event:           &multipleFollowEvent,
+			name: "multiple follow tags",
+			event: &nostr.Event{
+				PubKey:    odell,
+				Kind:      3,
+				CreatedAt: nostr.Timestamp(11),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", pip},
+					nostr.Tag{"p", pip}}, // added two times
+			},
 			expectedPubkeys: []string{pip},
 		},
 		{
-			name:            "auto follow tag",
-			event:           &autoFollowEvent,
+			name: "auto follow tag",
+			event: &nostr.Event{
+				PubKey:    odell,
+				Kind:      3,
+				CreatedAt: nostr.Timestamp(11),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", odell}, // autofollow event
+					nostr.Tag{"p", pip}},
+			},
 			expectedPubkeys: []string{pip},
 		},
 		{
-			name:            "valid",
-			event:           &validEvent,
-			expectedPubkeys: []string{gigi, odell},
+			name: "valid",
+			event: &nostr.Event{
+				PubKey:    calle,
+				Kind:      3,
+				CreatedAt: nostr.Timestamp(11),
+				Tags: nostr.Tags{
+					nostr.Tag{"p", gigi},
+					nostr.Tag{"p", odell}},
+			},
+			expectedPubkeys: []string{odell, gigi},
 		},
 	}
 
@@ -105,7 +95,7 @@ func TestParsePubkeys(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pubkeys := ParsePubkeys(test.event)
 			if !reflect.DeepEqual(pubkeys, test.expectedPubkeys) {
-				t.Fatalf("ParseFollowList(): expected %v, got %v", test.expectedPubkeys, pubkeys)
+				t.Fatalf("ParsePubkeys2(): expected %v, got %v", test.expectedPubkeys, pubkeys)
 			}
 		})
 	}
@@ -191,10 +181,16 @@ func TestProcessFollowList(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) {
 				DB := mockdb.SetupDB(test.DBType)
 				RWS := mockstore.SetupRWS(test.RWSType)
-				walksCounter := atomic.Uint32{}
+				event := &nostr.Event{
+					PubKey:    calle,
+					Kind:      3,
+					CreatedAt: nostr.Timestamp(11),
+					Tags: nostr.Tags{
+						nostr.Tag{"p", gigi},
+						nostr.Tag{"p", odell}},
+				}
 
-				err := ProcessFollowList(DB, RWS, &validEvent, &walksCounter)
-
+				err := ProcessFollowList(DB, RWS, event, &atomic.Uint32{})
 				if !errors.Is(err, test.expectedError) {
 					t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
 				}
@@ -286,20 +282,42 @@ func TestProcessFollowList(t *testing.T) {
 
 // ---------------------------------BENCHMARKS----------------------------------
 
-func BenchmarkParsePubkeys(b *testing.B) {
-	event := nostr.Event{
-		Tags: nostr.Tags{},
-	}
-
-	// creating a followList with 10k
-	pubkeys := []string{pip, calle, gigi, odell}
-	for i := 0; i < 10000; i++ {
-		pk := pubkeys[rand.IntN(4)]
-		event.Tags = append(event.Tags, nostr.Tag{"p", pk})
+func BenchmarkIsValidPubkey(b *testing.B) {
+	sk := nostr.GeneratePrivateKey()
+	pk, err := nostr.GetPublicKey(sk)
+	if err != nil {
+		b.Fatalf("failed to get public key")
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ParsePubkeys(&event)
+		nostr.IsValidPublicKey(pk)
+	}
+}
+
+func BenchmarkParsePubkeys(b *testing.B) {
+	tagSizes := []int{10, 100, 1000, 10000}
+
+	for _, size := range tagSizes {
+		b.Run(fmt.Sprintf("size %d", size), func(b *testing.B) {
+			event := nostr.Event{
+				Tags: nostr.Tags{},
+			}
+
+			for i := 0; i < size; i++ {
+				sk := nostr.GeneratePrivateKey()
+				pk, err := nostr.GetPublicKey(sk)
+				if err != nil {
+					b.Fatalf("failed to get public key: %v", err)
+				}
+
+				event.Tags = append(event.Tags, nostr.Tag{"p", pk})
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				ParsePubkeys(&event)
+			}
+		})
 	}
 }
