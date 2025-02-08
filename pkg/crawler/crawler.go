@@ -50,34 +50,26 @@ var (
 	}
 )
 
-// KindToRecordType() returns the appropriate record type for the specified event kind.
-func KindToRecordType(kind int) string {
-	switch kind {
-	case nostr.KindFollowList:
-		return models.Follow
-
-	default:
-		return ""
-	}
+type FirehoseConfig struct {
+	log    *logger.Aggregate
+	relays []string
 }
 
 /*
 Firehose connects to a list of relays and pulls kind:3 events that are newer than the current time.
-It efficiently filters events based on the pubkey "spamminess", determined by our
-own pagerank-based reputation system.
+It efficiently filters events based on the pubkey "spamminess", determined by our own pagerank-based reputation system.
 
 Finally, it uses the specified queueHandler function to send the events to the
 queue for further processing and/or to be written to the database.
 */
 func Firehose(
 	ctx context.Context,
-	logger *logger.Aggregate,
 	DB models.Database,
-	relays []string,
-	queueHandler func(event *nostr.Event) error) {
+	queueHandler func(event *nostr.Event) error,
+	config FirehoseConfig) {
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close(logger, pool, "Firehose")
+	defer close(config.log, pool, "Firehose")
 
 	ts := nostr.Now()
 	filters := nostr.Filters{{
@@ -85,8 +77,7 @@ func Firehose(
 		Since: &ts,
 	}}
 
-	for event := range pool.SubMany(ctx, relays, filters) {
-
+	for event := range pool.SubMany(ctx, config.relays, filters) {
 		if event.Event == nil {
 			continue
 		}
@@ -114,8 +105,7 @@ func Firehose(
 		}
 
 		if err := queueHandler(event.Event); err != nil {
-			logger.Error("Firehose queue handler: %v", err)
-			return
+			config.log.Error("Firehose queue handler: %v", err)
 		}
 	}
 }
@@ -235,10 +225,21 @@ func QueryPubkeyBatch(
 	return nil
 }
 
+// KindToRecordType() returns the appropriate record type for the specified event kind.
+func KindToRecordType(kind int) string {
+	switch kind {
+	case nostr.KindFollowList:
+		return models.Follow
+
+	default:
+		return ""
+	}
+}
+
 // ------------------------------------HELPERS----------------------------------
 
 // IsEventOutdated() returns whether it exists a record of node that is newer than the specified event.
-// e.g. event is a follow-list that is older than the latest follow list we processed for node, and should therefore be ignored.
+// e.g. `event` is a follow-list that is OLDER than the latest follow-list we processed for that node, and should therefore be ignored.
 func IsEventOutdated(node *models.Node, event *nostr.Event) bool {
 	if node == nil || node.Records == nil {
 		return false

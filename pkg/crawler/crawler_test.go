@@ -12,13 +12,18 @@ import (
 
 // Manually change pip's follow list and see if the events gets printed. Works only with `go test`
 func TestFirehose(t *testing.T) {
-	DB := mockdb.SetupDB("pip")
-	logger := logger.New(os.Stdout)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
+	DB := mockdb.SetupDB("pip")
+	logger := logger.New(os.Stdout)
+	config := FirehoseConfig{
+		log:    logger,
+		relays: Relays,
+	}
+
 	go HandleSignals(cancel, logger)
-	Firehose(ctx, logger, DB, Relays, PrintEvent)
+	Firehose(ctx, DB, PrintEvent, config)
 }
 
 func TestQueryPubkeys(t *testing.T) {
