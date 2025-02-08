@@ -64,9 +64,9 @@ queue for further processing and/or to be written to the database.
 */
 func Firehose(
 	ctx context.Context,
+	config FirehoseConfig,
 	DB models.Database,
-	queueHandler func(event *nostr.Event) error,
-	config FirehoseConfig) {
+	queueHandler func(event *nostr.Event) error) {
 
 	pool := nostr.NewSimplePool(ctx)
 	defer close(config.log, pool, "Firehose")
@@ -121,9 +121,9 @@ type QueryPubkeysConfig struct {
 // their events when the batch is bigger than batchSize, OR after queryInterval since the last query.
 func QueryPubkeys(
 	ctx context.Context,
+	config QueryPubkeysConfig,
 	pubkeyChan <-chan string,
-	queueHandler func(event *nostr.Event) error,
-	config QueryPubkeysConfig) {
+	queueHandler func(event *nostr.Event) error) {
 
 	batch := make([]string, 0, config.batchSize)
 	timer := time.After(config.queryInterval)

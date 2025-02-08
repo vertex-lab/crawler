@@ -11,16 +11,22 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
+type NodeArbiterConfig struct {
+	log                 *logger.Aggregate
+	startThreshold      float64
+	promotionMultiplier float64
+	demotionMultiplier  float64
+}
+
 // NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
 // - scans through all the nodes in the database
 // - promotes or demotes them based on their pagerank and promotion/demotion multipliers
 func NodeArbiter(
 	ctx context.Context,
-	logger *logger.Aggregate,
+	config NodeArbiterConfig,
 	DB models.Database,
 	RWS models.RandomWalkStore,
 	walksChanged *atomic.Uint32,
-	startThreshold, promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) {
 
 	var totalWalks float64
@@ -32,23 +38,23 @@ func NodeArbiter(
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("  > Stopping the Node Arbiter... ")
+			config.log.Info("  > Stopping the Node Arbiter... ")
 			return
 
 		case <-ticker.C:
-			totalWalks = float64(RWS.TotalVisits(ctx)) * float64(1-RWS.Alpha(ctx)) // on average a walk is 1/(1-alpha) steps long (roughly)
+			totalWalks = float64(RWS.TotalVisits(ctx)) * float64(1-RWS.Alpha(ctx)) // on average a walk is 1/(1-alpha) steps long
 			changeRatio = float64(walksChanged.Load()) / totalWalks
 
-			if changeRatio >= startThreshold {
-				promoted, demoted, err := ArbiterScan(ctx, DB, RWS, promotionMultiplier, demotionMultiplier, queueHandler)
+			if changeRatio >= config.startThreshold {
+				promoted, demoted, err := ArbiterScan(ctx, config, DB, RWS, queueHandler)
 				if err != nil {
-					logger.Error("%v", err)
+					config.log.Error("%v", err)
 					continue
 				}
 
-				// resetting the walksChanged since the last recomputation
+				// resetting the walksChanged since the last successful recomputation
 				walksChanged.Store(0)
-				logger.Info("NodeArbiter scan completed: promoted %d, demoted %d", promoted, demoted)
+				config.log.Info("NodeArbiter scan completed: promoted %d, demoted %d", promoted, demoted)
 			}
 		}
 	}
@@ -57,12 +63,12 @@ func NodeArbiter(
 // ArbiterScan() performs one entire database scan, promoting or demoting nodes based on their pagerank.
 func ArbiterScan(
 	ctx context.Context,
+	config NodeArbiterConfig,
 	DB models.Database,
 	RWS models.RandomWalkStore,
-	promotionMultiplier, demotionMultiplier float64,
 	queueHandler func(pk string) error) (promoted, demoted int, err error) {
 
-	ctx, cancel := context.WithTimeout(ctx, 600*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	var cursor uint64
@@ -87,8 +93,8 @@ func ArbiterScan(
 		}
 
 		walksPerNode := float64(RWS.WalksPerNode(ctx))
-		promotionThreshold := int(promotionMultiplier*walksPerNode + 0.5)
-		demotionThreshold := int(demotionMultiplier*walksPerNode + 0.5)
+		promotionThreshold := int(config.promotionMultiplier*walksPerNode + 0.5)
+		demotionThreshold := int(config.demotionMultiplier*walksPerNode + 0.5)
 
 		for i, ID := range nodeIDs {
 			// use a new context for the operation to avoid it being interrupted,
@@ -141,8 +147,7 @@ func ArbiterScan(
 	return promoted, demoted, nil
 }
 
-// PromoteNode() makes a node active, which means it generates random walks
-// for it and updates the status to active.
+// PromoteNode() makes a node active, which means it generates random walks for it and updates the status to active.
 func PromoteNode(
 	ctx context.Context,
 	DB models.Database,

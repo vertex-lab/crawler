@@ -41,10 +41,16 @@ func TestArbiterScan(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
+				ctx := context.Background()
 				DB := mockdb.SetupDB(test.DBType)
 				RWS := mockstore.SetupRWS(test.RWSType)
 
-				_, _, err := ArbiterScan(context.Background(), DB, RWS, 0, 0, func(pk string) error {
+				config := NodeArbiterConfig{
+					promotionMultiplier: 0.0,
+					demotionMultiplier:  0.0,
+				}
+
+				_, _, err := ArbiterScan(ctx, config, DB, RWS, func(pk string) error {
 					return nil
 				})
 
@@ -62,9 +68,15 @@ func TestArbiterScan(t *testing.T) {
 			DB := mockdb.SetupDB("simple-with-pks")
 			RWS := mockstore.SetupRWS("one-node1")
 
-			_, _, err := ArbiterScan(ctx, DB, RWS, 2.0, 2.0, func(pk string) error {
+			config := NodeArbiterConfig{
+				promotionMultiplier: 2.0,
+				demotionMultiplier:  2.0,
+			}
+
+			_, _, err := ArbiterScan(ctx, config, DB, RWS, func(pk string) error {
 				return nil
 			})
+
 			if err != nil {
 				t.Fatalf("ArbiterScan(): expected nil, got %v", err)
 			}
@@ -97,7 +109,12 @@ func TestArbiterScan(t *testing.T) {
 			RWS := mockstore.SetupRWS("one-node1")
 			queue := []string{}
 
-			_, _, err := ArbiterScan(ctx, DB, RWS, 0, 0, func(pk string) error {
+			config := NodeArbiterConfig{
+				promotionMultiplier: 0.0,
+				demotionMultiplier:  0.0,
+			}
+
+			_, _, err := ArbiterScan(ctx, config, DB, RWS, func(pk string) error {
 				queue = append(queue, pk)
 				return nil
 			})
@@ -142,15 +159,22 @@ func TestArbiterScan(t *testing.T) {
 }
 
 func TestNodeArbiter(t *testing.T) {
-	logger := logger.New(os.Stdout)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go HandleSignals(cancel, logger)
 
 	DB := mockdb.SetupDB("one-node0")
 	RWS := mockstore.SetupRWS("one-node0")
-	walksCounter := &atomic.Uint32{}
-	NodeArbiter(ctx, logger, DB, RWS, walksCounter, 0, 0, 0, func(pk string) error {
+	walksChanged := &atomic.Uint32{}
+
+	config := NodeArbiterConfig{
+		log:                 logger.New(os.Stdout),
+		startThreshold:      0,
+		promotionMultiplier: 0,
+		demotionMultiplier:  0,
+	}
+
+	go HandleSignals(cancel, config.log)
+	NodeArbiter(ctx, config, DB, RWS, walksChanged, func(pk string) error {
 		return nil
 	})
 }

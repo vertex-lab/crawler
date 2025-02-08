@@ -13,45 +13,50 @@ import (
 	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
+type ProcessEventsConfig struct {
+	log        *logger.Aggregate
+	printEvery uint32
+}
+
 // ProcessEvents() process one event at the time from the eventChannel, based on their kind.
 func ProcessEvents(
 	ctx context.Context,
-	logger *logger.Aggregate,
+	config ProcessEventsConfig,
 	DB models.Database,
 	RWS models.RandomWalkStore,
-	eventChan <-chan *nostr.Event,
-	eventCounter, walksChanged *atomic.Uint32) {
+	eventCounter, walksChanged *atomic.Uint32,
+	eventChan <-chan *nostr.Event) {
 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("  > Finishing processing the event... ")
+			config.log.Info("  > Finishing processing the event... ")
 			return
 
 		case event, ok := <-eventChan:
 			if !ok {
-				logger.Warn("Event channel closed, stopping processing.")
+				config.log.Warn("Event channel closed, stopped processing.")
 				return
 			}
 
 			if event == nil {
-				logger.Warn("ProcessEvents: event is nil")
+				config.log.Warn("ProcessEvents: event is nil")
 				continue
 			}
 
 			switch KindToRecordType(event.Kind) {
 			case models.Follow:
 				if err := ProcessFollowList(DB, RWS, event, walksChanged); err != nil {
-					logger.Error("Error processing follow list with eventID %v: %v", event.ID, err)
+					config.log.Error("Error processing follow list with eventID %v: %v", event.ID, err)
 				}
 
 			default:
-				logger.Warn("event of unwanted kind: %v", event.Kind)
+				config.log.Warn("event of unwanted kind: %v", event.Kind)
 			}
 
-			eventCounter.Add(1)
-			if eventCounter.Load()%5000 == 0 {
-				logger.Info("processed %d events", eventCounter.Load())
+			count := eventCounter.Add(1)
+			if count%config.printEvery == 0 {
+				config.log.Info("processed %d events", count)
 			}
 		}
 	}

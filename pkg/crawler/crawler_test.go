@@ -22,7 +22,7 @@ func TestFirehose(t *testing.T) {
 	}
 
 	go HandleSignals(cancel, config.log)
-	Firehose(ctx, DB, PrintEvent, config)
+	Firehose(ctx, config, DB, PrintEvent)
 }
 
 func TestQueryPubkeys(t *testing.T) {
@@ -48,7 +48,7 @@ func TestQueryPubkeys(t *testing.T) {
 			pubkeyChan <- pk
 		}
 
-		QueryPubkeys(ctx, pubkeyChan, PrintEvent, config)
+		QueryPubkeys(ctx, config, pubkeyChan, PrintEvent)
 	})
 
 	t.Run("timer", func(t *testing.T) {
@@ -72,6 +72,6 @@ func TestQueryPubkeys(t *testing.T) {
 			pubkeyChan <- pk
 		}
 
-		QueryPubkeys(ctx, pubkeyChan, PrintEvent, config)
+		QueryPubkeys(ctx, config, pubkeyChan, PrintEvent)
 	})
 }
