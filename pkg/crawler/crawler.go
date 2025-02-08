@@ -110,22 +110,26 @@ func Firehose(
 	}
 }
 
+type QueryPubkeysConfig struct {
+	log           *logger.Aggregate
+	relays        []string
+	batchSize     int
+	queryInterval time.Duration
+}
+
 // QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries for
 // their events when the batch is bigger than batchSize, OR after queryInterval since the last query.
 func QueryPubkeys(
 	ctx context.Context,
-	logger *logger.Aggregate,
-	relays []string,
 	pubkeyChan <-chan string,
-	batchSize int,
-	queryInterval time.Duration,
-	queueHandler func(event *nostr.Event) error) {
+	queueHandler func(event *nostr.Event) error,
+	config QueryPubkeysConfig) {
 
-	batch := make([]string, 0, batchSize)
-	timer := time.After(queryInterval)
+	batch := make([]string, 0, config.batchSize)
+	timer := time.After(config.queryInterval)
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close(logger, pool, "QueryPubkeys")
+	defer close(config.log, pool, "QueryPubkeys")
 
 	for {
 		select {
@@ -134,34 +138,34 @@ func QueryPubkeys(
 
 		case pubkey, ok := <-pubkeyChan:
 			if !ok {
-				logger.Warn("Pubkey channel closed, stopping processing.")
+				config.log.Warn("Pubkey channel closed, stopping processing.")
 				return
 			}
 
 			batch = append(batch, pubkey)
-			if len(batch) < batchSize {
+			if len(batch) < config.batchSize {
 				continue
 			}
 
-			if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
-				logger.Error("QueryPubkeys queue handler: %v", err)
+			if err := QueryPubkeyBatch(ctx, pool, config.relays, batch, queueHandler); err != nil {
+				config.log.Error("QueryPubkeys(): %v", err)
 				continue
 			}
 
 			// reset batch and timer only if successful
-			batch = make([]string, 0, batchSize)
-			timer = time.After(queryInterval)
+			batch = make([]string, 0, config.batchSize)
+			timer = time.After(config.queryInterval)
 
 		case <-timer:
 
-			if err := QueryPubkeyBatch(ctx, pool, relays, batch, queueHandler); err != nil {
-				logger.Error("QueryPubkeys(): %v", err)
+			if err := QueryPubkeyBatch(ctx, pool, config.relays, batch, queueHandler); err != nil {
+				config.log.Error("QueryPubkeys(): %v", err)
 				continue
 			}
 
 			// reset batch and timer only if successful
-			batch = make([]string, 0, batchSize)
-			timer = time.After(queryInterval)
+			batch = make([]string, 0, config.batchSize)
+			timer = time.After(config.queryInterval)
 		}
 	}
 }
@@ -187,7 +191,7 @@ func QueryPubkeyBatch(
 		Authors: pubkeys,
 	}
 
-	// a map that associates each pair (pubkey,kind) with the latest event of that kind.
+	// a map that associates each pair (pubkey,kind) with the latest event from that authors for that kind.
 	latest := make(map[string]*nostr.Event, len(pubkeys)*len(filter.Kinds))
 	for event := range pool.SubManyEose(ctx, relays, nostr.Filters{filter}) {
 

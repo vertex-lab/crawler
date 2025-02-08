@@ -16,13 +16,12 @@ func TestFirehose(t *testing.T) {
 	defer cancel()
 
 	DB := mockdb.SetupDB("pip")
-	logger := logger.New(os.Stdout)
 	config := FirehoseConfig{
-		log:    logger,
+		log:    logger.New(os.Stdout),
 		relays: Relays,
 	}
 
-	go HandleSignals(cancel, logger)
+	go HandleSignals(cancel, config.log)
 	Firehose(ctx, DB, PrintEvent, config)
 }
 
@@ -32,33 +31,47 @@ func TestQueryPubkeys(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
-		logger := logger.New(os.Stdout)
-		go HandleSignals(cancel, logger)
+		config := QueryPubkeysConfig{
+			log:           logger.New(os.Stdout),
+			relays:        Relays,
+			batchSize:     4,
+			queryInterval: 30 * time.Second,
+		}
 
+		config.log.Info("---------------------batchSize---------------------")
+		go HandleSignals(cancel, config.log)
+
+		// the queue contains enough pubkeys (4), so it should query immediately and then print.
 		pubkeyChan := make(chan string, 10)
 		pubkeys := []string{pip, calle, gigi, odell}
-		for _, pk := range pubkeys { // send the pubkeys to the queue
+		for _, pk := range pubkeys {
 			pubkeyChan <- pk
 		}
 
-		// the channel contains enough pubkeys, so it should query immediately and then print.
-		QueryPubkeys(ctx, logger, Relays, pubkeyChan, 4, 30*time.Second, PrintEvent)
+		QueryPubkeys(ctx, pubkeyChan, PrintEvent, config)
 	})
 
 	t.Run("timer", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
-		logger := logger.New(os.Stdout)
-		go HandleSignals(cancel, logger)
+		config := QueryPubkeysConfig{
+			log:           logger.New(os.Stdout),
+			relays:        Relays,
+			batchSize:     5,
+			queryInterval: 3 * time.Second,
+		}
 
+		config.log.Info("---------------------timer---------------------")
+		go HandleSignals(cancel, config.log)
+
+		// there aren't enough pubkeys, but the timer will kick in, so it should query and then print.
 		pubkeyChan := make(chan string, 10)
 		pubkeys := []string{pip, calle, gigi, odell}
-		for _, pk := range pubkeys { // send the pubkeys to the queue
+		for _, pk := range pubkeys {
 			pubkeyChan <- pk
 		}
 
-		// there aren't enough pubkeys, but the timer will kick in, so it should query and then print.
-		QueryPubkeys(ctx, logger, Relays, pubkeyChan, 11, 2*time.Second, PrintEvent)
+		QueryPubkeys(ctx, pubkeyChan, PrintEvent, config)
 	})
 }
