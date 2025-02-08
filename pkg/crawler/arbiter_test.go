@@ -46,8 +46,8 @@ func TestArbiterScan(t *testing.T) {
 				RWS := mockstore.SetupRWS(test.RWSType)
 
 				config := NodeArbiterConfig{
-					promotionMultiplier: 0.0,
-					demotionMultiplier:  0.0,
+					PromotionMultiplier: 0.0,
+					DemotionMultiplier:  0.0,
 				}
 
 				_, _, err := ArbiterScan(ctx, config, DB, RWS, func(pk string) error {
@@ -69,8 +69,8 @@ func TestArbiterScan(t *testing.T) {
 			RWS := mockstore.SetupRWS("one-node1")
 
 			config := NodeArbiterConfig{
-				promotionMultiplier: 2.0,
-				demotionMultiplier:  2.0,
+				PromotionMultiplier: 2.0,
+				DemotionMultiplier:  2.0,
 			}
 
 			_, _, err := ArbiterScan(ctx, config, DB, RWS, func(pk string) error {
@@ -110,8 +110,8 @@ func TestArbiterScan(t *testing.T) {
 			queue := []string{}
 
 			config := NodeArbiterConfig{
-				promotionMultiplier: 0.0,
-				demotionMultiplier:  0.0,
+				PromotionMultiplier: 0.0,
+				DemotionMultiplier:  0.0,
 			}
 
 			_, _, err := ArbiterScan(ctx, config, DB, RWS, func(pk string) error {
@@ -167,13 +167,13 @@ func TestNodeArbiter(t *testing.T) {
 	walksChanged := &atomic.Uint32{}
 
 	config := NodeArbiterConfig{
-		log:                 logger.New(os.Stdout),
-		startThreshold:      0,
-		promotionMultiplier: 0,
-		demotionMultiplier:  0,
+		Log:                 logger.New(os.Stdout),
+		ActivationThreshold: 0,
+		PromotionMultiplier: 0,
+		DemotionMultiplier:  0,
 	}
 
-	go HandleSignals(cancel, config.log)
+	go HandleSignals(cancel, config.Log)
 	NodeArbiter(ctx, config, DB, RWS, walksChanged, func(pk string) error {
 		return nil
 	})

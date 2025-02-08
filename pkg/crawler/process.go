@@ -14,8 +14,19 @@ import (
 )
 
 type ProcessEventsConfig struct {
-	log        *logger.Aggregate
-	printEvery uint32
+	Log        *logger.Aggregate
+	PrintEvery uint32
+}
+
+func NewProcessEventsConfig() ProcessEventsConfig {
+	return ProcessEventsConfig{
+		PrintEvery: 5000,
+	}
+}
+
+func (c ProcessEventsConfig) Print() {
+	fmt.Printf("Process\n")
+	fmt.Printf("  PrintEvery: %d\n", c.PrintEvery)
 }
 
 // ProcessEvents() process one event at the time from the eventChannel, based on their kind.
@@ -24,39 +35,39 @@ func ProcessEvents(
 	config ProcessEventsConfig,
 	DB models.Database,
 	RWS models.RandomWalkStore,
-	eventCounter, walksChanged *atomic.Uint32,
-	eventChan <-chan *nostr.Event) {
+	eventChan <-chan *nostr.Event,
+	eventCounter, walksChanged *atomic.Uint32) {
 
 	for {
 		select {
 		case <-ctx.Done():
-			config.log.Info("  > Finishing processing the event... ")
+			config.Log.Info("  > Finishing processing the event... ")
 			return
 
 		case event, ok := <-eventChan:
 			if !ok {
-				config.log.Warn("Event channel closed, stopped processing.")
+				config.Log.Warn("Event channel closed, stopped processing.")
 				return
 			}
 
 			if event == nil {
-				config.log.Warn("ProcessEvents: event is nil")
+				config.Log.Warn("ProcessEvents: event is nil")
 				continue
 			}
 
 			switch KindToRecordType(event.Kind) {
 			case models.Follow:
 				if err := ProcessFollowList(DB, RWS, event, walksChanged); err != nil {
-					config.log.Error("Error processing follow list with eventID %v: %v", event.ID, err)
+					config.Log.Error("Error processing follow list with eventID %v: %v", event.ID, err)
 				}
 
 			default:
-				config.log.Warn("event of unwanted kind: %v", event.Kind)
+				config.Log.Warn("event of unwanted kind: %v", event.Kind)
 			}
 
 			count := eventCounter.Add(1)
-			if count%config.printEvery == 0 {
-				config.log.Info("processed %d events", count)
+			if count%config.PrintEvery == 0 {
+				config.Log.Info("processed %d events", count)
 			}
 		}
 	}

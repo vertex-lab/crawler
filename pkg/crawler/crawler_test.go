@@ -17,29 +17,29 @@ func TestFirehose(t *testing.T) {
 
 	DB := mockdb.SetupDB("pip")
 	config := FirehoseConfig{
-		log:    logger.New(os.Stdout),
-		relays: Relays,
+		Log:    logger.New(os.Stdout),
+		Relays: Relays,
 	}
 
-	go HandleSignals(cancel, config.log)
+	go HandleSignals(cancel, config.Log)
 	Firehose(ctx, config, DB, PrintEvent)
 }
 
 func TestQueryPubkeys(t *testing.T) {
 	// These two tests should print the same 4 events, as the only difference is the triggering factor.
-	t.Run("batchSize", func(t *testing.T) {
+	t.Run("BatchSize", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
 		config := QueryPubkeysConfig{
-			log:           logger.New(os.Stdout),
-			relays:        Relays,
-			batchSize:     4,
-			queryInterval: 30 * time.Second,
+			Log:       logger.New(os.Stdout),
+			Relays:    Relays,
+			BatchSize: 4,
+			Interval:  30 * time.Second,
 		}
 
-		config.log.Info("---------------------batchSize---------------------")
-		go HandleSignals(cancel, config.log)
+		config.Log.Info("---------------------BatchSize---------------------")
+		go HandleSignals(cancel, config.Log)
 
 		// the queue contains enough pubkeys (4), so it should query immediately and then print.
 		pubkeyChan := make(chan string, 10)
@@ -56,14 +56,14 @@ func TestQueryPubkeys(t *testing.T) {
 		defer cancel()
 
 		config := QueryPubkeysConfig{
-			log:           logger.New(os.Stdout),
-			relays:        Relays,
-			batchSize:     5,
-			queryInterval: 3 * time.Second,
+			Log:       logger.New(os.Stdout),
+			Relays:    Relays,
+			BatchSize: 5,
+			Interval:  3 * time.Second,
 		}
 
-		config.log.Info("---------------------timer---------------------")
-		go HandleSignals(cancel, config.log)
+		config.Log.Info("---------------------timer---------------------")
+		go HandleSignals(cancel, config.Log)
 
 		// there aren't enough pubkeys, but the timer will kick in, so it should query and then print.
 		pubkeyChan := make(chan string, 10)

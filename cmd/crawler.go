@@ -29,15 +29,13 @@ func main() {
 		panic(err)
 	}
 
-	// configuring the logs
-	logger := logger.New(config.LogWriter)
 	nostr.DebugLogger.SetOutput(config.LogWriter)
 	nostr.InfoLogger.SetOutput(io.Discard) // discarding info logs
 	defer config.CloseLogs()
 
-	PrintStartup(logger)
-	defer PrintShutdown(logger)
-	go crawler.HandleSignals(cancel, logger)
+	PrintStartup(config.Log)
+	defer PrintShutdown(config.Log)
+	go crawler.HandleSignals(cancel, config.Log)
 
 	redis := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	size, err := redis.DBSize(ctx).Result()
@@ -51,7 +49,7 @@ func main() {
 	switch size {
 	case 0:
 		// if redis is empty, initialize a new database with the INIT_PUBKEYS specified in the enviroment
-		logger.Info("initializing crawler from empty database")
+		config.Log.Info("initializing crawler from empty database")
 		DB, err = redisdb.NewDatabaseFromPubkeys(ctx, redis, config.InitPubkeys)
 		if err != nil {
 			panic(err)
@@ -82,8 +80,8 @@ func main() {
 	walksChanged := &atomic.Uint32{} // tracks the number of walks updated since the last scan of NodeArbiter
 	walksChanged.Add(1000000)        // to make NodeArbiter activate immediately
 
-	eventQueue := make(chan *nostr.Event, config.EventChanCapacity)
-	pubkeyQueue := make(chan string, config.PubkeyChanCapacity)
+	eventQueue := make(chan *nostr.Event, config.EventQueueCapacity)
+	pubkeyQueue := make(chan string, config.PubkeyQueueCapacity)
 	for _, pk := range config.InitPubkeys { // send the initialization pubkeys to the queue (if any)
 		pubkeyQueue <- pk
 	}
@@ -94,11 +92,11 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.Firehose(ctx, logger, DB, crawler.Relays, func(event *nostr.Event) error {
+		crawler.Firehose(ctx, config.Firehose, DB, func(event *nostr.Event) error {
 			select {
 			case eventQueue <- event:
 			default:
-				logger.Warn("Firehose: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+				config.Log.Warn("Firehose: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 			}
 			return nil
 		})
@@ -106,11 +104,11 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.QueryPubkeys(ctx, logger, crawler.Relays, pubkeyQueue, config.QueryBatchSize, config.QueryInterval, func(event *nostr.Event) error {
+		crawler.QueryPubkeys(ctx, config.Query, pubkeyQueue, func(event *nostr.Event) error {
 			select {
 			case eventQueue <- event:
 			default:
-				logger.Warn("QueryPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
+				config.Log.Warn("QueryPubkeys: Channel is full, dropping eventID: %v by %v", event.ID, event.PubKey)
 			}
 			return nil
 		})
@@ -118,11 +116,11 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, logger, DB, RWS, walksChanged, config.NodeArbiterActivationThreshold, config.PromotionMultiplier, config.DemotionMultiplier, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, config.Arbiter, DB, RWS, walksChanged, func(pubkey string) error {
 			select {
 			case pubkeyQueue <- pubkey:
 			default:
-				logger.Warn("NodeArbiter: Channel is full, dropping pubkey: %v", pubkey)
+				config.Log.Warn("NodeArbiter: Channel is full, dropping pubkey: %v", pubkey)
 			}
 			return nil
 		})
@@ -132,8 +130,8 @@ func main() {
 		go DisplayStats(ctx, DB, RWS, eventQueue, pubkeyQueue, eventCounter, walksChanged)
 	}
 
-	logger.Info("ready to process events")
-	crawler.ProcessEvents(ctx, logger, DB, RWS, eventQueue, eventCounter, walksChanged)
+	config.Log.Info("ready to process events")
+	crawler.ProcessEvents(ctx, config.Process, DB, RWS, eventQueue, eventCounter, walksChanged)
 	wg.Wait()
 }
 

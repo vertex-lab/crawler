@@ -9,37 +9,64 @@ import (
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/vertex-lab/crawler/pkg/crawler"
+	"github.com/vertex-lab/crawler/pkg/utils/logger"
 )
 
-// The configuration parameters for the crawler.
+type SystemConfig struct {
+	Log                 *logger.Aggregate
+	LogWriter           io.Writer
+	DisplayStats        bool
+	EventQueueCapacity  int
+	PubkeyQueueCapacity int
+	InitPubkeys         []string // only used during initialization
+}
+
+func NewSystemConfig() SystemConfig {
+	return SystemConfig{
+		Log:                 logger.New(os.Stdout),
+		LogWriter:           os.Stdout,
+		DisplayStats:        false,
+		EventQueueCapacity:  1000,
+		PubkeyQueueCapacity: 1000,
+	}
+}
+
+// The configuration parameters for the system and the main processes.
 type Config struct {
-	LogWriter          io.Writer
-	DisplayStats       bool
-	InitPubkeys        []string // only used during initialization
-	EventChanCapacity  int
-	PubkeyChanCapacity int
-
-	QueryBatchSize int
-	QueryInterval  time.Duration
-
-	NodeArbiterActivationThreshold float64
-	PromotionMultiplier            float64
-	DemotionMultiplier             float64
+	SystemConfig
+	Firehose crawler.FirehoseConfig
+	Query    crawler.QueryPubkeysConfig
+	Process  crawler.ProcessEventsConfig
+	Arbiter  crawler.NodeArbiterConfig
 }
 
 // NewConfig() returns a config with default parameters.
 func NewConfig() *Config {
 	return &Config{
-		LogWriter:                      os.Stdout,
-		DisplayStats:                   false,
-		EventChanCapacity:              1000,
-		PubkeyChanCapacity:             1000,
-		QueryBatchSize:                 5,
-		QueryInterval:                  30 * time.Second,
-		NodeArbiterActivationThreshold: 0.01,
-		PromotionMultiplier:            0.1,
-		DemotionMultiplier:             1.1,
+		SystemConfig: NewSystemConfig(),
+		Firehose:     crawler.NewFirehoseConfig(),
+		Query:        crawler.NewQueryPubkeysConfig(),
+		Arbiter:      crawler.NewNodeArbiterConfig(),
+		Process:      crawler.NewProcessEventsConfig(),
 	}
+}
+
+func (c SystemConfig) Print() {
+	fmt.Println("System:")
+	fmt.Printf("  LogWriter: %T\n", c.LogWriter)
+	fmt.Printf("  DisplayStats: %t\n", c.DisplayStats)
+	fmt.Printf("  EventQueueCapacity: %d\n", c.EventQueueCapacity)
+	fmt.Printf("  PubkeyQueueCapacity: %d\n", c.PubkeyQueueCapacity)
+	fmt.Printf("  InitPubkeys: %v\n", c.InitPubkeys)
+}
+
+func (c *Config) Print() {
+	c.SystemConfig.Print()
+	c.Firehose.Print()
+	c.Query.Print()
+	c.Arbiter.Print()
+	c.Process.Print()
 }
 
 // LoadConfig() read the variables from the enviroment and parses them into a config struct.
@@ -48,8 +75,8 @@ func LoadConfig() (*Config, error) {
 	var err error
 
 	for _, item := range os.Environ() {
-		parts := strings.SplitN(item, "=", 2)
-		key, val := parts[0], parts[1]
+		keyVal := strings.SplitN(item, "=", 2)
+		key, val := keyVal[0], keyVal[1]
 
 		switch key {
 		case "LOGS":
@@ -58,64 +85,87 @@ func LoadConfig() (*Config, error) {
 				if err != nil {
 					return nil, fmt.Errorf("error opening file %v: %v", val, err)
 				}
+
+				config.Log = logger.New(config.LogWriter)
+				config.Firehose.Log = config.Log
+				config.Query.Log = config.Log
+				config.Process.Log = config.Log
+				config.Arbiter.Log = config.Log
 			}
 
 		case "DISPLAY_STATS":
 			config.DisplayStats, err = strconv.ParseBool(val)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
-		case "EVENT_CHAN_CAPACITY":
-			config.EventChanCapacity, err = strconv.Atoi(val)
+		case "EVENT_QUEUE_CAPACITY":
+			config.EventQueueCapacity, err = strconv.Atoi(val)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
-		case "PUBKEY_CHAN_CAPACITY":
-			config.PubkeyChanCapacity, err = strconv.Atoi(val)
+		case "PUBKEY_QUEUE_CAPACITY":
+			config.PubkeyQueueCapacity, err = strconv.Atoi(val)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
 		case "QUERY_BATCH_SIZE":
-			config.QueryBatchSize, err = strconv.Atoi(val)
+			config.Query.BatchSize, err = strconv.Atoi(val)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
 		case "QUERY_INTERVAL":
 			queryInterval, err := strconv.Atoi(val)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
-			config.QueryInterval = time.Duration(queryInterval) * time.Second
+			config.Query.Interval = time.Duration(queryInterval) * time.Second
 
 		case "NODE_ARBITER_ACTIVATION_THRESHOLD":
-			config.NodeArbiterActivationThreshold, err = strconv.ParseFloat(val, 64)
+			config.Arbiter.ActivationThreshold, err = strconv.ParseFloat(val, 64)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
 		case "PROMOTION_MULTIPLIER":
-			config.PromotionMultiplier, err = strconv.ParseFloat(val, 64)
+			config.Arbiter.PromotionMultiplier, err = strconv.ParseFloat(val, 64)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
 		case "DEMOTION_MULTIPLIER":
-			config.DemotionMultiplier, err = strconv.ParseFloat(val, 64)
+			config.Arbiter.DemotionMultiplier, err = strconv.ParseFloat(val, 64)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing %v: %v", parts, err)
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
 		case "INIT_PUBKEYS":
 			pubkeys := strings.Split(val, ",")
 			for _, pk := range pubkeys {
-				if nostr.IsValidPublicKey(pk) {
-					config.InitPubkeys = append(config.InitPubkeys, pk)
+				if !nostr.IsValidPublicKey(pk) {
+					return nil, fmt.Errorf("pubkey %s is not valid", pk)
 				}
 			}
+
+			config.InitPubkeys = pubkeys
+
+		case "RELAYS":
+			relays := strings.Split(val, ",")
+			if len(relays) == 0 {
+				return nil, fmt.Errorf("list of relays is empty")
+			}
+
+			for _, rel := range relays {
+				if !strings.HasPrefix(rel, "wss://") {
+					return nil, fmt.Errorf("relay %s has not a valid url", rel)
+				}
+			}
+
+			config.Firehose.Relays = relays
+			config.Query.Relays = relays
 		}
 	}
 
@@ -127,18 +177,4 @@ func (c *Config) CloseLogs() {
 	if file, ok := c.LogWriter.(*os.File); ok && file != os.Stdout {
 		file.Close()
 	}
-}
-
-func (c *Config) Print() {
-	fmt.Println("Config:")
-	fmt.Printf("  LogWriter: %T\n", c.LogWriter)
-	fmt.Printf("  DisplayStats: %t\n", c.DisplayStats)
-	fmt.Printf("  InitPubkeys: %v\n", c.InitPubkeys)
-	fmt.Printf("  EventChanCapacity: %d\n", c.EventChanCapacity)
-	fmt.Printf("  PubkeyChanCapacity: %d\n", c.PubkeyChanCapacity)
-	fmt.Printf("  QueryBatchSize: %d\n", c.QueryBatchSize)
-	fmt.Printf("  QueryInterval: %s\n", c.QueryInterval)
-	fmt.Printf("  NodeArbiterActivationThreshold: %f\n", c.NodeArbiterActivationThreshold)
-	fmt.Printf("  PromotionMultiplier: %f\n", c.PromotionMultiplier)
-	fmt.Printf("  DemotionMultiplier: %f\n", c.DemotionMultiplier)
 }

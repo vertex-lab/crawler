@@ -51,8 +51,19 @@ var (
 )
 
 type FirehoseConfig struct {
-	log    *logger.Aggregate
-	relays []string
+	Log    *logger.Aggregate
+	Relays []string
+}
+
+func NewFirehoseConfig() FirehoseConfig {
+	return FirehoseConfig{
+		Relays: Relays,
+	}
+}
+
+func (c FirehoseConfig) Print() {
+	fmt.Printf("Firehose\n")
+	fmt.Printf("  Relays: %v\n", c.Relays)
 }
 
 /*
@@ -69,7 +80,7 @@ func Firehose(
 	queueHandler func(event *nostr.Event) error) {
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close(config.log, pool, "Firehose")
+	defer close(config.Log, pool, "Firehose")
 
 	ts := nostr.Now()
 	filters := nostr.Filters{{
@@ -77,7 +88,7 @@ func Firehose(
 		Since: &ts,
 	}}
 
-	for event := range pool.SubMany(ctx, config.relays, filters) {
+	for event := range pool.SubMany(ctx, config.Relays, filters) {
 		if event.Event == nil {
 			continue
 		}
@@ -105,16 +116,31 @@ func Firehose(
 		}
 
 		if err := queueHandler(event.Event); err != nil {
-			config.log.Error("Firehose queue handler: %v", err)
+			config.Log.Error("Firehose queue handler: %v", err)
 		}
 	}
 }
 
 type QueryPubkeysConfig struct {
-	log           *logger.Aggregate
-	relays        []string
-	batchSize     int
-	queryInterval time.Duration
+	Log       *logger.Aggregate
+	Relays    []string
+	BatchSize int
+	Interval  time.Duration
+}
+
+func NewQueryPubkeysConfig() QueryPubkeysConfig {
+	return QueryPubkeysConfig{
+		Relays:    Relays,
+		BatchSize: 50,
+		Interval:  time.Minute,
+	}
+}
+
+func (c QueryPubkeysConfig) Print() {
+	fmt.Printf("Query\n")
+	fmt.Printf("  Relays: %v\n", c.Relays)
+	fmt.Printf("  BatchSize: %d\n", c.BatchSize)
+	fmt.Printf("  Interval: %v\n", c.Interval)
 }
 
 // QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries for
@@ -125,11 +151,11 @@ func QueryPubkeys(
 	pubkeyChan <-chan string,
 	queueHandler func(event *nostr.Event) error) {
 
-	batch := make([]string, 0, config.batchSize)
-	timer := time.After(config.queryInterval)
+	batch := make([]string, 0, config.BatchSize)
+	timer := time.After(config.Interval)
 
 	pool := nostr.NewSimplePool(ctx)
-	defer close(config.log, pool, "QueryPubkeys")
+	defer close(config.Log, pool, "QueryPubkeys")
 
 	for {
 		select {
@@ -138,34 +164,34 @@ func QueryPubkeys(
 
 		case pubkey, ok := <-pubkeyChan:
 			if !ok {
-				config.log.Warn("Pubkey channel closed, stopping processing.")
+				config.Log.Warn("Pubkey channel closed, stopping processing.")
 				return
 			}
 
 			batch = append(batch, pubkey)
-			if len(batch) < config.batchSize {
+			if len(batch) < config.BatchSize {
 				continue
 			}
 
-			if err := QueryPubkeyBatch(ctx, pool, config.relays, batch, queueHandler); err != nil {
-				config.log.Error("QueryPubkeys(): %v", err)
+			if err := QueryPubkeyBatch(ctx, pool, config.Relays, batch, queueHandler); err != nil {
+				config.Log.Error("QueryPubkeys(): %v", err)
 				continue
 			}
 
 			// reset batch and timer only if successful
-			batch = make([]string, 0, config.batchSize)
-			timer = time.After(config.queryInterval)
+			batch = make([]string, 0, config.BatchSize)
+			timer = time.After(config.Interval)
 
 		case <-timer:
 
-			if err := QueryPubkeyBatch(ctx, pool, config.relays, batch, queueHandler); err != nil {
-				config.log.Error("QueryPubkeys(): %v", err)
+			if err := QueryPubkeyBatch(ctx, pool, config.Relays, batch, queueHandler); err != nil {
+				config.Log.Error("QueryPubkeys(): %v", err)
 				continue
 			}
 
 			// reset batch and timer only if successful
-			batch = make([]string, 0, config.batchSize)
-			timer = time.After(config.queryInterval)
+			batch = make([]string, 0, config.BatchSize)
+			timer = time.After(config.Interval)
 		}
 	}
 }

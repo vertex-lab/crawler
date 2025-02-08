@@ -12,10 +12,25 @@ import (
 )
 
 type NodeArbiterConfig struct {
-	log                 *logger.Aggregate
-	startThreshold      float64
-	promotionMultiplier float64
-	demotionMultiplier  float64
+	Log                 *logger.Aggregate
+	ActivationThreshold float64
+	PromotionMultiplier float64
+	DemotionMultiplier  float64
+}
+
+func NewNodeArbiterConfig() NodeArbiterConfig {
+	return NodeArbiterConfig{
+		ActivationThreshold: 0.01,
+		PromotionMultiplier: 0.1,
+		DemotionMultiplier:  1.05,
+	}
+}
+
+func (c NodeArbiterConfig) Print() {
+	fmt.Printf("Arbiter\n")
+	fmt.Printf("  Activation: %f\n", c.ActivationThreshold)
+	fmt.Printf("  Promotion: %f\n", c.PromotionMultiplier)
+	fmt.Printf("  Demotion: %f\n", c.DemotionMultiplier)
 }
 
 // NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
@@ -38,23 +53,23 @@ func NodeArbiter(
 	for {
 		select {
 		case <-ctx.Done():
-			config.log.Info("  > Stopping the Node Arbiter... ")
+			config.Log.Info("  > Stopping the Node Arbiter... ")
 			return
 
 		case <-ticker.C:
 			totalWalks = float64(RWS.TotalVisits(ctx)) * float64(1-RWS.Alpha(ctx)) // on average a walk is 1/(1-alpha) steps long
 			changeRatio = float64(walksChanged.Load()) / totalWalks
 
-			if changeRatio >= config.startThreshold {
+			if changeRatio >= config.ActivationThreshold {
 				promoted, demoted, err := ArbiterScan(ctx, config, DB, RWS, queueHandler)
 				if err != nil {
-					config.log.Error("%v", err)
+					config.Log.Error("%v", err)
 					continue
 				}
 
 				// resetting the walksChanged since the last successful recomputation
 				walksChanged.Store(0)
-				config.log.Info("NodeArbiter scan completed: promoted %d, demoted %d", promoted, demoted)
+				config.Log.Info("NodeArbiter scan completed: promoted %d, demoted %d", promoted, demoted)
 			}
 		}
 	}
@@ -93,8 +108,8 @@ func ArbiterScan(
 		}
 
 		walksPerNode := float64(RWS.WalksPerNode(ctx))
-		promotionThreshold := int(config.promotionMultiplier*walksPerNode + 0.5)
-		demotionThreshold := int(config.demotionMultiplier*walksPerNode + 0.5)
+		promotionThreshold := int(config.PromotionMultiplier*walksPerNode + 0.5)
+		demotionThreshold := int(config.DemotionMultiplier*walksPerNode + 0.5)
 
 		for i, ID := range nodeIDs {
 			// use a new context for the operation to avoid it being interrupted,
