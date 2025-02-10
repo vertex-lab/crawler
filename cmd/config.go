@@ -37,8 +37,8 @@ type Config struct {
 	SystemConfig
 	Firehose crawler.FirehoseConfig
 	Query    crawler.QueryPubkeysConfig
-	Process  crawler.ProcessEventsConfig
 	Arbiter  crawler.NodeArbiterConfig
+	Process  crawler.ProcessEventsConfig
 }
 
 // NewConfig() returns a config with default parameters.
@@ -111,6 +111,21 @@ func LoadConfig() (*Config, error) {
 				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
+		case "RELAYS":
+			relays := strings.Split(val, ",")
+			if len(relays) == 0 {
+				return nil, fmt.Errorf("list of relays is empty")
+			}
+
+			for _, rel := range relays {
+				if !strings.HasPrefix(rel, "wss://") {
+					return nil, fmt.Errorf("relay %s has not a valid url", rel)
+				}
+			}
+
+			config.Firehose.Relays = relays
+			config.Query.Relays = relays
+
 		case "QUERY_BATCH_SIZE":
 			config.Query.BatchSize, err = strconv.Atoi(val)
 			if err != nil {
@@ -142,6 +157,13 @@ func LoadConfig() (*Config, error) {
 				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
+		case "PROCESS_PRINT_EVERY":
+			printEvery, err := strconv.Atoi(val)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
+			}
+			config.Process.PrintEvery = uint32(printEvery)
+
 		case "INIT_PUBKEYS":
 			pubkeys := strings.Split(val, ",")
 			for _, pk := range pubkeys {
@@ -151,21 +173,6 @@ func LoadConfig() (*Config, error) {
 			}
 
 			config.InitPubkeys = pubkeys
-
-		case "RELAYS":
-			relays := strings.Split(val, ",")
-			if len(relays) == 0 {
-				return nil, fmt.Errorf("list of relays is empty")
-			}
-
-			for _, rel := range relays {
-				if !strings.HasPrefix(rel, "wss://") {
-					return nil, fmt.Errorf("relay %s has not a valid url", rel)
-				}
-			}
-
-			config.Firehose.Relays = relays
-			config.Query.Relays = relays
 		}
 	}
 
