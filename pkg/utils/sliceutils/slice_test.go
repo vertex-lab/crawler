@@ -16,8 +16,7 @@ func TestUnique(t *testing.T) {
 		expectedSlice []uint32
 	}{
 		{
-			name:  "nil slice",
-			slice: nil,
+			name: "nil slice",
 		},
 		{
 			name:  "empty slice",
@@ -41,6 +40,84 @@ func TestUnique(t *testing.T) {
 			unique := Unique(test.slice)
 			if !reflect.DeepEqual(unique, test.expectedSlice) {
 				t.Errorf("Unique(): expected %v, got %v", test.expectedSlice, unique)
+			}
+		})
+	}
+}
+
+func TestDifference(t *testing.T) {
+	testCases := []struct {
+		name          string
+		slice1        []uint32
+		slice2        []uint32
+		expectedSlice []uint32
+	}{
+		{
+			name: "nil slices",
+		},
+		{
+			name:   "empty slices",
+			slice1: []uint32{},
+			slice2: []uint32{}},
+		{
+			name:          "normal",
+			slice1:        []uint32{0, 1, 2, 4},
+			slice2:        []uint32{1, 2, 3},
+			expectedSlice: []uint32{0, 4},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+
+			diff := Difference(test.slice1, test.slice2)
+			if !reflect.DeepEqual(diff, test.expectedSlice) {
+				t.Errorf("Difference(): expected %v, got %v", test.expectedSlice, diff)
+			}
+		})
+	}
+}
+
+func TestPartition(t *testing.T) {
+	testCases := []struct {
+		name            string
+		slice1          []uint32
+		slice2          []uint32
+		expectedRemoved []uint32
+		expectedCommon  []uint32
+		expectedAdded   []uint32
+	}{
+		{
+			name: "nil slices",
+		},
+		{
+			name:   "empty slices",
+			slice1: []uint32{},
+			slice2: []uint32{},
+		},
+		{
+			name:            "normal",
+			slice1:          []uint32{0, 1, 2, 4},
+			slice2:          []uint32{1, 2, 3},
+			expectedRemoved: []uint32{0, 4},
+			expectedCommon:  []uint32{1, 2},
+			expectedAdded:   []uint32{3},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			removed, common, added := Partition(test.slice1, test.slice2)
+			if !reflect.DeepEqual(removed, test.expectedRemoved) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedRemoved, removed)
+			}
+
+			if !reflect.DeepEqual(common, test.expectedCommon) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedCommon, common)
+			}
+
+			if !reflect.DeepEqual(added, test.expectedAdded) {
+				t.Errorf("Partition(): expected %v, got %v", test.expectedAdded, added)
 			}
 		})
 	}
@@ -81,80 +158,7 @@ func TestSplitSlice(t *testing.T) {
 	}
 }
 
-func TestDifference(t *testing.T) {
-	testCases := []struct {
-		name          string
-		slice1        []uint32
-		slice2        []uint32
-		expectedSlice []uint32
-	}{
-		{
-			name:   "empty slices",
-			slice1: []uint32{},
-			slice2: []uint32{}},
-		{
-			name:          "normal",
-			slice1:        []uint32{0, 1, 2, 4},
-			slice2:        []uint32{1, 2, 3},
-			expectedSlice: []uint32{0, 4},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-
-			diff := Difference(test.slice1, test.slice2)
-			if !reflect.DeepEqual(diff, test.expectedSlice) {
-				t.Errorf("Partition(): expected %v, got %v", test.expectedSlice, diff)
-			}
-		})
-	}
-}
-
-func TestPartition(t *testing.T) {
-	testCases := []struct {
-		name            string
-		slice1          []uint32
-		slice2          []uint32
-		expectedRemoved []uint32
-		expectedCommon  []uint32
-		expectedAdded   []uint32
-	}{
-		{
-			name:   "empty slices",
-			slice1: []uint32{},
-			slice2: []uint32{},
-		},
-		{
-			name:            "normal",
-			slice1:          []uint32{0, 1, 2, 4},
-			slice2:          []uint32{1, 2, 3},
-			expectedRemoved: []uint32{0, 4},
-			expectedCommon:  []uint32{1, 2},
-			expectedAdded:   []uint32{3},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			removed, common, added := Partition(test.slice1, test.slice2)
-			if !reflect.DeepEqual(removed, test.expectedRemoved) {
-				t.Errorf("Partition(): expected %v, got %v", test.expectedRemoved, removed)
-			}
-
-			if !reflect.DeepEqual(common, test.expectedCommon) {
-				t.Errorf("Partition(): expected %v, got %v", test.expectedCommon, common)
-			}
-
-			if !reflect.DeepEqual(added, test.expectedAdded) {
-				t.Errorf("Partition(): expected %v, got %v", test.expectedAdded, added)
-			}
-		})
-	}
-}
-
 func TestTrimCycles(t *testing.T) {
-
 	testCases := []struct {
 		name         string
 		oldWalk      []uint32
