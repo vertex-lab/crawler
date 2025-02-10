@@ -118,8 +118,8 @@ func LoadConfig() (*Config, error) {
 			}
 
 			for _, rel := range relays {
-				if !strings.HasPrefix(rel, "wss://") {
-					return nil, fmt.Errorf("relay %s has not a valid url", rel)
+				if !nostr.IsValidRelayURL(rel) {
+					return nil, fmt.Errorf("relay \"%s\" is not a valid url", rel)
 				}
 			}
 
