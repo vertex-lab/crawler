@@ -170,7 +170,7 @@ func PromoteNode(
 	nodeID uint32) error {
 
 	if err := walks.Generate(ctx, DB, RWS, nodeID); err != nil {
-		return fmt.Errorf("PromoteNode(): %w", err)
+		return fmt.Errorf("failed to generate walks: %w", err)
 	}
 
 	delta := &models.Delta{
@@ -179,7 +179,7 @@ func PromoteNode(
 	}
 
 	if err := DB.Update(ctx, delta); err != nil {
-		return fmt.Errorf("PromoteNode(): %w", err)
+		return fmt.Errorf("failed to update node: %w", err)
 	}
 
 	return nil
@@ -194,7 +194,7 @@ func DemoteNode(
 	nodeID uint32) error {
 
 	if err := walks.Remove(ctx, RWS, nodeID); err != nil {
-		return fmt.Errorf("DemoteNode(): %w", err)
+		return fmt.Errorf("failed to remove walks: %w", err)
 	}
 
 	delta := &models.Delta{
@@ -203,7 +203,7 @@ func DemoteNode(
 	}
 
 	if err := DB.Update(ctx, delta); err != nil {
-		return fmt.Errorf("DemoteNode(): %w", err)
+		return fmt.Errorf("failed to update node: %w", err)
 	}
 
 	return nil

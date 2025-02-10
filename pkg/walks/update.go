@@ -29,27 +29,27 @@ func Update(
 	removed, common, added []uint32) (int, error) {
 
 	if err := DB.Validate(); err != nil {
-		return 0, fmt.Errorf("Update(%d): %w", nodeID, err)
+		return 0, fmt.Errorf("DB validation failed: %w", err)
 	}
 
 	if err := RWS.Validate(); err != nil {
-		return 0, fmt.Errorf("Update(%d): %w", nodeID, err)
+		return 0, fmt.Errorf("RWS validation failed: %w", err)
 	}
 
 	if !DB.ContainsNode(ctx, nodeID) {
-		return 0, fmt.Errorf("Update(%d): %w", nodeID, models.ErrNodeNotFoundDB)
+		return 0, models.ErrNodeNotFoundDB
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	updated1, err := updateRemovedNodes(ctx, rng, DB, RWS, nodeID, removed, common)
 	if err != nil {
-		return updated1, fmt.Errorf("Update(%d): %w", nodeID, err)
+		return updated1, fmt.Errorf("updateRemoved: %w", err)
 	}
 
 	followsCount := len(common) + len(added)
 	updated2, err := updateAddedNodes(ctx, rng, DB, RWS, nodeID, added, followsCount)
 	if err != nil {
-		return updated1 + updated2, fmt.Errorf("Update(%d): %w", nodeID, err)
+		return updated1 + updated2, fmt.Errorf("updateAdded: %w", err)
 	}
 
 	return updated1 + updated2, nil
@@ -81,7 +81,7 @@ func updateRemovedNodes(
 	for _, r := range removed {
 		IDs, err := RWS.WalksVisitingAll(ctx, nodeID, r)
 		if err != nil {
-			return 0, fmt.Errorf("updateRemovedNodes(): failed to fetch walksVisitingAll: %w", err)
+			return 0, fmt.Errorf("failed to fetch walksVisitingAll: %w", err)
 		}
 
 		walkIDs = append(walkIDs, IDs...)
@@ -90,7 +90,7 @@ func updateRemovedNodes(
 
 	walks, err := RWS.Walks(ctx, walkIDs...)
 	if err != nil {
-		return 0, fmt.Errorf("updateRemovedNodes(): failed to fetch walks: %w", err)
+		return 0, fmt.Errorf("failed to fetch walks from IDs: %w", err)
 	}
 
 	var updated int
@@ -105,12 +105,12 @@ func updateRemovedNodes(
 		// generate a new walk segment that will replace the invalid segment of the walk
 		newSegment, err := generateWalkSegment(ctx, rng, DB, common, walk[:cutIndex], RWS.Alpha(ctx))
 		if err != nil {
-			return updated, fmt.Errorf("updateRemovedNodes(): %w", err)
+			return updated, fmt.Errorf("failed to generateWalkSegment: %w", err)
 		}
 
 		// prune and graft the walk with the new walk segment
 		if err = RWS.PruneGraftWalk(ctx, ID, cutIndex, newSegment); err != nil {
-			return updated, fmt.Errorf("updateRemovedNodes(): %w", err)
+			return updated, fmt.Errorf("failed to prune and graft: %w", err)
 		}
 
 		updated++
@@ -138,17 +138,17 @@ func updateAddedNodes(
 
 	limit, err := estimateWalksToUpdate(ctx, RWS, nodeID, len(added), followsCount)
 	if err != nil {
-		return 0, fmt.Errorf("updateAddedNodes(): %w", err)
+		return 0, fmt.Errorf("failed to estimate walks to update: %w", err)
 	}
 
 	walkIDs, err := RWS.WalksVisiting(ctx, limit, nodeID)
 	if err != nil {
-		return 0, fmt.Errorf("updateAddedNodes(): %w", err)
+		return 0, fmt.Errorf("failed to fetch walksVisitingAll: %w", err)
 	}
 
 	walks, err := RWS.Walks(ctx, walkIDs...)
 	if err != nil {
-		return 0, fmt.Errorf("updateAddedNodes(): %w", err)
+		return 0, fmt.Errorf("failed to fetch walks from IDs: %w", err)
 	}
 
 	var updated int
@@ -164,13 +164,13 @@ func updateAddedNodes(
 
 			newSegment, err = generateWalkSegment(ctx, rng, DB, added, walk[:cutIndex], RWS.Alpha(ctx))
 			if err != nil {
-				return updated, fmt.Errorf("updateAddedNodes(): %w", err)
+				return updated, fmt.Errorf("failed to generateWalkSegment: %w", err)
 			}
 		}
 
 		// prune and graft the walk with the new walk segment
 		if err := RWS.PruneGraftWalk(ctx, ID, cutIndex, newSegment); err != nil {
-			return updated, fmt.Errorf("updateAddedNodes(): %w", err)
+			return updated, fmt.Errorf("failed to prune and graft: %w", err)
 		}
 
 		updated++
@@ -199,7 +199,7 @@ func generateWalkSegment(
 
 	newSegment, err := generateWalk(ctx, rng, DB, nextID, alpha)
 	if err != nil {
-		return nil, fmt.Errorf("generateWalkSegment(): %w", err)
+		return nil, fmt.Errorf("failed to generate walk: %w", err)
 	}
 
 	return sliceutils.DeleteCyclesInPlace(currentWalk, newSegment), nil
@@ -229,11 +229,11 @@ func estimateWalksToUpdate(
 
 	visitsByNode, err := RWS.VisitCounts(ctx, nodeID)
 	if err != nil {
-		return 0, fmt.Errorf("estimateWalksToUpdate(): %w", err)
+		return 0, fmt.Errorf("failed to get the visit counts: %w", err)
 	}
 
 	if len(visitsByNode) != 1 {
-		return 0, fmt.Errorf("estimateWalksToUpdate(): visitsByNode has len %d instead of 1", len(visitsByNode))
+		return 0, fmt.Errorf("visitsByNode has len %d instead of 1", len(visitsByNode))
 	}
 
 	visits := float32(visitsByNode[0])             // the number of walks that visit (go through) nodeID

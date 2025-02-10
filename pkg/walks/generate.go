@@ -22,11 +22,11 @@ func Generate(
 	nodeID uint32) error {
 
 	if err := DB.Validate(); err != nil {
-		return fmt.Errorf("Generate(): %w", err)
+		return fmt.Errorf("DB validation failed: %w", err)
 	}
 
 	if err := RWS.Validate(); err != nil {
-		return fmt.Errorf("Generate(): %w", err)
+		return fmt.Errorf("RWS validation failed: %w", err)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -50,11 +50,11 @@ func GenerateAll(
 	DB models.Database,
 	RWS models.RandomWalkStore) error {
 	if err := DB.Validate(); err != nil {
-		return fmt.Errorf("GenerateAll(): %w", err)
+		return fmt.Errorf("DB validation failed: %w", err)
 	}
 
 	if err := RWS.Validate(); err != nil {
-		return fmt.Errorf("GenerateAll(): %w", err)
+		return fmt.Errorf("RWS validation failed: %w", err)
 	}
 
 	nodeIDs, err := DB.AllNodes(ctx)
@@ -100,14 +100,14 @@ func generateWalks(
 		for i := uint16(0); i < walksPerNode; i++ {
 			walk, err := generateWalk(ctx, rng, DB, ID, alpha)
 			if err != nil {
-				return fmt.Errorf("generateWalks(): %w", err)
+				return fmt.Errorf("failed to generate walk: %w", err)
 			}
 
 			walks[i] = walk
 		}
 
 		if err := RWS.AddWalks(ctx, walks...); err != nil {
-			return fmt.Errorf("generateWalks(): %w", err)
+			return fmt.Errorf("failed to add walks: %w", err)
 		}
 	}
 
@@ -151,7 +151,7 @@ func generateWalk(
 
 		follows, err := DB.Follows(ctx, currentID)
 		if err != nil {
-			return nil, fmt.Errorf("generateWalk(): %w", err)
+			return nil, fmt.Errorf("failed to fetch the follows of nodeID %d: %w", currentID, err)
 		}
 
 		currentID, shouldBreak = WalkStep(rng, follows[0], walk)
@@ -198,17 +198,17 @@ func WalkStep(rng *rand.Rand, follows, walk []uint32) (nextID uint32, stop bool)
 // Remove() removes all the walks that originated from nodeID.
 func Remove(ctx context.Context, RWS models.RandomWalkStore, nodeID uint32) error {
 	if err := RWS.Validate(); err != nil {
-		return fmt.Errorf("Remove(): %w", err)
+		return fmt.Errorf("RWS validation failed: %w", err)
 	}
 
 	walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 	if err != nil {
-		return fmt.Errorf("Remove(): %w", err)
+		return fmt.Errorf("failed to fetch walksVisitingAll: %w", err)
 	}
 
 	walks, err := RWS.Walks(ctx, walkIDs...)
 	if err != nil {
-		return fmt.Errorf("Remove(): %w", err)
+		return fmt.Errorf("failed to fetch walks from IDs: %w", err)
 	}
 
 	walksToRemove := make([]uint32, 0, RWS.WalksPerNode(ctx))
