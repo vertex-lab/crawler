@@ -164,7 +164,7 @@ func QueryPubkeys(
 
 		case pubkey, ok := <-pubkeyChan:
 			if !ok {
-				config.Log.Warn("Pubkey channel closed, stopping processing.")
+				config.Log.Warn("Pubkey queue closed, stopped processing.")
 				return
 			}
 
@@ -220,7 +220,6 @@ func QueryPubkeyBatch(
 	// a map that associates each pair (pubkey,kind) with the latest event from that authors for that kind.
 	latest := make(map[string]*nostr.Event, len(pubkeys)*len(filter.Kinds))
 	for event := range pool.SubManyEose(ctx, relays, nostr.Filters{filter}) {
-
 		if event.Event == nil {
 			continue
 		}
@@ -235,12 +234,8 @@ func QueryPubkeyBatch(
 
 		key := fmt.Sprintf("%s:%d", event.PubKey, event.Kind) // "<pubkey>:<kind>"" represent the pair (pubkey, kind)
 		e, exists := latest[key]
-		if !exists {
-			latest[key] = event.Event
-			continue
-		}
 
-		if event.CreatedAt > e.CreatedAt {
+		if !exists || event.CreatedAt > e.CreatedAt {
 			latest[key] = event.Event
 		}
 	}
