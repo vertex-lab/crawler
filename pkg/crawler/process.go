@@ -38,6 +38,8 @@ func ProcessEvents(
 	eventChan <-chan *nostr.Event,
 	eventCounter, walksChanged *atomic.Uint32) {
 
+	var err error
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -46,7 +48,7 @@ func ProcessEvents(
 
 		case event, ok := <-eventChan:
 			if !ok {
-				config.Log.Warn("Event channel closed, stopped processing.")
+				config.Log.Warn("Event queue closed, stopped processing.")
 				return
 			}
 
@@ -57,12 +59,14 @@ func ProcessEvents(
 
 			switch KindToRecordType(event.Kind) {
 			case models.Follow:
-				if err := ProcessFollowList(DB, RWS, event, walksChanged); err != nil {
-					config.Log.Error("Error processing follow list with eventID %v: %v", event.ID, err)
-				}
+				err = ProcessFollowList(DB, RWS, event, walksChanged)
 
 			default:
-				config.Log.Warn("event of unwanted kind: %v", event.Kind)
+				err = fmt.Errorf("unsupported event kind")
+			}
+
+			if err != nil {
+				config.Log.Error("ProcessEvents kind %d: %v; eventID %s by %s", event.Kind, err, event.ID, event.PubKey)
 			}
 
 			count := eventCounter.Add(1)
@@ -73,16 +77,15 @@ func ProcessEvents(
 	}
 }
 
-// ProcessFollowList() adds the author and its follows to the database.
-// It updates the node metadata of the author, and updates the random walks.
+// ProcessFollowList() updates the follow relationships for the event's author in the database.
+// If the author is active, new follows are added to the database as inactive nodes.
 func ProcessFollowList(
 	DB models.Database,
 	RWS models.RandomWalkStore,
 	event *nostr.Event,
 	walksChanged *atomic.Uint32) error {
 
-	// use a new context for the operation to avoid it being interrupted,
-	// which might result in an inconsistent state of the database. Expected time <1000ms
+	// use a new context for the operation to avoid it being interrupted
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -96,18 +99,17 @@ func ProcessFollowList(
 	}
 
 	pubkeys := ParsePubkeys(event)
-	newFollows, err := AssignNodeIDs(ctx, DB, pubkeys)
+	newFollows, err := resolveIDs(ctx, DB, pubkeys, author.Status)
 	if err != nil {
-		return fmt.Errorf("failed to assign node IDs to the follows of %s: %w", event.PubKey, err)
+		return fmt.Errorf("resolveIDs: %w", err)
 	}
 
-	followsByNode, err := DB.Follows(ctx, author.ID)
+	follows, err := DB.Follows(ctx, author.ID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch the old follows of %d: %w", author.ID, err)
 	}
-	oldFollows := followsByNode[0]
 
-	removed, common, added := sliceutils.Partition(oldFollows, newFollows)
+	removed, common, added := sliceutils.Partition(follows[0], newFollows)
 	delta := &models.Delta{
 		Record:  models.Record{ID: event.ID, Timestamp: event.CreatedAt.Time().Unix(), Type: models.Follow},
 		NodeID:  author.ID,
@@ -121,42 +123,61 @@ func ProcessFollowList(
 
 	updated, err := walks.Update(ctx, DB, RWS, author.ID, removed, common, added)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update the walks of nodeID %d: %w", author.ID, err)
 	}
 
 	walksChanged.Add(uint32(updated)) // this counter triggers the activation of NodeArbiter
 	return nil
 }
 
-// AssignNodeIDs() returns the nodeIDs of the specified pubkeys. If a pubkey isn't found in the database, it gets added as a new node.
-func AssignNodeIDs(
+// resolveIDs() assigns an ID to each pubkey. If the authorStatus is active and
+// a pubkey is not found (ID = nil), a new node is added with that pubkey.
+func resolveIDs(
 	ctx context.Context,
 	DB models.Database,
-	pubkeys []string) ([]uint32, error) {
+	pubkeys []string,
+	authorStatus string) ([]uint32, error) {
+
+	if len(pubkeys) == 0 {
+		return nil, nil
+	}
 
 	IDs, err := DB.NodeIDs(ctx, pubkeys...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch the IDs: %w", err)
 	}
 
-	nodeIDs := make([]uint32, len(IDs))
-	for i, ID := range IDs {
-		if ID == nil {
-			// if it's nil, the pubkey wasn't found in the database
-			// add a new node to the database, and assign it an ID
-			nodeID, err := DB.AddNode(ctx, pubkeys[i])
-			if err != nil {
-				return nil, err
+	newFollows := make([]uint32, 0, len(IDs))
+	switch authorStatus {
+	case models.StatusActive:
+		// if the pubkey is not in the DB (ID=nil), it gets added as a new node
+		for i, ID := range IDs {
+			if ID == nil {
+				newID, err := DB.AddNode(ctx, pubkeys[i])
+				if err != nil {
+					return nil, fmt.Errorf("failed to add %s", pubkeys[i])
+				}
+
+				newFollows = append(newFollows, newID)
+				continue
 			}
 
-			nodeIDs[i] = nodeID
-			continue
+			newFollows = append(newFollows, *ID)
 		}
 
-		nodeIDs[i] = *ID
+	case models.StatusInactive:
+		// if the pubkey is not in the DB (ID=nil), it DOESN'T get added as a new node
+		for _, ID := range IDs {
+			if ID != nil {
+				newFollows = append(newFollows, *ID)
+			}
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown status: %s", authorStatus)
 	}
 
-	return nodeIDs, nil
+	return newFollows, nil
 }
 
 // ParsePubkeys() returns the slice of pubkeys that are correctly listed in the nostr.Tags.

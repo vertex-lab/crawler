@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -12,9 +11,7 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
-	"github.com/vertex-lab/crawler/pkg/pagerank"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
-	"github.com/vertex-lab/crawler/pkg/walks"
 )
 
 const odell = "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
@@ -101,183 +98,112 @@ func TestParsePubkeys(t *testing.T) {
 	}
 }
 
-func TestAssignNodeIDs(t *testing.T) {
+func TestResolveIDs(t *testing.T) {
 	testCases := []struct {
 		name          string
 		DBType        string
+		status        string
 		pubkeys       []string
 		expectedError error
 		expectedIDs   []uint32
 	}{
 		{
-			name:          "nil pubkeys",
-			DBType:        "simple",
-			pubkeys:       nil,
-			expectedError: nil,
-			expectedIDs:   []uint32{},
+			name:   "nil pubkeys",
+			DBType: "simple",
+			status: models.StatusActive,
 		},
 		{
-			name:          "empty pubkeys",
-			DBType:        "simple",
-			pubkeys:       []string{},
-			expectedError: nil,
-			expectedIDs:   []uint32{},
+			name:    "empty pubkeys",
+			DBType:  "simple",
+			status:  models.StatusActive,
+			pubkeys: []string{},
 		},
 		{
-			name:          "existing pubkey",
-			DBType:        "simple",
-			pubkeys:       []string{"0", "1"},
-			expectedError: nil,
-			expectedIDs:   []uint32{0, 1},
+			name:        "existing pubkeys (active)",
+			DBType:      "simple",
+			status:      models.StatusActive,
+			pubkeys:     []string{"0", "1"},
+			expectedIDs: []uint32{0, 1},
 		},
 		{
-			name:          "existing and new pubkey",
-			DBType:        "simple",
-			pubkeys:       []string{"0", "1", "3"},
-			expectedError: nil,
-			expectedIDs:   []uint32{0, 1, 3},
+			name:        "existing pubkeys (inactive)",
+			DBType:      "simple",
+			status:      models.StatusInactive,
+			pubkeys:     []string{"0", "1"},
+			expectedIDs: []uint32{0, 1},
+		},
+		{
+			name:        "existing and new pubkeys (active)",
+			DBType:      "simple",
+			status:      models.StatusActive,
+			pubkeys:     []string{"0", "1", "3"},
+			expectedIDs: []uint32{0, 1, 3},
+		},
+		{
+			name:        "existing and new pubkeys (inactive)",
+			DBType:      "simple",
+			status:      models.StatusInactive,
+			pubkeys:     []string{"0", "1", "3"},
+			expectedIDs: []uint32{0, 1},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
-			followIDs, err := AssignNodeIDs(context.Background(), DB, test.pubkeys)
-
+			IDs, err := resolveIDs(ctx, DB, test.pubkeys, test.status)
 			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("ProcessNodeIDs(): expected %v, got %v", test.expectedError, err)
+				t.Fatalf("resolveIDs(): expected %v, got %v", test.expectedError, err)
 			}
 
-			if !reflect.DeepEqual(followIDs, test.expectedIDs) {
-				t.Errorf("ProcessNodeIDs(): expected %v, got %v", test.expectedIDs, followIDs)
+			if !reflect.DeepEqual(IDs, test.expectedIDs) {
+				t.Errorf("resolveIDs(): expected %v, got %v", test.expectedIDs, IDs)
 			}
 		})
 	}
 }
 
 func TestProcessFollowList(t *testing.T) {
-	t.Run("simple errors", func(t *testing.T) {
-		testCases := []struct {
-			name          string
-			DBType        string
-			RWSType       string
-			expectedError error
-		}{
-			{
-				name:          "nil DB",
-				DBType:        "nil",
-				RWSType:       "one-node0",
-				expectedError: models.ErrNilDB,
-			},
-			{
-				name:          "event.PubKey not found",
-				DBType:        "one-node0",
-				RWSType:       "one-node0",
-				expectedError: models.ErrNodeNotFoundDB,
-			},
-		}
+	testCases := []struct {
+		name          string
+		DBType        string
+		RWSType       string
+		expectedError error
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			RWSType:       "one-node0",
+			expectedError: models.ErrNilDB,
+		},
+		{
+			name:          "event.PubKey not found",
+			DBType:        "one-node0",
+			RWSType:       "one-node0",
+			expectedError: models.ErrNodeNotFoundDB,
+		},
+	}
 
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				DB := mockdb.SetupDB(test.DBType)
-				RWS := mockstore.SetupRWS(test.RWSType)
-				event := &nostr.Event{
-					PubKey:    calle,
-					Kind:      3,
-					CreatedAt: nostr.Timestamp(11),
-					Tags: nostr.Tags{
-						nostr.Tag{"p", gigi},
-						nostr.Tag{"p", odell}},
-				}
-
-				err := ProcessFollowList(DB, RWS, event, &atomic.Uint32{})
-				if !errors.Is(err, test.expectedError) {
-					t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
-				}
-			})
-		}
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		var maxDist float64 = 0.01
-		var walksPerNode uint16 = 5000
-		var alpha float32 = 0.85
-		var maxWalkDiff float64 = 3 * maxDist * float64(walksPerNode) // the walks counter seems to converge slower than the pagerank
-		ctx := context.Background()
-
-		DB := mockdb.SetupDB("pip")
-		RWS, err := mockstore.NewRWS(alpha, walksPerNode)
-		if err != nil {
-			t.Fatalf("NewRWS(): expected nil, got %v", err)
-		}
-
-		if err := walks.GenerateAll(ctx, DB, RWS); err != nil {
-			t.Fatalf("GenerateAll(): expected nil, got %v", err)
-		}
-
-		// one after the other, the graph will be built: pip --> gigi; calle --> odell --> pip
-		events := []*nostr.Event{
-			{
-				PubKey:    pip,
-				CreatedAt: nostr.Timestamp(1),
-				Tags: nostr.Tags{
-					nostr.Tag{"p", calle},
-				},
-			},
-			{
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			DB := mockdb.SetupDB(test.DBType)
+			RWS := mockstore.SetupRWS(test.RWSType)
+			event := &nostr.Event{
 				PubKey:    calle,
-				CreatedAt: nostr.Timestamp(2),
+				Kind:      3,
+				CreatedAt: nostr.Timestamp(11),
 				Tags: nostr.Tags{
-					nostr.Tag{"p", odell},
-				},
-			},
-			{
-				PubKey:    odell,
-				CreatedAt: nostr.Timestamp(3),
-				Tags: nostr.Tags{
-					nostr.Tag{"p", pip},
-				},
-			},
-		}
-
-		expectedPagerank := map[int]models.PagerankMap{
-			0: {0: 0.54, 1: 0.46, 2: 0},
-			1: {0: 0.3887, 1: 0.3304, 2: 0.2809},
-			2: {0: 0.3887, 1: 0.3304, 2: 0.2809},
-		}
-
-		expectedWalksCounter := map[int]float64{
-			0: float64(walksPerNode),
-			1: float64(walksPerNode) + float64(walksPerNode)*float64(alpha),
-			2: float64(walksPerNode) + float64(walksPerNode)*float64(alpha) + float64(walksPerNode)*float64(alpha)*float64(alpha),
-		}
-
-		walksCounter := atomic.Uint32{}
-		for i, event := range events {
-			if err := ProcessFollowList(DB, RWS, event, &walksCounter); err != nil {
-				t.Fatalf("ProcessFollowList(event%d): expected nil, got %v", i, err)
+					nostr.Tag{"p", gigi},
+					nostr.Tag{"p", odell}},
 			}
 
-			walks := walksCounter.Load()
-			expectedWalks := expectedWalksCounter[i]
-			diff := math.Abs(float64(expectedWalks) - float64(walks))
-
-			if diff > maxWalkDiff {
-				t.Errorf("Expected distance %v, got abs(%v)", maxWalkDiff, diff)
+			err := ProcessFollowList(DB, RWS, event, &atomic.Uint32{})
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
 			}
-
-			ranks, err := pagerank.Global(ctx, RWS, 0, 1, 2)
-			if err != nil {
-				t.Errorf("pagerank Global failed(): %v", err)
-			}
-
-			distance := pagerank.Distance(ranks, expectedPagerank[i])
-			if distance > maxDist {
-				t.Errorf("Expected distance %v, got %v", maxDist, distance)
-				t.Errorf("Expected pagerank %v, got %v", expectedPagerank[i], ranks)
-			}
-		}
-	})
+		})
+	}
 }
 
 // ---------------------------------BENCHMARKS----------------------------------

@@ -106,11 +106,6 @@ func Firehose(
 			continue // If the node is not found (err != nil), skip
 		}
 
-		// if the author is an inactive node, skip
-		if node.Status == models.StatusInactive {
-			continue
-		}
-
 		if IsEventOutdated(node, event.Event) {
 			continue
 		}
