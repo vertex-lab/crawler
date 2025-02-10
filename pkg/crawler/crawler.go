@@ -139,7 +139,7 @@ func (c QueryPubkeysConfig) Print() {
 }
 
 // QueryPubkeys() extracts pubkeys from the pubkeyChan channel, and queries for
-// their events when the batch is bigger than batchSize, OR after queryInterval since the last query.
+// their events when the batch is bigger than config.batchSize, OR after config.Interval since the last query.
 func QueryPubkeys(
 	ctx context.Context,
 	config QueryPubkeysConfig,
