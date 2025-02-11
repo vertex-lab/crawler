@@ -30,7 +30,9 @@ Therefore, the number of walks checked is (roughly) iterations * batchSize.
 func TestWalks(t *testing.T) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
-	fmt.Printf("redis successfully connected\n")
+
+	fmt.Println("----------------------------")
+	fmt.Println("Testing the walks consistency")
 	fmt.Printf("----------------------------\n\n")
 
 	var counter int
@@ -93,6 +95,9 @@ func TestPagerank(t *testing.T) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
+	fmt.Println("---------------------------------")
+	fmt.Println("Testing the pagerank distribution")
+
 	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
 	if err != nil {
 		t.Fatalf("NewDatabaseConnection(): %v", err)
@@ -102,7 +107,6 @@ func TestPagerank(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRWSConnection(): %v", err)
 	}
-	fmt.Println("redis successfully connected")
 
 	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
@@ -113,14 +117,14 @@ func TestPagerank(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Global(): %v", err)
 	}
-	fmt.Println("original pagerank successfully computed")
+	fmt.Println(" > original pagerank successfully computed")
 
 	// copy the DB into an in-memory mock to speed up random walks generation
 	DB_memory, err := copy(DB, nodeIDs...)
 	if err != nil {
 		t.Fatalf("CopyFollows(): %v", err)
 	}
-	fmt.Println("DB successfully copied")
+	fmt.Println(" > DB successfully copied")
 
 	// generate the walks only for the active nodes, and then compare
 	// the resulting pagerank distribution with the one in redis.
@@ -131,8 +135,8 @@ func TestPagerank(t *testing.T) {
 		t.Fatalf("NewRWS(): %v", err)
 	}
 
-	fmt.Printf("generating walks for active nodes\n")
-	fmt.Printf("---------------------------------\n")
+	fmt.Printf(" > generating walks for active nodes\n")
+	fmt.Printf("---------------------------------\n\n")
 
 	var actives int
 	for i, ID := range nodeIDs {
