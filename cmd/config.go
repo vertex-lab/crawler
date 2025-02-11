@@ -22,16 +22,6 @@ type SystemConfig struct {
 	InitPubkeys         []string // only used during initialization
 }
 
-func NewSystemConfig() SystemConfig {
-	return SystemConfig{
-		Log:                 logger.New(os.Stdout),
-		LogWriter:           os.Stdout,
-		DisplayStats:        false,
-		EventQueueCapacity:  1000,
-		PubkeyQueueCapacity: 1000,
-	}
-}
-
 // The configuration parameters for the system and the main processes.
 type Config struct {
 	SystemConfig
@@ -39,6 +29,15 @@ type Config struct {
 	Query    crawler.QueryPubkeysConfig
 	Arbiter  crawler.NodeArbiterConfig
 	Process  crawler.ProcessEventsConfig
+}
+
+func NewSystemConfig() SystemConfig {
+	return SystemConfig{
+		LogWriter:           os.Stdout,
+		DisplayStats:        false,
+		EventQueueCapacity:  1000,
+		PubkeyQueueCapacity: 1000,
+	}
 }
 
 // NewConfig() returns a config with default parameters.
@@ -80,18 +79,19 @@ func LoadConfig() (*Config, error) {
 
 		switch key {
 		case "LOGS":
+			// LogWriter gets updated if a .log file is specified; otherwise it remains os.Stdout
 			if strings.HasSuffix(val, ".log") {
 				config.LogWriter, err = os.OpenFile(val, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 				if err != nil {
-					return nil, fmt.Errorf("error opening file %v: %v", val, err)
+					return nil, fmt.Errorf("error opening file \"%v\": %v", val, err)
 				}
-
-				config.Log = logger.New(config.LogWriter)
-				config.Firehose.Log = config.Log
-				config.Query.Log = config.Log
-				config.Process.Log = config.Log
-				config.Arbiter.Log = config.Log
 			}
+
+			config.Log = logger.New(config.LogWriter)
+			config.Firehose.Log = config.Log
+			config.Query.Log = config.Log
+			config.Process.Log = config.Log
+			config.Arbiter.Log = config.Log
 
 		case "DISPLAY_STATS":
 			config.DisplayStats, err = strconv.ParseBool(val)
