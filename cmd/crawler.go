@@ -145,18 +145,10 @@ func DisplayStats(
 	pubkeyQueue <-chan string,
 	eventCounter, walksChanged *atomic.Uint32) {
 
+	const statsLines = 10
+
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-
-	const statsLines = 11
-	firstDisplay := true
-	clearStats := func() {
-		if !firstDisplay {
-			// Move the cursor up by `statsLines` and clear those lines
-			fmt.Printf("\033[%dA", statsLines)
-			fmt.Print("\033[J")
-		}
-	}
 
 	for {
 		select {
@@ -173,8 +165,11 @@ func DisplayStats(
 			memStats := new(runtime.MemStats)
 			runtime.ReadMemStats(memStats)
 
-			clearStats()
-			fmt.Printf("\n------------ System Stats -------------\n")
+			// clear stats
+			fmt.Printf("\033[%dA", statsLines)
+			fmt.Print("\033[J")
+
+			fmt.Printf("------------ System Stats -------------\n")
 			fmt.Printf("Database Size: %d nodes\n", DB.Size(ctx))
 			fmt.Printf("Event Queue: %d/%d\n", eventQueueLen, eventQueueCap)
 			fmt.Printf("Pubkey Queue: %d/%d\n", pubkeyQueueLen, pubkeyQueueCap)
@@ -184,7 +179,6 @@ func DisplayStats(
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
 			fmt.Println("---------------------------------------")
-			firstDisplay = false
 		}
 	}
 }
