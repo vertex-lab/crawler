@@ -105,12 +105,12 @@ func Partition[S ~[]E, E cmp.Ordered](slice1, slice2 S) (removed, common, added 
 }
 
 // SplitSlice splits a slice into a slice of slices, each with a maximum size of batchSize
-func SplitSlice(slice []string, batchSize int) [][]string {
+func SplitSlice[S ~[]E, E cmp.Ordered](slice S, batchSize int) []S {
 	if len(slice) == 0 {
 		return nil
 	}
 
-	split := make([][]string, 0, len(slice)/batchSize)
+	split := make([]S, 0, len(slice)/batchSize)
 	for batchSize < len(slice) {
 		split, slice = append(split, slice[:batchSize]), slice[batchSize:]
 	}
