@@ -14,12 +14,17 @@ import (
 )
 
 type SystemConfig struct {
-	Log                 *logger.Aggregate
-	LogWriter           io.Writer
-	DisplayStats        bool
+	Log          *logger.Aggregate
+	LogWriter    io.Writer
+	DisplayStats bool
+
+	RedisAddress string
+	SQLiteURL    string
+
 	EventQueueCapacity  int
 	PubkeyQueueCapacity int
-	InitPubkeys         []string // only used during initialization
+
+	InitPubkeys []string // only used during initialization
 }
 
 // The configuration parameters for the system and the main processes.
@@ -33,8 +38,11 @@ type Config struct {
 
 func NewSystemConfig() SystemConfig {
 	return SystemConfig{
+		Log:                 logger.New(os.Stdout),
 		LogWriter:           os.Stdout,
 		DisplayStats:        false,
+		RedisAddress:        "localhost:6379",
+		SQLiteURL:           "events.sqlite",
 		EventQueueCapacity:  1000,
 		PubkeyQueueCapacity: 1000,
 	}
@@ -55,6 +63,8 @@ func (c SystemConfig) Print() {
 	fmt.Println("System:")
 	fmt.Printf("  LogWriter: %T\n", c.LogWriter)
 	fmt.Printf("  DisplayStats: %t\n", c.DisplayStats)
+	fmt.Printf("  RedisAddress: %s\n", c.RedisAddress)
+	fmt.Printf("  SQLiteURL: %s\n", c.SQLiteURL)
 	fmt.Printf("  EventQueueCapacity: %d\n", c.EventQueueCapacity)
 	fmt.Printf("  PubkeyQueueCapacity: %d\n", c.PubkeyQueueCapacity)
 	fmt.Printf("  InitPubkeys: %v\n", c.InitPubkeys)
@@ -99,6 +109,12 @@ func LoadConfig() (*Config, error) {
 				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
+		case "REDIS_ADDRESS":
+			config.RedisAddress = val
+
+		case "SQLITE_URL":
+			config.SQLiteURL = val
+
 		case "EVENT_QUEUE_CAPACITY":
 			config.EventQueueCapacity, err = strconv.Atoi(val)
 			if err != nil {
@@ -125,6 +141,16 @@ func LoadConfig() (*Config, error) {
 
 			config.Firehose.Relays = relays
 			config.Query.Relays = relays
+
+		case "INIT_PUBKEYS":
+			pubkeys := strings.Split(val, ",")
+			for _, pk := range pubkeys {
+				if !nostr.IsValidPublicKey(pk) {
+					return nil, fmt.Errorf("pubkey %s is not valid", pk)
+				}
+			}
+
+			config.InitPubkeys = pubkeys
 
 		case "QUERY_BATCH_SIZE":
 			config.Query.BatchSize, err = strconv.Atoi(val)
@@ -163,16 +189,6 @@ func LoadConfig() (*Config, error) {
 				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 			config.Process.PrintEvery = uint32(printEvery)
-
-		case "INIT_PUBKEYS":
-			pubkeys := strings.Split(val, ",")
-			for _, pk := range pubkeys {
-				if !nostr.IsValidPublicKey(pk) {
-					return nil, fmt.Errorf("pubkey %s is not valid", pk)
-				}
-			}
-
-			config.InitPubkeys = pubkeys
 		}
 	}
 

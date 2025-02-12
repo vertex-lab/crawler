@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -20,6 +21,7 @@ type NodeArbiterConfig struct {
 
 func NewNodeArbiterConfig() NodeArbiterConfig {
 	return NodeArbiterConfig{
+		Log:                 logger.New(os.Stdout),
 		ActivationThreshold: 0.01,
 		PromotionMultiplier: 0.1,
 		DemotionMultiplier:  1.05,

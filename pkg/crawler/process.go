@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -20,6 +21,7 @@ type ProcessEventsConfig struct {
 
 func NewProcessEventsConfig() ProcessEventsConfig {
 	return ProcessEventsConfig{
+		Log:        logger.New(os.Stdout),
 		PrintEvery: 5000,
 	}
 }

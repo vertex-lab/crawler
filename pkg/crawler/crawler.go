@@ -57,6 +57,7 @@ type FirehoseConfig struct {
 
 func NewFirehoseConfig() FirehoseConfig {
 	return FirehoseConfig{
+		Log:    logger.New(os.Stdout),
 		Relays: Relays,
 	}
 }
@@ -125,6 +126,7 @@ type QueryPubkeysConfig struct {
 
 func NewQueryPubkeysConfig() QueryPubkeysConfig {
 	return QueryPubkeysConfig{
+		Log:       logger.New(os.Stdout),
 		Relays:    Relays,
 		BatchSize: 50,
 		Interval:  time.Minute,
