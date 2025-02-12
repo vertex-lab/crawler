@@ -130,7 +130,7 @@ func ProcessFollowList(
 	return nil
 }
 
-// resolveIDs() assigns an ID to each pubkey. If the authorStatus is active and
+// resolveIDs() returns an ID for each pubkey. If the authorStatus is active and
 // a pubkey is not found (ID = nil), a new node is added with that pubkey.
 func resolveIDs(
 	ctx context.Context,

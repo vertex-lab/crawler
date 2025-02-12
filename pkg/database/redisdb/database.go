@@ -220,7 +220,7 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	// check if nodeID exists
 	exists, err := DB.client.Exists(ctx, KeyNode(delta.NodeID)).Result()
 	if err != nil {
-		return fmt.Errorf("failed to check for the existance of nodeID %v: %w", delta.NodeID, err)
+		return fmt.Errorf("failed to check for the existance of nodeID %d: %w", delta.NodeID, err)
 	}
 	if exists <= 0 {
 		return fmt.Errorf("%w with ID %d", models.ErrNodeNotFoundDB, delta.NodeID)

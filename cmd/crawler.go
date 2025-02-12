@@ -26,7 +26,7 @@ func main() {
 
 	config, err := LoadConfig()
 	if err != nil {
-		panic(err)
+		panic("failed to load config: " + err.Error())
 	}
 
 	nostr.DebugLogger.SetOutput(config.LogWriter)
@@ -40,7 +40,7 @@ func main() {
 	redis := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	size, err := redis.DBSize(ctx).Result()
 	if err != nil {
-		panic(err)
+		panic("failed to connect to redis: " + err.Error())
 	}
 
 	var DB models.Database
@@ -52,27 +52,27 @@ func main() {
 		config.Log.Info("initializing crawler from empty database")
 		DB, err = redisdb.NewDatabaseFromPubkeys(ctx, redis, config.InitPubkeys)
 		if err != nil {
-			panic(err)
+			panic("failed to connect to the database: " + err.Error())
 		}
 
 		RWS, err = redistore.NewRWS(ctx, redis, 0.85, 100)
 		if err != nil {
-			panic(err)
+			panic("failed to connect to the random walk store: " + err.Error())
 		}
 
 		if err = walks.GenerateAll(ctx, DB, RWS); err != nil {
-			panic(err)
+			panic("failed to generate the walks: " + err.Error())
 		}
 
 	default:
 		DB, err = redisdb.NewDatabaseConnection(ctx, redis)
 		if err != nil {
-			panic(err)
+			panic("failed to connect to the database: " + err.Error())
 		}
 
 		RWS, err = redistore.NewRWSConnection(ctx, redis)
 		if err != nil {
-			panic(err)
+			panic("failed to connect to the random walk store: " + err.Error())
 		}
 	}
 
