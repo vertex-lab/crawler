@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -90,21 +91,14 @@ func Firehose(
 	}}
 
 	for event := range pool.SubMany(ctx, config.Relays, filters) {
-		if event.Event == nil {
-			continue
-		}
-
-		if !event.CheckID() {
-			continue
-		}
-
-		if match, err := event.CheckSignature(); err != nil || !match {
-			continue
-		}
-
 		node, err := DB.NodeByKey(ctx, event.PubKey)
-		if err != nil || node == nil {
-			continue // If the node is not found (err != nil), skip
+		if errors.Is(err, models.ErrNodeNotFoundDB) {
+			continue
+		}
+
+		if err != nil {
+			config.Log.Error("Firehose: failed to fetch node by key %s: %v", event.PubKey, err)
+			continue
 		}
 
 		if IsEventOutdated(node, event.Event) {
@@ -217,17 +211,6 @@ func QueryPubkeyBatch(
 	// a map that associates each pair (pubkey,kind) with the latest event from that authors for that kind.
 	latest := make(map[string]*nostr.Event, len(pubkeys)*len(filter.Kinds))
 	for event := range pool.SubManyEose(ctx, relays, nostr.Filters{filter}) {
-		if event.Event == nil {
-			continue
-		}
-
-		if !event.CheckID() {
-			continue
-		}
-
-		if match, err := event.CheckSignature(); err != nil || !match {
-			continue
-		}
 
 		key := fmt.Sprintf("%s:%d", event.PubKey, event.Kind) // "<pubkey>:<kind>"" represent the pair (pubkey, kind)
 		e, exists := latest[key]
