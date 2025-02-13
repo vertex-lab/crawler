@@ -145,7 +145,7 @@ func DisplayStats(
 	pubkeyQueue <-chan string,
 	eventCounter, walksChanged *atomic.Uint32) {
 
-	const statsLines = 10
+	const statsLines = 9
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -175,7 +175,6 @@ func DisplayStats(
 			fmt.Printf("Pubkey Queue: %d/%d\n", pubkeyQueueLen, pubkeyQueueCap)
 			fmt.Printf("Processed Events: %d\n", eventCounter.Load())
 			fmt.Printf("Walks changed since last scan: %v\n", walksChanged.Load())
-			fmt.Printf("Total walks: %v\n", walksChanged.Load())
 			fmt.Printf("Goroutines: %d\n", goroutines)
 			fmt.Printf("Memory Usage: %.2f MB\n", float64(memStats.Alloc)/(1024*1024))
 			fmt.Println("---------------------------------------")
