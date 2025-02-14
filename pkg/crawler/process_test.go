@@ -45,8 +45,7 @@ func TestParsePubkeys(t *testing.T) {
 				CreatedAt: nostr.Timestamp(1713083262),
 				Tags: nostr.Tags{
 					nostr.Tag{"p", gigi},
-					nostr.Tag{"e", calle},       // not a p tag
-					nostr.Tag{"p", pip + "xxx"}, // pubkey not valid
+					nostr.Tag{"e", calle}, // not a p tag
 				}},
 			expectedPubkeys: []string{gigi},
 		},
@@ -92,7 +91,7 @@ func TestParsePubkeys(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pubkeys := ParsePubkeys(test.event)
 			if !reflect.DeepEqual(pubkeys, test.expectedPubkeys) {
-				t.Fatalf("ParsePubkeys2(): expected %v, got %v", test.expectedPubkeys, pubkeys)
+				t.Fatalf("ParsePubkeys(): expected %v, got %v", test.expectedPubkeys, pubkeys)
 			}
 		})
 	}
@@ -108,42 +107,49 @@ func TestResolveIDs(t *testing.T) {
 		expectedIDs   []uint32
 	}{
 		{
-			name:   "nil pubkeys",
-			DBType: "simple",
+			name:   "nil pks",
+			DBType: "simple-with-pks",
 			status: models.StatusActive,
 		},
 		{
-			name:    "empty pubkeys",
-			DBType:  "simple",
+			name:    "empty pks",
+			DBType:  "simple-with-pks",
 			status:  models.StatusActive,
 			pubkeys: []string{},
 		},
 		{
-			name:        "existing pubkeys (active)",
-			DBType:      "simple",
+			name:        "existing pks (active)",
+			DBType:      "simple-with-pks",
 			status:      models.StatusActive,
-			pubkeys:     []string{"0", "1"},
+			pubkeys:     []string{odell, calle},
 			expectedIDs: []uint32{0, 1},
 		},
 		{
-			name:        "existing pubkeys (inactive)",
-			DBType:      "simple",
+			name:        "existing pks (inactive)",
+			DBType:      "simple-with-pks",
 			status:      models.StatusInactive,
-			pubkeys:     []string{"0", "1"},
+			pubkeys:     []string{odell, calle},
 			expectedIDs: []uint32{0, 1},
 		},
 		{
-			name:        "existing and new pubkeys (active)",
-			DBType:      "simple",
+			name:        "existing and new pks (active)",
+			DBType:      "simple-with-pks",
 			status:      models.StatusActive,
-			pubkeys:     []string{"0", "1", "3"},
+			pubkeys:     []string{odell, calle, gigi},
 			expectedIDs: []uint32{0, 1, 3},
 		},
 		{
-			name:        "existing and new pubkeys (inactive)",
-			DBType:      "simple",
+			name:        "existing and new INVALID pks (active)",
+			DBType:      "simple-with-pks",
+			status:      models.StatusActive,
+			pubkeys:     []string{odell, calle, "6e468422dfb74a5738702a8823b9b28168abab8655faacb6953cd0ee15deee93"},
+			expectedIDs: []uint32{0, 1},
+		},
+		{
+			name:        "existing and new pks (inactive)",
+			DBType:      "simple-with-pks",
 			status:      models.StatusInactive,
-			pubkeys:     []string{"0", "1", "3"},
+			pubkeys:     []string{odell, calle, gigi},
 			expectedIDs: []uint32{0, 1},
 		},
 	}
@@ -153,6 +159,7 @@ func TestResolveIDs(t *testing.T) {
 			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			IDs, err := resolveIDs(ctx, DB, test.pubkeys, test.status)
+
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("resolveIDs(): expected %v, got %v", test.expectedError, err)
 			}

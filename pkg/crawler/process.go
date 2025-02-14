@@ -152,16 +152,19 @@ func resolveIDs(
 	newFollows := make([]uint32, 0, len(IDs))
 	switch authorStatus {
 	case models.StatusActive:
-		// if the pubkey is not in the DB (ID=nil), it gets added as a new node
 		for i, ID := range IDs {
+			// if the pubkey is not in the DB (ID=nil), it gets added as a new node
 			if ID == nil {
-				newID, err := DB.AddNode(ctx, pubkeys[i])
-				if err != nil {
-					return nil, fmt.Errorf("failed to add %s", pubkeys[i])
+				if !nostr.IsValidPublicKey(pubkeys[i]) {
+					continue
 				}
 
-				newFollows = append(newFollows, newID)
-				continue
+				newID, err := DB.AddNode(ctx, pubkeys[i])
+				if err != nil {
+					return nil, fmt.Errorf("failed to add %s: %w", pubkeys[i], err)
+				}
+
+				ID = &newID
 			}
 
 			newFollows = append(newFollows, *ID)
@@ -186,6 +189,7 @@ func resolveIDs(
 // - Badly formatted tags are ignored.
 // - Pubkeys will be uniquely added (no repetitions).
 // - The author of the event will be removed from the followed pubkeys if present.
+// - NO CHECKING the validity of the pubkeys
 func ParsePubkeys(event *nostr.Event) []string {
 	const followPrefix = "p"
 
@@ -207,10 +211,6 @@ func ParsePubkeys(event *nostr.Event) []string {
 
 		// remove the author from the followed pubkeys, as that is no signal
 		if pubkey == event.PubKey {
-			continue
-		}
-
-		if !nostr.IsValidPublicKey(pubkey) {
 			continue
 		}
 
