@@ -176,7 +176,7 @@ func PromoteNode(
 	}
 
 	delta := &models.Delta{
-		Record: models.Record{Timestamp: time.Now().Unix(), Type: models.Promotion},
+		Record: models.Record{Timestamp: time.Now().Unix(), Kind: models.Promotion},
 		NodeID: nodeID,
 	}
 
@@ -200,7 +200,7 @@ func DemoteNode(
 	}
 
 	delta := &models.Delta{
-		Record: models.Record{Timestamp: time.Now().Unix(), Type: models.Demotion},
+		Record: models.Record{Timestamp: time.Now().Unix(), Kind: models.Demotion},
 		NodeID: nodeID,
 	}
 

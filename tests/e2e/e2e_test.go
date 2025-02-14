@@ -31,9 +31,9 @@ func TestWalks(t *testing.T) {
 	cl := redisutils.SetupProdClient()
 	ctx := context.Background()
 
-	fmt.Println("----------------------------")
+	fmt.Println("-----------------------------")
 	fmt.Println("Testing the walks consistency")
-	fmt.Printf("----------------------------\n\n")
+	fmt.Printf("-----------------------------\n\n")
 
 	var counter int
 	var batchSize int64 = 10000

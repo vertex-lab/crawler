@@ -22,11 +22,10 @@ const (
 	StatusActive   string = "active" // meaning, we generate random walks for this node
 	StatusInactive string = "inactive"
 
-	// types of Records
-	Added     string = "added"
-	Follow    string = "follows"
-	Promotion string = "promotion"
-	Demotion  string = "demotion"
+	// internal record kinds
+	Added     int = -3
+	Promotion int = -2
+	Demotion  int = -1
 )
 
 // Node contains the metadata about a node, including a collection of Records.
@@ -39,9 +38,9 @@ type Node struct {
 
 // Record encapsulates data around an update that involved a Node. For example an update to its follow-list, or its promotion/demotion.
 type Record struct {
-	ID        string // e.g. the kind:3 eventID
-	Timestamp int64  // e.g. the kind:3 timestamp
-	Type      string // e.g. "follows", "mutes", "promotion"...
+	ID        string // e.g. the event.ID
+	Timestamp int64  // e.g. the event.CreatedAt
+	Kind      int    // e.g. the event.Kind or "Promotion" / "Demotion"
 }
 
 // Delta represent the updates to do for a specified NodeID. Added and Removed represent respectively the

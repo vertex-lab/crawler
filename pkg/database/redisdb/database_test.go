@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
 )
@@ -50,7 +51,7 @@ func TestParseNode(t *testing.T) {
 				ID:      19,
 				Pubkey:  "nineteen",
 				Status:  models.StatusActive,
-				Records: []models.Record{{ID: "dsaudsaiudsa", Timestamp: 11, Type: models.Follow}},
+				Records: []models.Record{{ID: "dsaudsaiudsa", Timestamp: 11, Kind: nostr.KindFollowList}},
 			},
 		},
 	}
@@ -370,7 +371,7 @@ func TestUpdate(t *testing.T) {
 				DBType: "simple",
 				delta: &models.Delta{
 					NodeID: 0,
-					Record: models.Record{Type: models.Promotion, Timestamp: 123},
+					Record: models.Record{Kind: models.Promotion, Timestamp: 123},
 				},
 				expectedNode: &models.Node{
 					ID:     0,
@@ -383,7 +384,7 @@ func TestUpdate(t *testing.T) {
 				DBType: "simple",
 				delta: &models.Delta{
 					NodeID: 0,
-					Record: models.Record{Type: models.Promotion, Timestamp: 123},
+					Record: models.Record{Kind: models.Promotion, Timestamp: 123},
 				},
 				expectedNode: &models.Node{
 					ID:     0,
@@ -436,7 +437,7 @@ func TestUpdate(t *testing.T) {
 
 		delta := &models.Delta{
 			NodeID:  0,
-			Record:  models.Record{Type: models.Follow, Timestamp: 123, ID: "abc"},
+			Record:  models.Record{Kind: nostr.KindFollowList, Timestamp: 123, ID: "abc"},
 			Removed: []uint32{1},
 			Added:   []uint32{2},
 		}

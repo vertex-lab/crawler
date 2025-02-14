@@ -59,8 +59,8 @@ func ProcessEvents(
 				continue
 			}
 
-			switch KindToRecordType(event.Kind) {
-			case models.Follow:
+			switch event.Kind {
+			case nostr.KindFollowList:
 				err = ProcessFollowList(DB, RWS, event, walksChanged)
 
 			default:
@@ -113,7 +113,7 @@ func ProcessFollowList(
 
 	removed, common, added := sliceutils.Partition(follows[0], newFollows)
 	delta := &models.Delta{
-		Record:  models.Record{ID: event.ID, Timestamp: event.CreatedAt.Time().Unix(), Type: models.Follow},
+		Record:  models.Record{ID: event.ID, Timestamp: event.CreatedAt.Time().Unix(), Kind: event.Kind},
 		NodeID:  author.ID,
 		Added:   added,
 		Removed: removed,

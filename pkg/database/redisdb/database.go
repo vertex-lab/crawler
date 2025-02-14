@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/redis/go-redis/v9"
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/redisutils"
@@ -92,7 +93,7 @@ func ParseNode(nodeMap map[string]string) (*models.Node, error) {
 	}
 
 	node := models.Node{}
-	FollowRecord := models.Record{Type: models.Follow}
+	FollowRecord := models.Record{Kind: nostr.KindFollowList}
 
 	for key, val := range nodeMap {
 		switch key {
@@ -226,11 +227,11 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 		return fmt.Errorf("%w with ID %d", models.ErrNodeNotFoundDB, delta.NodeID)
 	}
 
-	switch delta.Type {
+	switch delta.Kind {
 	case models.Promotion, models.Demotion:
 		err = DB.updateStatus(ctx, delta.NodeID, delta.Record)
 
-	case models.Follow:
+	case nostr.KindFollowList:
 		err = DB.updateFollows(ctx, delta)
 	}
 
@@ -243,7 +244,7 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 
 // updateStatus updates the status of nodeID
 func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record models.Record) error {
-	switch record.Type {
+	switch record.Kind {
 	case models.Promotion:
 		return DB.client.HSet(ctx, KeyNode(nodeID), NodeStatus, models.StatusActive, NodePromotionTS, record.Timestamp).Err()
 
@@ -251,7 +252,7 @@ func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record mode
 		return DB.client.HSet(ctx, KeyNode(nodeID), NodeStatus, models.StatusInactive, NodeDemotionTS, record.Timestamp).Err()
 
 	default:
-		return fmt.Errorf("invalid record type: %v", record.Type)
+		return fmt.Errorf("invalid record type: %v", record.Kind)
 	}
 }
 
@@ -645,7 +646,7 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 
 		delta := &models.Delta{
 			NodeID: nodeID,
-			Record: models.Record{Type: models.Follow},
+			Record: models.Record{Kind: nostr.KindFollowList},
 			Added:  randomFollows,
 		}
 

@@ -230,17 +230,6 @@ func QueryPubkeyBatch(
 	return nil
 }
 
-// KindToRecordType() returns the appropriate record type for the specified event kind.
-func KindToRecordType(kind int) string {
-	switch kind {
-	case nostr.KindFollowList:
-		return models.Follow
-
-	default:
-		return ""
-	}
-}
-
 // ------------------------------------HELPERS----------------------------------
 
 // IsEventOutdated() returns whether it exists a record of node that is newer than the specified event.
@@ -250,9 +239,8 @@ func IsEventOutdated(node *models.Node, event *nostr.Event) bool {
 		return false
 	}
 
-	var filterType = KindToRecordType(event.Kind)
 	for _, rec := range node.Records {
-		if rec.Type != filterType {
+		if rec.Kind != event.Kind {
 			continue
 		}
 

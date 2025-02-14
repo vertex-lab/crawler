@@ -12,6 +12,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
@@ -80,7 +81,7 @@ func (DB *Database) AddNode(ctx context.Context, pubkey string) (uint32, error) 
 		ID:      nodeID,
 		Pubkey:  pubkey,
 		Status:  models.StatusInactive,
-		Records: []models.Record{{Type: models.Added, Timestamp: time.Now().Unix()}},
+		Records: []models.Record{{Kind: models.Added, Timestamp: time.Now().Unix()}},
 	}
 
 	return nodeID, nil
@@ -102,11 +103,11 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 		return models.ErrNodeNotFoundDB
 	}
 
-	switch delta.Type {
+	switch delta.Kind {
 	case models.Promotion, models.Demotion:
 		err = DB.updateStatus(ctx, delta.NodeID, delta.Record)
 
-	case models.Follow:
+	case nostr.KindFollowList:
 		err = DB.updateFollows(ctx, delta)
 	}
 
@@ -121,7 +122,7 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record models.Record) error {
 	_ = ctx
 
-	switch record.Type {
+	switch record.Kind {
 	case models.Promotion:
 		DB.NodeIndex[nodeID].Status = models.StatusActive
 
@@ -129,7 +130,7 @@ func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record mode
 		DB.NodeIndex[nodeID].Status = models.StatusInactive
 
 	default:
-		return fmt.Errorf("invalid record type: %v", record.Type)
+		return fmt.Errorf("invalid record type: %v", record.Kind)
 	}
 
 	DB.NodeIndex[nodeID].Records = append(DB.NodeIndex[nodeID].Records, record)

@@ -96,13 +96,13 @@ func TestIsEventOutdated(t *testing.T) {
 		},
 		{
 			name:             "outdated event",
-			node:             &models.Node{Records: []models.Record{{Type: models.Follow, Timestamp: 1}}},
+			node:             &models.Node{Records: []models.Record{{Kind: nostr.KindFollowList, Timestamp: 1}}},
 			event:            &nostr.Event{Kind: nostr.KindFollowList, CreatedAt: 0},
 			expectedOutdated: true,
 		},
 		{
 			name:             "newer event",
-			node:             &models.Node{Records: []models.Record{{Type: models.Follow, Timestamp: 1}}},
+			node:             &models.Node{Records: []models.Record{{Kind: nostr.KindFollowList, Timestamp: 1}}},
 			event:            &nostr.Event{Kind: nostr.KindFollowList, CreatedAt: 5},
 			expectedOutdated: false,
 		},

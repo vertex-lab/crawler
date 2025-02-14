@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
 )
 
@@ -177,14 +178,14 @@ func TestUpdate(t *testing.T) {
 				DBType: "simple",
 				delta: &models.Delta{
 					NodeID: 0,
-					Record: models.Record{Timestamp: 111, Type: models.Promotion},
+					Record: models.Record{Timestamp: 111, Kind: models.Promotion},
 				},
 
 				expectedNode: &models.Node{
 					ID:      0,
 					Pubkey:  "0",
 					Status:  models.StatusActive,
-					Records: []models.Record{{Timestamp: 111, Type: models.Promotion}},
+					Records: []models.Record{{Timestamp: 111, Kind: models.Promotion}},
 				},
 			},
 			{
@@ -192,14 +193,14 @@ func TestUpdate(t *testing.T) {
 				DBType: "simple",
 				delta: &models.Delta{
 					NodeID: 1,
-					Record: models.Record{Timestamp: 111, Type: models.Demotion},
+					Record: models.Record{Timestamp: 111, Kind: models.Demotion},
 				},
 
 				expectedNode: &models.Node{
 					ID:      1,
 					Pubkey:  "1",
 					Status:  models.StatusInactive,
-					Records: []models.Record{{Timestamp: 111, Type: models.Demotion}},
+					Records: []models.Record{{Timestamp: 111, Kind: models.Demotion}},
 				},
 			},
 		}
@@ -229,7 +230,7 @@ func TestUpdate(t *testing.T) {
 		DB := SetupDB("simple")
 		delta := &models.Delta{
 			NodeID:  0,
-			Record:  models.Record{ID: "xxx", Timestamp: 111, Type: models.Follow},
+			Record:  models.Record{ID: "xxx", Timestamp: 111, Kind: nostr.KindFollowList},
 			Removed: []uint32{1},
 			Added:   []uint32{2},
 		}
