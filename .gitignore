@@ -4,5 +4,10 @@
 # Ignore all the .env
 **/*.env
 
+# Ignore all sqlite files
+**/*.sqlite
+**/*-shm
+**/*-wal
+
 # Ignore the debugs
 .vscode

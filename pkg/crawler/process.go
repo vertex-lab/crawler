@@ -12,6 +12,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
+	"github.com/vertex-lab/relay/pkg/eventstore"
 )
 
 type ProcessEventsConfig struct {
@@ -37,6 +38,7 @@ func ProcessEvents(
 	config ProcessEventsConfig,
 	DB models.Database,
 	RWS models.RandomWalkStore,
+	eventStore *eventstore.Store,
 	eventChan <-chan *nostr.Event,
 	eventCounter, walksChanged *atomic.Uint32) {
 
@@ -61,14 +63,14 @@ func ProcessEvents(
 
 			switch event.Kind {
 			case nostr.KindFollowList:
-				err = ProcessFollowList(DB, RWS, event, walksChanged)
+				err = HandleFollowList(DB, RWS, eventStore, event, walksChanged)
 
 			default:
 				err = fmt.Errorf("unsupported event kind")
 			}
 
 			if err != nil {
-				config.Log.Error("ProcessEvents kind %d: %v; eventID %s by %s", event.Kind, err, event.ID, event.PubKey)
+				config.Log.Error("ProcessEvents: eventID %s, kind %d by %s: %v", event.ID, event.Kind, event.PubKey, err)
 			}
 
 			count := eventCounter.Add(1)
@@ -79,17 +81,49 @@ func ProcessEvents(
 	}
 }
 
-// ProcessFollowList() updates the follow relationships for the event's author in the database.
-// If the author is active, new follows are added to the database as inactive nodes.
-func ProcessFollowList(
+/*
+HandleFollowList() process the follow-list and saves it to the eventStore, replacing
+an older event if present.
+
+TODO: processFollowList decides whether to process an event or not based on IsEventOutdated.
+This function returns true if event.CreatedAt <= record.Timestamp (the latter is timestamp
+of the last update to the follow-list).
+
+eventStore.Replace internally applies the same condition.
+However, it would be best to have this validation done at the level of the parent function
+HandleFollowList, once and for both the child functions. What is the source of truth?
+I think I lean towards the event being the source of truth. It's signed!
+*/
+func HandleFollowList(
 	DB models.Database,
 	RWS models.RandomWalkStore,
+	eventStore *eventstore.Store,
 	event *nostr.Event,
 	walksChanged *atomic.Uint32) error {
 
 	// use a new context for the operation to avoid it being interrupted
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	if err := processFollowList(ctx, DB, RWS, event, walksChanged); err != nil {
+		return fmt.Errorf("failed to process follow-list: %w", err)
+	}
+
+	if err := eventStore.Replace(ctx, event); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// processFollowList() updates the follow relationships for the event's author in the database.
+// Only if the author is active, new follows are added to the database as inactive nodes.
+func processFollowList(
+	ctx context.Context,
+	DB models.Database,
+	RWS models.RandomWalkStore,
+	event *nostr.Event,
+	walksChanged *atomic.Uint32) error {
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
 	if err != nil {

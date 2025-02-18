@@ -194,6 +194,7 @@ func TestProcessFollowList(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			DB := mockdb.SetupDB(test.DBType)
 			RWS := mockstore.SetupRWS(test.RWSType)
 			event := &nostr.Event{
@@ -205,7 +206,7 @@ func TestProcessFollowList(t *testing.T) {
 					nostr.Tag{"p", odell}},
 			}
 
-			err := ProcessFollowList(DB, RWS, event, &atomic.Uint32{})
+			err := processFollowList(ctx, DB, RWS, event, &atomic.Uint32{})
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
 			}

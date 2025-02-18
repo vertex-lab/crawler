@@ -18,6 +18,7 @@ import (
 	"github.com/vertex-lab/crawler/pkg/store/redistore"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 	"github.com/vertex-lab/crawler/pkg/walks"
+	"github.com/vertex-lab/relay/pkg/eventstore"
 )
 
 func main() {
@@ -76,6 +77,11 @@ func main() {
 		}
 	}
 
+	eventStore, err := eventstore.New(config.SQLiteURL)
+	if err != nil {
+		panic("failed to connect to the sqlite eventstore: " + err.Error())
+	}
+
 	eventCounter := &atomic.Uint32{} // tracks the number of events processed
 	walksChanged := &atomic.Uint32{} // tracks the number of walks updated since the last scan of NodeArbiter
 	walksChanged.Add(1000000)        // to make NodeArbiter activate immediately
@@ -131,7 +137,7 @@ func main() {
 	}
 
 	config.Log.Info("ready to process events")
-	crawler.ProcessEvents(ctx, config.Process, DB, RWS, eventQueue, eventCounter, walksChanged)
+	crawler.ProcessEvents(ctx, config.Process, DB, RWS, eventStore, eventQueue, eventCounter, walksChanged)
 	wg.Wait()
 }
 
