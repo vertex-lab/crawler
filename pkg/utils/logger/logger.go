@@ -16,8 +16,8 @@ type Aggregate struct {
 func New(out io.Writer) *Aggregate {
 	return &Aggregate{
 		InfoLogger:  log.New(out, "INFO: ", log.LstdFlags),
-		WarnLogger:  log.New(out, "WARN: ", log.Ldate|log.Ltime|log.Lshortfile),
-		ErrorLogger: log.New(out, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
+		WarnLogger:  log.New(out, "WARN: ", log.LstdFlags),
+		ErrorLogger: log.New(out, "ERROR: ", log.LstdFlags),
 	}
 }
 
