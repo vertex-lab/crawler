@@ -65,6 +65,9 @@ func ProcessEvents(
 			case nostr.KindFollowList:
 				err = HandleFollowList(DB, RWS, eventStore, event, walksChanged)
 
+			case nostr.KindProfileMetadata:
+				err = eventStore.Replace(ctx, event)
+
 			default:
 				err = fmt.Errorf("unsupported event kind")
 			}

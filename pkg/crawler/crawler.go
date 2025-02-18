@@ -17,6 +17,7 @@ import (
 var (
 	RelevantKinds = []int{
 		nostr.KindFollowList,
+		nostr.KindProfileMetadata,
 	}
 
 	Relays = []string{
@@ -265,7 +266,7 @@ func close(logger *logger.Aggregate, pool *nostr.SimplePool, funcName string) {
 func PrintEvent(event *nostr.Event) error {
 	fmt.Printf("\nevent ID: %v", event.ID)
 	fmt.Printf("\nevent pubkey: %v", event.PubKey)
-	fmt.Printf("\nevent timestamp: %d\n", event.CreatedAt.Time().Unix())
+	fmt.Printf("\nevent kind: %d\n", event.Kind)
 	return nil
 }
 
