@@ -115,6 +115,9 @@ func LoadConfig() (*Config, error) {
 		case "SQLITE_URL":
 			config.SQLiteURL = val
 
+		case "IMAGES_URL":
+			config.Process.ImagesURL = val
+
 		case "EVENT_QUEUE_CAPACITY":
 			config.EventQueueCapacity, err = strconv.Atoi(val)
 			if err != nil {

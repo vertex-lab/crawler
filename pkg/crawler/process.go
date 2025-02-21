@@ -2,7 +2,13 @@ package crawler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
+	"net/http"
 	"os"
 	"sync/atomic"
 	"time"
@@ -13,11 +19,14 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 	"github.com/vertex-lab/relay/pkg/eventstore"
+	"golang.org/x/image/draw"
 )
 
 type ProcessEventsConfig struct {
 	Log        *logger.Aggregate
 	PrintEvery uint32
+
+	ImagesURL string // the path to the directory where kind:0 'picture' and 'banner' are stored
 }
 
 func NewProcessEventsConfig() ProcessEventsConfig {
@@ -30,6 +39,7 @@ func NewProcessEventsConfig() ProcessEventsConfig {
 func (c ProcessEventsConfig) Print() {
 	fmt.Printf("Process\n")
 	fmt.Printf("  PrintEvery: %d\n", c.PrintEvery)
+	fmt.Printf("  ImagesURL: %s\n", c.ImagesURL)
 }
 
 // ProcessEvents() process one event at the time from the eventChannel, based on their kind.
@@ -66,7 +76,7 @@ func ProcessEvents(
 				err = HandleFollowList(DB, RWS, eventStore, event, walksChanged)
 
 			case nostr.KindProfileMetadata:
-				err = eventStore.Replace(ctx, event)
+				err = HandleProfileMetadata(eventStore, event, config.ImagesURL)
 
 			default:
 				err = fmt.Errorf("unsupported event kind")
@@ -82,6 +92,80 @@ func ProcessEvents(
 			}
 		}
 	}
+}
+
+func HandleProfileMetadata(eventStore *eventstore.Store, event *nostr.Event, imagesDir string) error {
+	// use a new context for the operation to avoid it being interrupted
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := eventStore.Replace(ctx, event); err != nil {
+		return fmt.Errorf("failed to replace event: %w", err)
+	}
+
+	type Images struct {
+		PictureURL string `json:"picture"`
+		BannerURL  string `json:"banner"`
+	}
+
+	var images Images
+	if err := json.Unmarshal([]byte(event.Content), &images); err != nil {
+		return fmt.Errorf("failed to unmarshal 'picture' from event.Content: %w", err)
+	}
+
+	if images.PictureURL == "" {
+		return nil
+	}
+
+	img, _, err := downloadImage(images.PictureURL)
+	if err != nil {
+		return err
+	}
+
+	img = scaleImage(img, draw.BiLinear, 300)
+	return saveImage(img, imagesDir+"picture_"+event.PubKey+".jpeg")
+}
+
+func downloadImage(URL string) (img image.Image, format string, err error) {
+	res, err := http.Get(URL)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch image %s: %w", URL, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("failed to download image %s, status: %s", URL, res.Status)
+	}
+
+	img, format, err = image.Decode(res.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	return img, format, nil
+}
+
+// ScaleImage() returns a rescaled image with the same aspect ratio using the specified scaler.
+func scaleImage(img image.Image, scaler draw.Scaler, width int) image.Image {
+	scaleFactor := float64(width) / float64(img.Bounds().Dx())
+	height := int(float64(img.Bounds().Dy())*scaleFactor + 0.5)
+	scaled := image.NewRGBA(image.Rect(0, 0, width, height))
+	scaler.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Over, nil)
+	return scaled
+}
+
+func saveImage(img image.Image, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", path, err)
+	}
+	defer file.Close()
+
+	if err := jpeg.Encode(file, img, nil); err != nil {
+		return fmt.Errorf("failed to save image to %s: %w", path, err)
+	}
+
+	return nil
 }
 
 /*

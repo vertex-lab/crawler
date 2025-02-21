@@ -10,6 +10,7 @@ require (
 	github.com/nbd-wtf/go-nostr v0.49.7
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/vertex-lab/relay v0.0.0-20250218140819-771422accd9e
+	golang.org/x/image v0.24.0
 )
 
 require (

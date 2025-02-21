@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/jpeg"
+	"os"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
 	"github.com/vertex-lab/crawler/pkg/models"
 	mockstore "github.com/vertex-lab/crawler/pkg/store/mock"
+	"golang.org/x/image/draw"
 )
 
 const odell = "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9"
@@ -214,6 +217,28 @@ func TestProcessFollowList(t *testing.T) {
 	}
 }
 
+var (
+	picturePip string = "https://m.primal.net/IfSZ.jpg"
+	bannerPip  string = "https://m.primal.net/IfSc.png"
+)
+
+func TestResizeSaveImage(t *testing.T) {
+	file, err := os.Open("test.jpeg")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img, err := jpeg.Decode(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img = scaleImage(img, draw.BiLinear, 1000)
+	if err = saveImage(img, "test_bilinear.jpeg"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // ---------------------------------BENCHMARKS----------------------------------
 
 func BenchmarkIsValidPubkey(b *testing.B) {
@@ -251,6 +276,37 @@ func BenchmarkParsePubkeys(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				ParsePubkeys(&event)
+			}
+		})
+	}
+}
+
+func BenchmarkResizeImage(b *testing.B) {
+	file, err := os.Open("test.jpeg")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	img, err := jpeg.Decode(file)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	benchs := []struct {
+		name   string
+		scaler draw.Scaler
+	}{
+		{name: "nearest neighbor", scaler: draw.NearestNeighbor},
+		{name: "approx bilinear", scaler: draw.ApproxBiLinear},
+		{name: "bilinear", scaler: draw.BiLinear},
+		{name: "catmullrom", scaler: draw.CatmullRom},
+	}
+
+	for _, bench := range benchs {
+		b.Run(bench.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				scaleImage(img, bench.scaler, 300)
 			}
 		})
 	}
