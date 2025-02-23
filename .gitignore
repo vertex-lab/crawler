@@ -9,5 +9,8 @@
 **/*-shm
 **/*-wal
 
+# Ignore all images
+**/*.jpeg
+
 # Ignore the debugs
 .vscode

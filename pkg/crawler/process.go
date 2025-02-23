@@ -10,6 +10,7 @@ import (
 	_ "image/png"
 	"net/http"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -96,34 +97,62 @@ func ProcessEvents(
 
 func HandleProfileMetadata(eventStore *eventstore.Store, event *nostr.Event, imagesDir string) error {
 	// use a new context for the operation to avoid it being interrupted
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := eventStore.Replace(ctx, event); err != nil {
-		return fmt.Errorf("failed to replace event: %w", err)
+	var oldContent string
+	row := eventStore.DB.QueryRowContext(ctx, "SELECT content FROM events WHERE kind = ? pubkey = ?", event.Kind, event.PubKey)
+	err := row.Scan(&oldContent)
+	if err != nil {
+		return fmt.Errorf("failed to query for the content of the old event: %w", err)
 	}
 
-	type Images struct {
-		PictureURL string `json:"picture"`
-		BannerURL  string `json:"banner"`
-	}
-
-	var images Images
-	if err := json.Unmarshal([]byte(event.Content), &images); err != nil {
-		return fmt.Errorf("failed to unmarshal 'picture' from event.Content: %w", err)
-	}
-
-	if images.PictureURL == "" {
-		return nil
-	}
-
-	img, _, err := downloadImage(images.PictureURL)
+	saved, err := eventStore.Replace(ctx, event)
 	if err != nil {
 		return err
 	}
 
-	img = scaleImage(img, draw.BiLinear, 300)
-	return saveImage(img, imagesDir+"picture_"+event.PubKey+".jpeg")
+	if !saved {
+		return nil
+	}
+
+	oldURL := extractPictureURL(oldContent)
+	newURL := extractPictureURL(event.Content)
+
+	if newURL != "" && newURL != oldURL {
+		img, _, err := downloadImage(newURL)
+		if err != nil {
+			return err
+		}
+
+		img1 := scaleImage(img, draw.BiLinear, 300)
+		path1 := imagesDir + "picture_300_" + event.PubKey + "_" + strconv.FormatInt(event.CreatedAt.Time().Unix(), 10) + ".jpeg"
+		if err := saveImage(img1, path1); err != nil {
+			return err
+		}
+
+		img2 := scaleImage(img, draw.BiLinear, 30)
+		path2 := imagesDir + "picture_30_" + event.PubKey + "_" + strconv.FormatInt(event.CreatedAt.Time().Unix(), 10) + ".jpeg"
+		if err := saveImage(img2, path2); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// This function extracts the URL specified in the 'picture' field. In case of errors or missing field, returns the empty string "".
+func extractPictureURL(content string) string {
+	if len(content) == 0 {
+		return ""
+	}
+
+	var img map[string]string
+	if err := json.Unmarshal([]byte(content), &img); err != nil {
+		return ""
+	}
+
+	return img["picture"]
 }
 
 func downloadImage(URL string) (img image.Image, format string, err error) {
@@ -196,9 +225,9 @@ func HandleFollowList(
 		return fmt.Errorf("failed to process follow-list: %w", err)
 	}
 
-	if err := eventStore.Replace(ctx, event); err != nil {
-		return err
-	}
+	// if err := eventStore.Replace(ctx, event); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

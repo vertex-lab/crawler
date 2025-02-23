@@ -233,8 +233,13 @@ func TestResizeSaveImage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img = scaleImage(img, draw.BiLinear, 1000)
-	if err = saveImage(img, "test_bilinear.jpeg"); err != nil {
+	img1 := scaleImage(img, draw.BiLinear, 300)
+	if err := saveImage(img1, "test_300.jpeg"); err != nil {
+		t.Fatal(err)
+	}
+
+	img2 := scaleImage(img, draw.BiLinear, 30)
+	if err := saveImage(img2, "test_30.jpeg"); err != nil {
 		t.Fatal(err)
 	}
 }
