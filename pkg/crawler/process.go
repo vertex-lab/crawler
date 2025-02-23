@@ -51,7 +51,7 @@ func ProcessEvents(
 	RWS models.RandomWalkStore,
 	eventStore *eventstore.Store,
 	eventChan <-chan *nostr.Event,
-	eventCounter, walksChanged *atomic.Uint32) {
+	eventCounter, walksTracker *atomic.Uint32) {
 
 	var err error
 
@@ -74,7 +74,7 @@ func ProcessEvents(
 
 			switch event.Kind {
 			case nostr.KindFollowList:
-				err = HandleFollowList(DB, RWS, eventStore, event, walksChanged)
+				err = HandleFollowList(DB, RWS, eventStore, event, walksTracker)
 
 			case nostr.KindProfileMetadata:
 				err = HandleProfileMetadata(eventStore, event, config.ImagesURL)

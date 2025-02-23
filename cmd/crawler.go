@@ -83,8 +83,8 @@ func main() {
 	}
 
 	eventCounter := &atomic.Uint32{} // tracks the number of events processed
-	walksChanged := &atomic.Uint32{} // tracks the number of walks updated since the last scan of NodeArbiter
-	walksChanged.Add(1000000)        // to make NodeArbiter activate immediately
+	walksTracker := &atomic.Uint32{} // tracks the number of walks updated since the last scan of NodeArbiter
+	walksTracker.Add(1000000)        // to make NodeArbiter activate immediately
 
 	eventQueue := make(chan *nostr.Event, config.EventQueueCapacity)
 	pubkeyQueue := make(chan string, config.PubkeyQueueCapacity)
@@ -122,7 +122,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		crawler.NodeArbiter(ctx, config.Arbiter, DB, RWS, walksChanged, func(pubkey string) error {
+		crawler.NodeArbiter(ctx, config.Arbiter, DB, RWS, walksTracker, func(pubkey string) error {
 			select {
 			case pubkeyQueue <- pubkey:
 			default:
@@ -133,11 +133,11 @@ func main() {
 	}()
 
 	if config.DisplayStats {
-		go DisplayStats(ctx, DB, RWS, eventQueue, pubkeyQueue, eventCounter, walksChanged)
+		go DisplayStats(ctx, DB, RWS, eventQueue, pubkeyQueue, eventCounter, walksTracker)
 	}
 
 	config.Log.Info("ready to process events")
-	crawler.ProcessEvents(ctx, config.Process, DB, RWS, eventStore, eventQueue, eventCounter, walksChanged)
+	crawler.ProcessEvents(ctx, config.Process, DB, RWS, eventStore, eventQueue, eventCounter, walksTracker)
 	wg.Wait()
 }
 
