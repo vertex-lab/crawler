@@ -7,7 +7,6 @@ import (
 	"image/jpeg"
 	"os"
 	"reflect"
-	"sync/atomic"
 	"testing"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -209,7 +208,7 @@ func TestProcessFollowList(t *testing.T) {
 					nostr.Tag{"p", odell}},
 			}
 
-			err := processFollowList(ctx, DB, RWS, event, &atomic.Uint32{})
+			_, err := processFollowList(ctx, DB, RWS, event)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("ProcessFollowList(): expected %v, got %v", test.expectedError, err)
 			}

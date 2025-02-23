@@ -197,68 +197,59 @@ func saveImage(img image.Image, path string) error {
 	return nil
 }
 
-/*
-HandleFollowList() process the follow-list and saves it to the eventStore, replacing
-an older event if present.
-
-TODO: processFollowList decides whether to process an event or not based on IsEventOutdated.
-This function returns true if event.CreatedAt <= record.Timestamp (the latter is timestamp
-of the last update to the follow-list).
-
-eventStore.Replace internally applies the same condition.
-However, it would be best to have this validation done at the level of the parent function
-HandleFollowList, once and for both the child functions. What is the source of truth?
-I think I lean towards the event being the source of truth. It's signed!
-*/
+// HandleFollowList() saves the event to the eventStore, replacing an older event
+// if present, and then process the follow-list.
 func HandleFollowList(
 	DB models.Database,
 	RWS models.RandomWalkStore,
 	eventStore *eventstore.Store,
 	event *nostr.Event,
-	walksChanged *atomic.Uint32) error {
+	walksTracker *atomic.Uint32) error {
 
 	// use a new context for the operation to avoid it being interrupted
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := processFollowList(ctx, DB, RWS, event, walksChanged); err != nil {
-		return fmt.Errorf("failed to process follow-list: %w", err)
+	stored, err := eventStore.Replace(ctx, event)
+	if err != nil {
+		return err
 	}
 
-	// if err := eventStore.Replace(ctx, event); err != nil {
-	// 	return err
-	// }
+	if stored {
+		walksChanged, err := processFollowList(ctx, DB, RWS, event)
+		if err != nil {
+			return fmt.Errorf("failed to process follow-list: %w", err)
+		}
+
+		walksTracker.Add(uint32(walksChanged))
+	}
 
 	return nil
 }
 
-// processFollowList() updates the follow relationships for the event's author in the database.
+// processFollowList() updates the follow relationships for the event's author in the database, as well as the random walks.
 // Only if the author is active, new follows are added to the database as inactive nodes.
+// It returns the number of walks that have been updated.
 func processFollowList(
 	ctx context.Context,
 	DB models.Database,
 	RWS models.RandomWalkStore,
-	event *nostr.Event,
-	walksChanged *atomic.Uint32) error {
+	event *nostr.Event) (int, error) {
 
 	author, err := DB.NodeByKey(ctx, event.PubKey)
 	if err != nil {
-		return fmt.Errorf("failed to fetch node by key %v: %w", event.PubKey, err)
-	}
-
-	if IsEventOutdated(author, event) {
-		return nil
+		return 0, fmt.Errorf("failed to fetch node by key %v: %w", event.PubKey, err)
 	}
 
 	pubkeys := ParsePubkeys(event)
 	newFollows, err := resolveIDs(ctx, DB, pubkeys, author.Status)
 	if err != nil {
-		return fmt.Errorf("resolveIDs: %w", err)
+		return 0, fmt.Errorf("resolveIDs: %w", err)
 	}
 
 	follows, err := DB.Follows(ctx, author.ID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch the old follows of %d: %w", author.ID, err)
+		return 0, fmt.Errorf("failed to fetch the old follows of %d: %w", author.ID, err)
 	}
 
 	removed, common, added := sliceutils.Partition(follows[0], newFollows)
@@ -270,16 +261,10 @@ func processFollowList(
 	}
 
 	if err := DB.Update(ctx, delta); err != nil {
-		return fmt.Errorf("failed to update nodeID %d: %w", author.ID, err)
+		return 0, fmt.Errorf("failed to update nodeID %d: %w", author.ID, err)
 	}
 
-	updated, err := walks.Update(ctx, DB, RWS, author.ID, removed, common, added)
-	if err != nil {
-		return fmt.Errorf("failed to update the walks of nodeID %d: %w", author.ID, err)
-	}
-
-	walksChanged.Add(uint32(updated)) // this counter triggers the activation of NodeArbiter
-	return nil
+	return walks.Update(ctx, DB, RWS, author.ID, removed, common, added)
 }
 
 // resolveIDs() returns an ID for each pubkey. If the authorStatus is active and
