@@ -43,13 +43,13 @@ func Update(
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	updated1, err := updateRemovedNodes(ctx, rng, DB, RWS, nodeID, removed, common)
 	if err != nil {
-		return updated1, fmt.Errorf("updateRemoved: %w", err)
+		return updated1, fmt.Errorf("failed to update the walks of nodeID %d: updateRemoved: %w", nodeID, err)
 	}
 
 	followsCount := len(common) + len(added)
 	updated2, err := updateAddedNodes(ctx, rng, DB, RWS, nodeID, added, followsCount)
 	if err != nil {
-		return updated1 + updated2, fmt.Errorf("updateAdded: %w", err)
+		return updated1 + updated2, fmt.Errorf("failed to update the walks of nodeID %d: updateAdded: %w", nodeID, err)
 	}
 
 	return updated1 + updated2, nil
