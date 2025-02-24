@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -92,17 +91,13 @@ func Firehose(
 	}}
 
 	for event := range pool.SubMany(ctx, config.Relays, filters) {
-		node, err := DB.NodeByKey(ctx, event.PubKey)
-		if errors.Is(err, models.ErrNodeNotFoundDB) {
-			continue
-		}
-
+		ID, err := DB.NodeIDs(ctx, event.PubKey)
 		if err != nil {
-			config.Log.Error("Firehose: failed to fetch node by key %s: %v", event.PubKey, err)
+			config.Log.Error("Firehose: failed to fetch ID of %s: %v", event.PubKey, err)
 			continue
 		}
 
-		if IsEventOutdated(node, event.Event) {
+		if ID[0] == nil {
 			continue
 		}
 
