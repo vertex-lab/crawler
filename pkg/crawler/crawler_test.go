@@ -20,7 +20,7 @@ func TestFirehose(t *testing.T) {
 	DB := mockdb.SetupDB("pip")
 	config := FirehoseConfig{
 		Log:    logger.New(os.Stdout),
-		Relays: Relays,
+		Relays: defaultRelays,
 	}
 
 	go HandleSignals(cancel, config.Log)
@@ -35,7 +35,7 @@ func TestQueryPubkeys(t *testing.T) {
 
 		config := QueryPubkeysConfig{
 			Log:       logger.New(os.Stdout),
-			Relays:    Relays,
+			Relays:    defaultRelays,
 			BatchSize: 4,
 			Interval:  30 * time.Second,
 		}
@@ -59,7 +59,7 @@ func TestQueryPubkeys(t *testing.T) {
 
 		config := QueryPubkeysConfig{
 			Log:       logger.New(os.Stdout),
-			Relays:    Relays,
+			Relays:    defaultRelays,
 			BatchSize: 5,
 			Interval:  3 * time.Second,
 		}

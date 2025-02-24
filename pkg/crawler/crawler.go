@@ -20,7 +20,7 @@ var (
 		nostr.KindProfileMetadata,
 	}
 
-	Relays = []string{
+	defaultRelays = []string{
 		"wss://purplepag.es",
 		"wss://njump.me",
 		"wss://relay.snort.social",
@@ -60,7 +60,7 @@ type FirehoseConfig struct {
 func NewFirehoseConfig() FirehoseConfig {
 	return FirehoseConfig{
 		Log:    logger.New(os.Stdout),
-		Relays: Relays,
+		Relays: defaultRelays,
 	}
 }
 
@@ -122,7 +122,7 @@ type QueryPubkeysConfig struct {
 func NewQueryPubkeysConfig() QueryPubkeysConfig {
 	return QueryPubkeysConfig{
 		Log:       logger.New(os.Stdout),
-		Relays:    Relays,
+		Relays:    defaultRelays,
 		BatchSize: 50,
 		Interval:  time.Minute,
 	}
