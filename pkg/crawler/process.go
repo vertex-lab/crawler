@@ -57,7 +57,7 @@ func ProcessEvents(
 			}
 
 			if event == nil {
-				config.Log.Warn("ProcessEvents: event is nil")
+				config.Log.Error("ProcessEvents: event is nil")
 				continue
 			}
 
@@ -66,7 +66,7 @@ func ProcessEvents(
 				err = HandleFollowList(DB, RWS, eventStore, event, walksTracker)
 
 			case nostr.KindProfileMetadata:
-				_, err = eventStore.Replace(ctx, event)
+				err = HandleProfileMetadata(eventStore, event)
 
 			default:
 				err = fmt.Errorf("unsupported event kind")
@@ -82,6 +82,18 @@ func ProcessEvents(
 			}
 		}
 	}
+}
+
+func HandleProfileMetadata(eventStore *eventstore.Store, event *nostr.Event) error {
+	// use a new context for the operation to avoid it being interrupted
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := eventStore.Replace(ctx, event); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // HandleFollowList() saves the event to the eventStore, replacing an older event
