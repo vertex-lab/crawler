@@ -22,20 +22,24 @@ func Generate(
 	nodeID uint32) error {
 
 	if err := DB.Validate(); err != nil {
-		return fmt.Errorf("DB validation failed: %w", err)
+		return fmt.Errorf("failed to generate the walks of nodeID %d: DB validation failed: %w", nodeID, err)
 	}
 
 	if err := RWS.Validate(); err != nil {
-		return fmt.Errorf("RWS validation failed: %w", err)
+		return fmt.Errorf("failed to generate the walks of nodeID %d: RWS validation failed: %w", nodeID, err)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return generateWalks(ctx, rng, DB, RWS, nodeID)
+	if err := generateWalks(ctx, rng, DB, RWS, nodeID); err != nil {
+		return fmt.Errorf("failed to generate the walks of nodeID %d: %w", nodeID, err)
+	}
+
+	return nil
 }
 
 /*
 GenerateAll() generates `walksPerNode` random walks for ALL nodes in the database
-using dampening factor `alpha`. The walk pointers are added to the RandomWalkStore.
+using dampening factor `alpha`.
 
 # NOTE:
 
@@ -50,24 +54,28 @@ func GenerateAll(
 	DB models.Database,
 	RWS models.RandomWalkStore) error {
 	if err := DB.Validate(); err != nil {
-		return fmt.Errorf("DB validation failed: %w", err)
+		return fmt.Errorf("failed to generate the walks: DB validation failed: %w", err)
 	}
 
 	if err := RWS.Validate(); err != nil {
-		return fmt.Errorf("RWS validation failed: %w", err)
+		return fmt.Errorf("failed to generate the walks: RWS validation failed: %w", err)
 	}
 
 	nodeIDs, err := DB.AllNodes(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate the walks: %w", err)
 	}
 
 	if len(nodeIDs) == 0 {
-		return models.ErrEmptyDB
+		return fmt.Errorf("failed to generate the walks: %w", models.ErrEmptyDB)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return generateWalks(ctx, rng, DB, RWS, nodeIDs...)
+	if err := generateWalks(ctx, rng, DB, RWS, nodeIDs...); err != nil {
+		return fmt.Errorf("failed to generate the walks: %w", err)
+	}
+
+	return nil
 }
 
 /*
@@ -120,7 +128,7 @@ The function returns an error if the DB cannot find the successorIDs of a node.
 
 It's important to note that the walk breaks early when a cycle is encountered.
 This behaviour simplifies the data structure (now a walk visits a node only once,
-so we can use Sets) and helps with mitigating self-boosting spam networks.
+so we can use sets) and helps with mitigating self-boosting spam networks.
 
 At the same time this doesn't influence much the ranking of normal users
 since a cycle occurance is very improbable.
@@ -198,17 +206,17 @@ func WalkStep(rng *rand.Rand, follows, walk []uint32) (nextID uint32, stop bool)
 // Remove() removes all the walks that originated from nodeID.
 func Remove(ctx context.Context, RWS models.RandomWalkStore, nodeID uint32) error {
 	if err := RWS.Validate(); err != nil {
-		return fmt.Errorf("RWS validation failed: %w", err)
+		return fmt.Errorf("failed to remove the walks of nodeID %d: RWS validation failed: %w", nodeID, err)
 	}
 
 	walkIDs, err := RWS.WalksVisiting(ctx, -1, nodeID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch walksVisitingAll: %w", err)
+		return fmt.Errorf("failed to remove the walks of nodeID %d: failed to fetch walksVisitingAll: %w", nodeID, err)
 	}
 
 	walks, err := RWS.Walks(ctx, walkIDs...)
 	if err != nil {
-		return fmt.Errorf("failed to fetch walks from IDs: %w", err)
+		return fmt.Errorf("failed to remove the walks of nodeID %d: failed to fetch walks from IDs: %w", nodeID, err)
 	}
 
 	walksToRemove := make([]uint32, 0, RWS.WalksPerNode(ctx))
@@ -218,7 +226,11 @@ func Remove(ctx context.Context, RWS models.RandomWalkStore, nodeID uint32) erro
 		}
 	}
 
-	return RWS.RemoveWalks(ctx, walksToRemove...)
+	if err := RWS.RemoveWalks(ctx, walksToRemove...); err != nil {
+		return fmt.Errorf("failed to remove the walks of nodeID %d: %w", nodeID, err)
+	}
+
+	return nil
 }
 
 // startsWith() returns whether walk starts with nodeID.

@@ -62,7 +62,7 @@ func main() {
 		}
 
 		if err = walks.GenerateAll(ctx, DB, RWS); err != nil {
-			panic("failed to generate the walks: " + err.Error())
+			panic(err)
 		}
 
 	default:

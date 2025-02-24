@@ -29,15 +29,15 @@ func Update(
 	removed, common, added []uint32) (int, error) {
 
 	if err := DB.Validate(); err != nil {
-		return 0, fmt.Errorf("DB validation failed: %w", err)
+		return 0, fmt.Errorf("failed to update the walks of nodeID %d: DB validation failed: %w", nodeID, err)
 	}
 
 	if err := RWS.Validate(); err != nil {
-		return 0, fmt.Errorf("RWS validation failed: %w", err)
+		return 0, fmt.Errorf("failed to update the walks of nodeID %d: RWS validation failed: %w", nodeID, err)
 	}
 
 	if !DB.ContainsNode(ctx, nodeID) {
-		return 0, models.ErrNodeNotFoundDB
+		return 0, fmt.Errorf("failed to update the walks of nodeID %d: %w", nodeID, models.ErrNodeNotFoundDB)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -110,7 +110,7 @@ func updateRemovedNodes(
 
 		// prune and graft the walk with the new walk segment
 		if err = RWS.PruneGraftWalk(ctx, ID, cutIndex, newSegment); err != nil {
-			return updated, fmt.Errorf("failed to prune and graft: %w", err)
+			return updated, fmt.Errorf("failed to prune and graft walkID %d: %w", ID, err)
 		}
 
 		updated++
@@ -170,7 +170,7 @@ func updateAddedNodes(
 
 		// prune and graft the walk with the new walk segment
 		if err := RWS.PruneGraftWalk(ctx, ID, cutIndex, newSegment); err != nil {
-			return updated, fmt.Errorf("failed to prune and graft: %w", err)
+			return updated, fmt.Errorf("failed to prune and graft walkID %d: %w", ID, err)
 		}
 
 		updated++
