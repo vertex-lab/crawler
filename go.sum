@@ -56,14 +56,10 @@ github.com/tidwall/match v1.1.1/go.mod h1:eRSPERbgtNPcGhD8UCthc6PmLEQXEWd3PRB5JT
 github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
 github.com/tidwall/pretty v1.2.1 h1:qjsOFOWWQl+N3RsoF5/ssm1pHmJJwhjlSbZ51I6wMl4=
 github.com/tidwall/pretty v1.2.1/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
-github.com/vertex-lab/relay v0.0.0-20250218140819-771422accd9e h1:77qv0Pa+5lL9HYFHjichBM2lDuojUe269CN42nBQBPI=
-github.com/vertex-lab/relay v0.0.0-20250218140819-771422accd9e/go.mod h1:txCnCd2hS0F23G29v57FeoTdxh5iSdS7zYgYhENOvrc=
 github.com/vertex-lab/relay v0.0.0-20250223154722-5f7589ff7e3e h1:Xlce49n7vHWBS1ewxIPixvGToQeuhbcGUD2S+dCIcfY=
 github.com/vertex-lab/relay v0.0.0-20250223154722-5f7589ff7e3e/go.mod h1:cYT00JOi8QZLdAgSCWENPX2JssowkwjnC42Y4OmVM6g=
 golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d h1:0olWaB5pg3+oychR51GUVCEsGkeCU/2JxjBgIo4f3M0=
 golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d/go.mod h1:qj5a5QZpwLU2NLQudwIN5koi3beDhSAlJwa67PuM98c=
-golang.org/x/image v0.24.0 h1:AN7zRgVsbvmTfNyqIbbOraYL8mSwcKncEj8ofjgzcMQ=
-golang.org/x/image v0.24.0/go.mod h1:4b/ITuLfqYq1hqZcjofwctIhi7sZh2WaCjvsBNjjya8=
 golang.org/x/net v0.34.0 h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=
 golang.org/x/net v0.34.0/go.mod h1:di0qlW3YNM5oh6GqDGQr92MyTozJPmybPK4Ev/Gm31k=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=

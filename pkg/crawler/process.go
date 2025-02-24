@@ -2,15 +2,8 @@ package crawler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"image"
-	_ "image/gif"
-	"image/jpeg"
-	_ "image/png"
-	"net/http"
 	"os"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -20,14 +13,11 @@ import (
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
 	"github.com/vertex-lab/crawler/pkg/walks"
 	"github.com/vertex-lab/relay/pkg/eventstore"
-	"golang.org/x/image/draw"
 )
 
 type ProcessEventsConfig struct {
 	Log        *logger.Aggregate
 	PrintEvery uint32
-
-	ImagesURL string // the path to the directory where kind:0 'picture' and 'banner' are stored
 }
 
 func NewProcessEventsConfig() ProcessEventsConfig {
@@ -40,7 +30,6 @@ func NewProcessEventsConfig() ProcessEventsConfig {
 func (c ProcessEventsConfig) Print() {
 	fmt.Printf("Process\n")
 	fmt.Printf("  PrintEvery: %d\n", c.PrintEvery)
-	fmt.Printf("  ImagesURL: %s\n", c.ImagesURL)
 }
 
 // ProcessEvents() process one event at the time from the eventChannel, based on their kind.
@@ -77,7 +66,7 @@ func ProcessEvents(
 				err = HandleFollowList(DB, RWS, eventStore, event, walksTracker)
 
 			case nostr.KindProfileMetadata:
-				err = HandleProfileMetadata(eventStore, event, config.ImagesURL)
+				_, err = eventStore.Replace(ctx, event)
 
 			default:
 				err = fmt.Errorf("unsupported event kind")
@@ -93,108 +82,6 @@ func ProcessEvents(
 			}
 		}
 	}
-}
-
-func HandleProfileMetadata(eventStore *eventstore.Store, event *nostr.Event, imagesDir string) error {
-	// use a new context for the operation to avoid it being interrupted
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var oldContent string
-	row := eventStore.DB.QueryRowContext(ctx, "SELECT content FROM events WHERE kind = ? pubkey = ?", event.Kind, event.PubKey)
-	err := row.Scan(&oldContent)
-	if err != nil {
-		return fmt.Errorf("failed to query for the content of the old event: %w", err)
-	}
-
-	saved, err := eventStore.Replace(ctx, event)
-	if err != nil {
-		return err
-	}
-
-	if !saved {
-		return nil
-	}
-
-	oldURL := extractPictureURL(oldContent)
-	newURL := extractPictureURL(event.Content)
-
-	if newURL != "" && newURL != oldURL {
-		img, _, err := downloadImage(newURL)
-		if err != nil {
-			return err
-		}
-
-		img1 := scaleImage(img, draw.BiLinear, 300)
-		path1 := imagesDir + "picture_300_" + event.PubKey + "_" + strconv.FormatInt(event.CreatedAt.Time().Unix(), 10) + ".jpeg"
-		if err := saveImage(img1, path1); err != nil {
-			return err
-		}
-
-		img2 := scaleImage(img, draw.BiLinear, 30)
-		path2 := imagesDir + "picture_30_" + event.PubKey + "_" + strconv.FormatInt(event.CreatedAt.Time().Unix(), 10) + ".jpeg"
-		if err := saveImage(img2, path2); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// This function extracts the URL specified in the 'picture' field. In case of errors or missing field, returns the empty string "".
-func extractPictureURL(content string) string {
-	if len(content) == 0 {
-		return ""
-	}
-
-	var img map[string]string
-	if err := json.Unmarshal([]byte(content), &img); err != nil {
-		return ""
-	}
-
-	return img["picture"]
-}
-
-func downloadImage(URL string) (img image.Image, format string, err error) {
-	res, err := http.Get(URL)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to fetch image %s: %w", URL, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("failed to download image %s, status: %s", URL, res.Status)
-	}
-
-	img, format, err = image.Decode(res.Body)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to decode image: %w", err)
-	}
-
-	return img, format, nil
-}
-
-// ScaleImage() returns a rescaled image with the same aspect ratio using the specified scaler.
-func scaleImage(img image.Image, scaler draw.Scaler, width int) image.Image {
-	scaleFactor := float64(width) / float64(img.Bounds().Dx())
-	height := int(float64(img.Bounds().Dy())*scaleFactor + 0.5)
-	scaled := image.NewRGBA(image.Rect(0, 0, width, height))
-	scaler.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Over, nil)
-	return scaled
-}
-
-func saveImage(img image.Image, path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", path, err)
-	}
-	defer file.Close()
-
-	if err := jpeg.Encode(file, img, nil); err != nil {
-		return fmt.Errorf("failed to save image to %s: %w", path, err)
-	}
-
-	return nil
 }
 
 // HandleFollowList() saves the event to the eventStore, replacing an older event
