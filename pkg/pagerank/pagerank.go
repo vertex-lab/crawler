@@ -13,6 +13,7 @@ import (
 )
 
 // Global() computes the global pagerank score for the specified nodeIDs.
+// If a nodeID is not found, its pagerank is assumed to be 0.
 func Global(
 	ctx context.Context,
 	RWS models.RandomWalkStore,
@@ -32,13 +33,9 @@ func Global(
 		return nil, models.ErrEmptyRWS
 	}
 
-	if totalVisits == 0 {
-		return nil, models.ErrEmptyRWS
-	}
-
-	// compute the pagerank as the frequency of visits
 	pagerank := make(models.PagerankMap, len(nodeIDs))
 	for i, ID := range nodeIDs {
+		// compute the pagerank as the frequency of visits
 		pagerank[ID] = float64(visits[i]) / totalVisits
 
 	}

@@ -57,12 +57,13 @@ func TestGlobal(t *testing.T) {
 		{
 			name:          "triangle RWS",
 			RWSType:       "triangle",
-			nodeIDs:       []uint32{0, 1, 2},
+			nodeIDs:       []uint32{0, 1, 2, 69},
 			expectedError: nil,
 			expectedPagerank: models.PagerankMap{
-				0: 1.0 / 3.0,
-				1: 1.0 / 3.0,
-				2: 1.0 / 3.0,
+				0:  1.0 / 3.0,
+				1:  1.0 / 3.0,
+				2:  1.0 / 3.0,
+				69: 0.0,
 			},
 		},
 	}

@@ -33,7 +33,7 @@ type RandomWalkStore interface {
 	// TotalVisits() returns the total number of visits. In case of any error, the default value 0 is returned.
 	TotalVisits(ctx context.Context) int
 
-	// VisitCounts() returns a map that associates each nodeID with the number of times it was visited by a walk.
+	// VisitCounts() returns the number of times each nodeID was visited by a walk. If nodeID is not found, 0 visits are returned.
 	VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error)
 
 	/*WalksVisiting() returns up to limit UNIQUE walkIDs evenly distributed among the specified nodeIDs.

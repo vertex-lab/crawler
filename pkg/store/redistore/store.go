@@ -165,7 +165,7 @@ func (RWS *RandomWalkStore) Validate() error {
 	return nil
 }
 
-// VisitCounts() returns a slice containing the number of times each node was visited by a walk.
+// VisitCounts() returns the number of times each nodeID was visited by a walk. If nodeID is not found, 0 visits are returned.
 func (RWS *RandomWalkStore) VisitCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
 	if err := RWS.Validate(); err != nil {
 		return nil, err
