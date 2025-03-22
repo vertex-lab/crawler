@@ -4,6 +4,10 @@ go 1.23.3
 
 toolchain go1.23.6
 
+replace github.com/vertex-lab/relay => ../relay
+
+replace github.com/nbd-wtf/go-nostr => ../go-nostr
+
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/joho/godotenv v1.5.1
