@@ -109,12 +109,12 @@ func HandleFollowList(
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	stored, err := eventStore.Replace(ctx, event)
+	replaced, err := eventStore.Replace(ctx, event)
 	if err != nil {
 		return err
 	}
 
-	if stored {
+	if replaced {
 		walksChanged, err := processFollowList(ctx, DB, RWS, event)
 		if err != nil {
 			return fmt.Errorf("failed to process follow-list: %w", err)
