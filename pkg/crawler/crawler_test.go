@@ -6,9 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nbd-wtf/go-nostr"
 	mockdb "github.com/vertex-lab/crawler/pkg/database/mock"
-	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/logger"
 )
 
@@ -76,44 +74,4 @@ func TestQueryPubkeys(t *testing.T) {
 
 		QueryPubkeys(ctx, config, pubkeyChan, PrintEvent)
 	})
-}
-
-func TestIsEventOutdated(t *testing.T) {
-	testCases := []struct {
-		name             string
-		node             *models.Node
-		event            *nostr.Event
-		expectedOutdated bool
-	}{
-		{
-			name:  "nil node",
-			event: &nostr.Event{Kind: nostr.KindFollowList},
-		},
-		{
-			name:  "nil records",
-			node:  &models.Node{},
-			event: &nostr.Event{Kind: nostr.KindFollowList},
-		},
-		{
-			name:             "outdated event",
-			node:             &models.Node{Records: []models.Record{{Kind: nostr.KindFollowList, Timestamp: 1}}},
-			event:            &nostr.Event{Kind: nostr.KindFollowList, CreatedAt: 0},
-			expectedOutdated: true,
-		},
-		{
-			name:             "newer event",
-			node:             &models.Node{Records: []models.Record{{Kind: nostr.KindFollowList, Timestamp: 1}}},
-			event:            &nostr.Event{Kind: nostr.KindFollowList, CreatedAt: 5},
-			expectedOutdated: false,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			outdated := IsEventOutdated(test.node, test.event)
-			if outdated != test.expectedOutdated {
-				t.Fatalf("IsEventOutdated(): expected %v, got %v", test.expectedOutdated, outdated)
-			}
-		})
-	}
 }

@@ -228,26 +228,6 @@ func QueryPubkeyBatch(
 
 // ------------------------------------HELPERS----------------------------------
 
-// IsEventOutdated() returns whether it exists a record of node that is newer than the specified event.
-// e.g. `event` is a follow-list that is OLDER than the latest follow-list we processed for that node, and should therefore be ignored.
-func IsEventOutdated(node *models.Node, event *nostr.Event) bool {
-	if node == nil || node.Records == nil {
-		return false
-	}
-
-	for _, rec := range node.Records {
-		if rec.Kind != event.Kind {
-			continue
-		}
-
-		if rec.Timestamp >= event.CreatedAt.Time().Unix() {
-			return true
-		}
-	}
-
-	return false
-}
-
 // Close() iterates over the relays in the pool and closes all connections.
 func close(logger *logger.Aggregate, pool *nostr.SimplePool, funcName string) {
 	logger.Info("  > " + funcName + ": closing relay connections... ")
