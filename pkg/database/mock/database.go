@@ -432,9 +432,11 @@ func SetupDB(DBType string) *Database {
 		DB := NewDatabase()
 		DB.KeyIndex = map[string]uint32{odell: 0, calle: 1, pip: 2}
 		DB.LastNodeID = 2
-		DB.NodeIndex[0] = &models.Node{ID: 0, Pubkey: odell, Status: models.StatusInactive}
-		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: calle, Status: models.StatusActive}
-		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: pip, Status: models.StatusInactive}
+		records := []models.Record{{Kind: models.Added, Timestamp: time.Unix(69, 0)}}
+
+		DB.NodeIndex[0] = &models.Node{ID: 0, Pubkey: odell, Status: models.StatusInactive, Records: records}
+		DB.NodeIndex[1] = &models.Node{ID: 1, Pubkey: calle, Status: models.StatusActive, Records: records}
+		DB.NodeIndex[2] = &models.Node{ID: 2, Pubkey: pip, Status: models.StatusInactive, Records: records}
 
 		DB.Follow[0] = mapset.NewSet[uint32](1)
 		DB.Follow[1] = mapset.NewSet[uint32]()

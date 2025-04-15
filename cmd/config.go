@@ -183,6 +183,13 @@ func LoadConfig() (*Config, error) {
 				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
 			}
 
+		case "PROMOTION_WAIT_PERIOD":
+			duration, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing %v: %v", keyVal, err)
+			}
+			config.Arbiter.PromotionWaitPeriod = time.Duration(duration) * time.Second
+
 		case "PROCESS_PRINT_EVERY":
 			printEvery, err := strconv.Atoi(val)
 			if err != nil {

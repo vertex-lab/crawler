@@ -17,6 +17,7 @@ type NodeArbiterConfig struct {
 	ActivationThreshold float64
 	PromotionMultiplier float64
 	DemotionMultiplier  float64
+	PromotionWaitPeriod time.Duration
 }
 
 func NewNodeArbiterConfig() NodeArbiterConfig {
@@ -25,6 +26,7 @@ func NewNodeArbiterConfig() NodeArbiterConfig {
 		ActivationThreshold: 0.01,
 		PromotionMultiplier: 0.1,
 		DemotionMultiplier:  1.05,
+		PromotionWaitPeriod: time.Hour,
 	}
 }
 
@@ -33,11 +35,12 @@ func (c NodeArbiterConfig) Print() {
 	fmt.Printf("  Activation: %f\n", c.ActivationThreshold)
 	fmt.Printf("  Promotion: %f\n", c.PromotionMultiplier)
 	fmt.Printf("  Demotion: %f\n", c.DemotionMultiplier)
+	fmt.Printf("  WaitPeriod: %v\n", c.PromotionWaitPeriod)
 }
 
 // NodeArbiter() activates when pagerankTotal > threshold. When that happens it:
 // - scans through all the nodes in the database
-// - promotes or demotes them based on their pagerank and promotion/demotion multipliers
+// - promotes or demotes nodes
 func NodeArbiter(
 	ctx context.Context,
 	config NodeArbiterConfig,
@@ -109,10 +112,7 @@ func ArbiterScan(
 			return promoted, demoted, fmt.Errorf("ArbiterScan(): visits: %w", err)
 		}
 
-		walksPerNode := float64(RWS.WalksPerNode(ctx))
-		promotionThreshold := int(config.PromotionMultiplier*walksPerNode + 0.5)
-		demotionThreshold := int(config.DemotionMultiplier*walksPerNode + 0.5)
-
+		walksPerNode := RWS.WalksPerNode(ctx)
 		for i, ID := range nodeIDs {
 			// use a new context for the operation to avoid it being interrupted,
 			// which might result in an inconsistent state of the database. Expected time <100ms
@@ -126,16 +126,14 @@ func ArbiterScan(
 				}
 
 				switch {
-				// Active --> Inactive
-				case node.Status == models.StatusActive && visits[i] < demotionThreshold:
+				case shouldDemote(node, visits[i], walksPerNode, config):
 					if err := DemoteNode(opCtx, DB, RWS, ID); err != nil {
 						return fmt.Errorf("failed to demote node %d: %w", ID, err)
 					}
 
 					demoted++
 
-				// Inactive --> Active
-				case node.Status == models.StatusInactive && visits[i] >= promotionThreshold:
+				case shouldPromote(node, visits[i], walksPerNode, config):
 					if err := PromoteNode(opCtx, DB, RWS, ID); err != nil {
 						return fmt.Errorf("failed to promote node %d: %w", ID, err)
 					}
@@ -164,6 +162,32 @@ func ArbiterScan(
 	return promoted, demoted, nil
 }
 
+// Returns whether the given node should be demoted.
+func shouldDemote(node *models.Node, visits int, walksPerNode uint16, config NodeArbiterConfig) bool {
+	if node.Status != models.StatusActive {
+		return false
+	}
+
+	threshold := int(config.DemotionMultiplier*float64(walksPerNode) + 0.5)
+	return visits < threshold
+}
+
+// Returns whether the given node should be promoted.
+func shouldPromote(node *models.Node, visits int, walksPerNode uint16, config NodeArbiterConfig) bool {
+	if node.Status != models.StatusInactive {
+		return false
+	}
+
+	ts := node.Added()
+	if ts == nil || time.Since(*ts) < config.PromotionWaitPeriod {
+		// node is too new to be eligible for promotion
+		return false
+	}
+
+	threshold := int(config.PromotionMultiplier*float64(walksPerNode) + 0.5)
+	return visits >= threshold
+}
+
 // PromoteNode() makes a node active, which means it generates random walks for it and updates the status to active.
 func PromoteNode(
 	ctx context.Context,
@@ -175,11 +199,7 @@ func PromoteNode(
 		return fmt.Errorf("failed to generate walks: %w", err)
 	}
 
-	delta := &models.Delta{
-		Kind:   models.Promotion,
-		NodeID: nodeID,
-	}
-
+	delta := &models.Delta{Kind: models.Promotion, NodeID: nodeID}
 	if err := DB.Update(ctx, delta); err != nil {
 		return fmt.Errorf("failed to update node: %w", err)
 	}
@@ -199,11 +219,7 @@ func DemoteNode(
 		return fmt.Errorf("failed to remove walks: %w", err)
 	}
 
-	delta := &models.Delta{
-		Kind:   models.Demotion,
-		NodeID: nodeID,
-	}
-
+	delta := &models.Delta{Kind: models.Demotion, NodeID: nodeID}
 	if err := DB.Update(ctx, delta); err != nil {
 		return fmt.Errorf("failed to update node: %w", err)
 	}
