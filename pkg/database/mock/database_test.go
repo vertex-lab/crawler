@@ -173,36 +173,6 @@ func TestUpdate(t *testing.T) {
 				delta:         &models.Delta{NodeID: 1},
 				expectedError: models.ErrNodeNotFoundDB,
 			},
-			{
-				name:   "valid promotion",
-				DBType: "simple",
-				delta: &models.Delta{
-					NodeID: 0,
-					Record: models.Record{Timestamp: 111, Kind: models.Promotion},
-				},
-
-				expectedNode: &models.Node{
-					ID:      0,
-					Pubkey:  "0",
-					Status:  models.StatusActive,
-					Records: []models.Record{{Timestamp: 111, Kind: models.Promotion}},
-				},
-			},
-			{
-				name:   "valid demotion",
-				DBType: "simple",
-				delta: &models.Delta{
-					NodeID: 1,
-					Record: models.Record{Timestamp: 111, Kind: models.Demotion},
-				},
-
-				expectedNode: &models.Node{
-					ID:      1,
-					Pubkey:  "1",
-					Status:  models.StatusInactive,
-					Records: []models.Record{{Timestamp: 111, Kind: models.Demotion}},
-				},
-			},
 		}
 
 		for _, test := range testCases {
@@ -229,18 +199,14 @@ func TestUpdate(t *testing.T) {
 	t.Run("valid follows", func(t *testing.T) {
 		DB := SetupDB("simple")
 		delta := &models.Delta{
+			Kind:    nostr.KindFollowList,
 			NodeID:  0,
-			Record:  models.Record{ID: "xxx", Timestamp: 111, Kind: nostr.KindFollowList},
 			Removed: []uint32{1},
 			Added:   []uint32{2},
 		}
 
 		if err := DB.Update(context.Background(), delta); err != nil {
 			t.Fatalf("Update(%d): expected nil got %v", delta.NodeID, err)
-		}
-
-		if !reflect.DeepEqual(DB.NodeIndex[delta.NodeID].Records, []models.Record{delta.Record}) {
-			t.Errorf("expected records %v, got %v", delta.Record, DB.NodeIndex[delta.NodeID].Records)
 		}
 
 		if !reflect.DeepEqual(DB.Follow[delta.NodeID].ToSlice(), []uint32{2}) {

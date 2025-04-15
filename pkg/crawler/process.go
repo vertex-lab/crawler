@@ -153,7 +153,7 @@ func processFollowList(
 
 	removed, common, added := sliceutils.Partition(follows[0], newFollows)
 	delta := &models.Delta{
-		Record:  models.Record{ID: event.ID, Timestamp: event.CreatedAt.Time().Unix(), Kind: event.Kind},
+		Kind:    nostr.KindFollowList,
 		NodeID:  author.ID,
 		Added:   added,
 		Removed: removed,

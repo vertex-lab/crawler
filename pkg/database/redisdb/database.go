@@ -27,14 +27,12 @@ const (
 	KeyFollowersPrefix string = "followers:"
 
 	// redis node HASH fields
-	NodeID            string = "id"
-	NodePubkey        string = "pubkey"
-	NodeStatus        string = "status"
-	NodeFollowEventID string = "follows_event_ID"
-	NodeFollowEventTS string = "follows_event_TS"
-	NodePromotionTS   string = "promotion_TS"
-	NodeDemotionTS    string = "demotion_TS"
-	NodeAddedTS       string = "added_TS"
+	NodeID          string = "id"
+	NodePubkey      string = "pubkey"
+	NodeStatus      string = "status"
+	NodePromotionTS string = "promotion_TS"
+	NodeDemotionTS  string = "demotion_TS"
+	NodeAddedTS     string = "added_TS"
 )
 
 // Database fulfills the Database interface defined in models
@@ -93,8 +91,6 @@ func ParseNode(nodeMap map[string]string) (*models.Node, error) {
 	}
 
 	node := models.Node{}
-	FollowRecord := models.Record{Kind: nostr.KindFollowList}
-
 	for key, val := range nodeMap {
 		switch key {
 		case NodeID:
@@ -110,20 +106,27 @@ func ParseNode(nodeMap map[string]string) (*models.Node, error) {
 		case NodeStatus:
 			node.Status = val
 
-		case NodeFollowEventID:
-			FollowRecord.ID = val
-
-		case NodeFollowEventTS:
-			ts, err := redisutils.ParseInt64(val)
+		case NodeAddedTS:
+			ts, err := redisutils.ParseUnixTimestamp(val)
 			if err != nil {
 				return nil, err
 			}
-			FollowRecord.Timestamp = ts
-		}
-	}
+			node.Records = append(node.Records, models.Record{Kind: models.Added, Timestamp: ts})
 
-	if FollowRecord.Timestamp > 0 {
-		node.Records = []models.Record{FollowRecord}
+		case NodePromotionTS:
+			ts, err := redisutils.ParseUnixTimestamp(val)
+			if err != nil {
+				return nil, err
+			}
+			node.Records = append(node.Records, models.Record{Kind: models.Promotion, Timestamp: ts})
+
+		case NodeDemotionTS:
+			ts, err := redisutils.ParseUnixTimestamp(val)
+			if err != nil {
+				return nil, err
+			}
+			node.Records = append(node.Records, models.Record{Kind: models.Demotion, Timestamp: ts})
+		}
 	}
 
 	return &node, nil
@@ -131,7 +134,6 @@ func ParseNode(nodeMap map[string]string) (*models.Node, error) {
 
 // NodeByID() retrieves a node by its nodeID.
 func (DB *Database) NodeByID(ctx context.Context, nodeID uint32) (*models.Node, error) {
-
 	if err := DB.Validate(); err != nil {
 		return nil, err
 	}
@@ -175,7 +177,6 @@ func (DB *Database) NodeByKey(ctx context.Context, pubkey string) (*models.Node,
 
 // AddNode() adds a node to the database and returns its assigned nodeID.
 func (DB *Database) AddNode(ctx context.Context, pubkey string) (uint32, error) {
-
 	if err := DB.Validate(); err != nil {
 		return math.MaxUint32, err
 	}
@@ -228,8 +229,11 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	}
 
 	switch delta.Kind {
-	case models.Promotion, models.Demotion:
-		err = DB.updateStatus(ctx, delta.NodeID, delta.Record)
+	case models.Promotion:
+		err = DB.promote(ctx, delta.NodeID)
+
+	case models.Demotion:
+		err = DB.demote(ctx, delta.NodeID)
 
 	case nostr.KindFollowList:
 		err = DB.updateFollows(ctx, delta)
@@ -242,18 +246,12 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	return nil
 }
 
-// updateStatus updates the status of nodeID
-func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record models.Record) error {
-	switch record.Kind {
-	case models.Promotion:
-		return DB.client.HSet(ctx, KeyNode(nodeID), NodeStatus, models.StatusActive, NodePromotionTS, record.Timestamp).Err()
+func (DB *Database) promote(ctx context.Context, nodeID uint32) error {
+	return DB.client.HSet(ctx, KeyNode(nodeID), NodeStatus, models.StatusActive, NodePromotionTS, time.Now().Unix()).Err()
+}
 
-	case models.Demotion:
-		return DB.client.HSet(ctx, KeyNode(nodeID), NodeStatus, models.StatusInactive, NodeDemotionTS, record.Timestamp).Err()
-
-	default:
-		return fmt.Errorf("invalid record type: %v", record.Kind)
-	}
+func (DB *Database) demote(ctx context.Context, nodeID uint32) error {
+	return DB.client.HSet(ctx, KeyNode(nodeID), NodeStatus, models.StatusInactive, NodeDemotionTS, time.Now().Unix()).Err()
 }
 
 // updateFollows adds and removed follow relationships
@@ -280,8 +278,6 @@ func (DB *Database) updateFollows(ctx context.Context, delta *models.Delta) erro
 		}
 	}
 
-	// updating FollowRecord
-	pipe.HSet(ctx, KeyNode(delta.NodeID), NodeFollowEventID, delta.ID, NodeFollowEventTS, delta.Timestamp)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -645,8 +641,8 @@ func GenerateDB(cl *redis.Client, nodesNum, successorsPerNode int, rng *rand.Ran
 		}
 
 		delta := &models.Delta{
+			Kind:   nostr.KindFollowList,
 			NodeID: nodeID,
-			Record: models.Record{Kind: nostr.KindFollowList},
 			Added:  randomFollows,
 		}
 

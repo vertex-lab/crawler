@@ -3,6 +3,7 @@ package redisutils
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vertex-lab/crawler/pkg/models"
 	"github.com/vertex-lab/crawler/pkg/utils/sliceutils"
@@ -116,6 +117,15 @@ func ParseUniqueIDs(strIDs []string) ([]uint32, error) {
 // ParseInt64() parses an int from the specified string
 func ParseInt64(strVal string) (int64, error) {
 	return strconv.ParseInt(strVal, 10, 64)
+}
+
+// ParseUnitTimestamp() parses a unix timestamp string into a time.Time
+func ParseUnixTimestamp(strVal string) (time.Time, error) {
+	unix, err := strconv.ParseInt(strVal, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(unix, 0), nil
 }
 
 // ParseUint16() parses an uint16 from the specified string

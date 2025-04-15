@@ -21,8 +21,8 @@ type StaticSetup struct {
 // are applied, the graph returns to its original state.
 func Inverse(d *models.Delta) *models.Delta {
 	return &models.Delta{
+		Kind:    d.Kind,
 		NodeID:  d.NodeID,
-		Record:  models.Record{Kind: d.Kind},
 		Removed: d.Added,
 		Added:   d.Removed,
 	}
@@ -55,10 +55,10 @@ func Dandlings() (ST StaticSetup, Deltas []*models.Delta) {
 
 	// Because of symmetry, these are all the possible deltas.
 	Deltas = []*models.Delta{
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{1}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{1, 2}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{1, 2, 3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{1, 2, 3, 4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{1}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{1, 2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{1, 2, 3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{1, 2, 3, 4}},
 	}
 
 	return ST, Deltas
@@ -117,29 +117,29 @@ func Acyclic1() (ST StaticSetup, Deltas []*models.Delta) {
 
 	Deltas = []*models.Delta{
 		// simple removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}},
 
 		// simple additions
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{3}},
 
 		// additions and removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}, Added: []uint32{4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}, Added: []uint32{4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}, Added: []uint32{3, 4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}, Added: []uint32{4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}, Added: []uint32{4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}, Added: []uint32{3, 4}},
 
 		// simple additions
-		{NodeID: 4, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{0}},
-		{NodeID: 4, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{1}},
-		{NodeID: 4, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{2}},
-		{NodeID: 4, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{3}},
-		{NodeID: 4, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{0, 1}},
+		{NodeID: 4, Kind: nostr.KindFollowList, Added: []uint32{0}},
+		{NodeID: 4, Kind: nostr.KindFollowList, Added: []uint32{1}},
+		{NodeID: 4, Kind: nostr.KindFollowList, Added: []uint32{2}},
+		{NodeID: 4, Kind: nostr.KindFollowList, Added: []uint32{3}},
+		{NodeID: 4, Kind: nostr.KindFollowList, Added: []uint32{0, 1}},
 	}
 
 	return ST, Deltas
@@ -166,26 +166,26 @@ func Acyclic2() (ST StaticSetup, Deltas []*models.Delta) {
 
 	Deltas = []*models.Delta{
 		// simple removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}},
 
 		// simple additions
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{5}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{5}},
 
 		// additions and removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{3, 4}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{5}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{3, 5}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{3, 4}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{5}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{3, 5}},
 
 		// simple additions
-		{NodeID: 1, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{2}},
-		{NodeID: 1, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{3}},
-		{NodeID: 1, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{4}},
+		{NodeID: 1, Kind: nostr.KindFollowList, Added: []uint32{2}},
+		{NodeID: 1, Kind: nostr.KindFollowList, Added: []uint32{3}},
+		{NodeID: 1, Kind: nostr.KindFollowList, Added: []uint32{4}},
 	}
 
 	return ST, Deltas
@@ -208,17 +208,17 @@ func Acyclic3() (ST StaticSetup, Deltas []*models.Delta) {
 
 	Deltas = []*models.Delta{
 		// simple removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}},
 
 		// simple additions
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{3}},
 
 		// additions and removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}, Added: []uint32{3}},
 	}
 
 	return ST, Deltas
@@ -241,17 +241,17 @@ func Acyclic4() (ST StaticSetup, Deltas []*models.Delta) {
 
 	Deltas = []*models.Delta{
 		// simple removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}},
 
 		// simple additions
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{3}},
 
 		// additions and removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{2}, Added: []uint32{3}},
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1, 2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{2}, Added: []uint32{3}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1, 2}, Added: []uint32{3}},
 	}
 
 	return ST, Deltas
@@ -280,13 +280,13 @@ func CyclicLong50() (ST StaticSetup, Deltas []*models.Delta) {
 	// because of symmetry, these are all the possible changes that produce cycles non shorter than 25
 	Deltas = []*models.Delta{
 		// simple removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}},
 
 		// simple additions
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Added: []uint32{25}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Added: []uint32{25}},
 
 		// additions and removals
-		{NodeID: 0, Record: models.Record{Kind: nostr.KindFollowList}, Removed: []uint32{1}, Added: []uint32{25}},
+		{NodeID: 0, Kind: nostr.KindFollowList, Removed: []uint32{1}, Added: []uint32{25}},
 	}
 
 	return ST, Deltas

@@ -81,7 +81,7 @@ func (DB *Database) AddNode(ctx context.Context, pubkey string) (uint32, error) 
 		ID:      nodeID,
 		Pubkey:  pubkey,
 		Status:  models.StatusInactive,
-		Records: []models.Record{{Kind: models.Added, Timestamp: time.Now().Unix()}},
+		Records: []models.Record{{Kind: models.Added, Timestamp: time.Now()}},
 	}
 
 	return nodeID, nil
@@ -104,8 +104,11 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	}
 
 	switch delta.Kind {
-	case models.Promotion, models.Demotion:
-		err = DB.updateStatus(ctx, delta.NodeID, delta.Record)
+	case models.Promotion:
+		err = DB.promote(ctx, delta.NodeID)
+
+	case models.Demotion:
+		err = DB.demote(ctx, delta.NodeID)
 
 	case nostr.KindFollowList:
 		err = DB.updateFollows(ctx, delta)
@@ -118,22 +121,17 @@ func (DB *Database) Update(ctx context.Context, delta *models.Delta) error {
 	return nil
 }
 
-// updateStatus updates the status of nodeID
-func (DB *Database) updateStatus(ctx context.Context, nodeID uint32, record models.Record) error {
+func (DB *Database) promote(ctx context.Context, nodeID uint32) error {
 	_ = ctx
+	DB.NodeIndex[nodeID].Status = models.StatusActive
+	DB.NodeIndex[nodeID].Records = append(DB.NodeIndex[nodeID].Records, models.Record{Kind: models.Promotion, Timestamp: time.Now()})
+	return nil
+}
 
-	switch record.Kind {
-	case models.Promotion:
-		DB.NodeIndex[nodeID].Status = models.StatusActive
-
-	case models.Demotion:
-		DB.NodeIndex[nodeID].Status = models.StatusInactive
-
-	default:
-		return fmt.Errorf("invalid record type: %v", record.Kind)
-	}
-
-	DB.NodeIndex[nodeID].Records = append(DB.NodeIndex[nodeID].Records, record)
+func (DB *Database) demote(ctx context.Context, nodeID uint32) error {
+	_ = ctx
+	DB.NodeIndex[nodeID].Status = models.StatusInactive
+	DB.NodeIndex[nodeID].Records = append(DB.NodeIndex[nodeID].Records, models.Record{Kind: models.Demotion, Timestamp: time.Now()})
 	return nil
 }
 
@@ -166,7 +164,6 @@ func (DB *Database) updateFollows(ctx context.Context, delta *models.Delta) erro
 		}
 	}
 
-	DB.NodeIndex[delta.NodeID].Records = append(DB.NodeIndex[delta.NodeID].Records, delta.Record)
 	return nil
 }
 

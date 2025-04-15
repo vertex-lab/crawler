@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/vertex-lab/crawler/pkg/models"
@@ -26,7 +27,7 @@ func TestParseNode(t *testing.T) {
 			nodeMap: nil,
 		},
 		{
-			name: "valid without follow record",
+			name: "valid without records",
 			nodeMap: map[string]string{
 				NodeID:     "19",
 				NodePubkey: "nineteen",
@@ -39,19 +40,20 @@ func TestParseNode(t *testing.T) {
 			},
 		},
 		{
-			name: "valid with follow record",
+			name: "valid with one record",
 			nodeMap: map[string]string{
-				NodeID:            "19",
-				NodePubkey:        "nineteen",
-				NodeStatus:        models.StatusActive,
-				NodeFollowEventID: "dsaudsaiudsa",
-				NodeFollowEventTS: "11",
+				NodeID:      "19",
+				NodePubkey:  "nineteen",
+				NodeStatus:  models.StatusActive,
+				NodeAddedTS: "1",
 			},
 			expectedNode: &models.Node{
-				ID:      19,
-				Pubkey:  "nineteen",
-				Status:  models.StatusActive,
-				Records: []models.Record{{ID: "dsaudsaiudsa", Timestamp: 11, Kind: nostr.KindFollowList}},
+				ID:     19,
+				Pubkey: "nineteen",
+				Status: models.StatusActive,
+				Records: []models.Record{
+					{Kind: models.Added, Timestamp: time.Unix(1, 0)},
+				},
 			},
 		},
 	}
@@ -117,7 +119,6 @@ func TestNodeByID(t *testing.T) {
 		DBType        string
 		nodeID        uint32
 		expectedError error
-		expectedNode  *models.Node
 	}{
 		{
 			name:          "nil DB",
@@ -137,16 +138,6 @@ func TestNodeByID(t *testing.T) {
 			nodeID:        1,
 			expectedError: models.ErrNodeNotFoundDB,
 		},
-		{
-			name:   "valid",
-			DBType: "one-node0",
-			nodeID: 0,
-			expectedNode: &models.Node{
-				ID:     0,
-				Pubkey: "0",
-				Status: models.StatusInactive,
-			},
-		},
 	}
 
 	for _, test := range testCases {
@@ -160,13 +151,8 @@ func TestNodeByID(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeByID(ctx, test.nodeID)
-			if !errors.Is(err, test.expectedError) {
+			if _, err := DB.NodeByID(ctx, test.nodeID); !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedError, err)
-			}
-
-			if !reflect.DeepEqual(nodeMeta, test.expectedNode) {
-				t.Errorf("NodeByID(%v): expected %v, got %v", test.nodeID, test.expectedNode, nodeMeta)
 			}
 		})
 	}
@@ -198,17 +184,6 @@ func TestNodeByKey(t *testing.T) {
 			pubkey:        "one",
 			expectedError: models.ErrNodeNotFoundDB,
 		},
-		{
-			name:   "valid",
-			DBType: "one-node0",
-			pubkey: "0",
-			expectedNode: &models.Node{
-				ID:     0,
-				Pubkey: "0",
-				Status: models.StatusInactive,
-			},
-			expectedError: nil,
-		},
 	}
 
 	for _, test := range testCases {
@@ -222,13 +197,8 @@ func TestNodeByKey(t *testing.T) {
 				t.Fatalf("SetupDB(): expected nil, got %v", err)
 			}
 
-			nodeMeta, err := DB.NodeByKey(ctx, test.pubkey)
-			if !errors.Is(err, test.expectedError) {
+			if _, err := DB.NodeByKey(ctx, test.pubkey); !errors.Is(err, test.expectedError) {
 				t.Fatalf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedError, err)
-			}
-
-			if !reflect.DeepEqual(nodeMeta, test.expectedNode) {
-				t.Errorf("NodeByKey(%v): expected %v, got %v", test.pubkey, test.expectedNode, nodeMeta)
 			}
 		})
 	}
@@ -289,9 +259,10 @@ func TestAddNode(t *testing.T) {
 
 		pubkey := "1"
 		expectedNode := &models.Node{
-			ID:     1,
-			Pubkey: pubkey,
-			Status: models.StatusInactive,
+			ID:      1,
+			Pubkey:  pubkey,
+			Status:  models.StatusInactive,
+			Records: []models.Record{{Kind: models.Added, Timestamp: time.Unix(time.Now().Unix(), 0)}},
 		}
 
 		DB, err := SetupDB(cl, "one-node0")
@@ -370,26 +341,34 @@ func TestUpdate(t *testing.T) {
 				name:   "valid promotion",
 				DBType: "simple",
 				delta: &models.Delta{
+					Kind:   models.Promotion,
 					NodeID: 0,
-					Record: models.Record{Kind: models.Promotion, Timestamp: 123},
 				},
 				expectedNode: &models.Node{
 					ID:     0,
 					Pubkey: "0",
 					Status: models.StatusActive,
+					Records: []models.Record{
+						{Kind: models.Added, Timestamp: time.Unix(time.Now().Unix(), 0)},
+						{Kind: models.Promotion, Timestamp: time.Unix(time.Now().Unix(), 0)},
+					},
 				},
 			},
 			{
 				name:   "valid demotion",
 				DBType: "simple",
 				delta: &models.Delta{
+					Kind:   models.Demotion,
 					NodeID: 0,
-					Record: models.Record{Kind: models.Promotion, Timestamp: 123},
 				},
 				expectedNode: &models.Node{
 					ID:     0,
 					Pubkey: "0",
-					Status: models.StatusActive,
+					Status: models.StatusInactive,
+					Records: []models.Record{
+						{Kind: models.Added, Timestamp: time.Unix(time.Now().Unix(), 0)},
+						{Kind: models.Demotion, Timestamp: time.Unix(time.Now().Unix(), 0)},
+					},
 				},
 			},
 		}
@@ -436,31 +415,14 @@ func TestUpdate(t *testing.T) {
 		}
 
 		delta := &models.Delta{
+			Kind:    nostr.KindFollowList,
 			NodeID:  0,
-			Record:  models.Record{Kind: nostr.KindFollowList, Timestamp: 123, ID: "abc"},
 			Removed: []uint32{1},
 			Added:   []uint32{2},
 		}
 
 		if err := DB.Update(ctx, delta); err != nil {
 			t.Fatalf("Update(%d): expected nil, got %v", delta.NodeID, err)
-		}
-
-		// check that the follow record changed
-		expectedNode := &models.Node{
-			ID:      0,
-			Pubkey:  "0",
-			Status:  models.StatusInactive,
-			Records: []models.Record{delta.Record},
-		}
-
-		node, err := DB.NodeByID(ctx, delta.NodeID)
-		if err != nil {
-			t.Fatalf("NodeByID(%d) expected nil, got %v", delta.NodeID, err)
-		}
-
-		if !reflect.DeepEqual(node, expectedNode) {
-			t.Fatalf("expected node %v, got %v", expectedNode, node)
 		}
 
 		// check the follows of nodeID

@@ -15,6 +15,7 @@ package models
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 const (
@@ -32,21 +33,56 @@ const (
 type Node struct {
 	ID      uint32
 	Pubkey  string
-	Status  string   // either active or inactive
-	Records []Record // not all Records will be necessarily returned from the DB
+	Status  string // either active or inactive
+	Records []Record
 }
 
-// Record encapsulates data around an update that involved a Node. For example an update to its follow-list, or its promotion/demotion.
+// Record encapsulates data around an update that involved a [Node], for example its promotion/demotion.
 type Record struct {
-	ID        string // e.g. the event.ID
-	Timestamp int64  // e.g. the event.CreatedAt
-	Kind      int    // e.g. the event.Kind or "Promotion" / "Demotion"
+	Kind      int // either [Added], [Promotion] or [Demotion]
+	Timestamp time.Time
+}
+
+// Added() returns the the timestamp of when the [Node] was added.
+// If nil, it means the records don't contain it.
+func (n *Node) Added() *time.Time {
+	for _, rec := range n.Records {
+		if rec.Kind == Added {
+			return &rec.Timestamp
+		}
+	}
+
+	return nil
+}
+
+// Promoted() returns the the timestamp of the last promotion of the [Node].
+// If nil, it means the records don't contain it.
+func (n *Node) Promoted() *time.Time {
+	for _, rec := range n.Records {
+		if rec.Kind == Promotion {
+			return &rec.Timestamp
+		}
+	}
+
+	return nil
+}
+
+// Demoted() returns the the timestamp of the last demotion of the [Node].
+// If nil, it means the records don't contain it.
+func (n *Node) Demoted() *time.Time {
+	for _, rec := range n.Records {
+		if rec.Kind == Demotion {
+			return &rec.Timestamp
+		}
+	}
+
+	return nil
 }
 
 // Delta represent the updates to do for a specified NodeID. Added and Removed represent respectively the
 // added and removed relationship (e.g. a Node added 0,11 and removed 12 from its follow-list)
 type Delta struct {
-	Record
+	Kind    int
 	NodeID  uint32
 	Removed []uint32
 	Added   []uint32
