@@ -256,6 +256,29 @@ func (DB *Database) Followers(ctx context.Context, nodeIDs ...uint32) ([][]uint3
 	return followerSlice, nil
 }
 
+func (DB *Database) FollowerCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
+	_ = ctx
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	counts := make([]int, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		followers, exists := DB.Follower[ID]
+		if !exists {
+			return nil, models.ErrNodeNotFoundDB
+		}
+
+		counts[i] = followers.Cardinality()
+	}
+
+	return counts, nil
+}
+
 // Pubkeys() returns a slice of pubkeys that correspond with the given slice of nodeIDs.
 // If a pubkey is not found, nil is returned.
 func (DB *Database) Pubkeys(ctx context.Context, nodeIDs ...uint32) ([]*string, error) {

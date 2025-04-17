@@ -266,3 +266,30 @@ func BenchmarkPagerank(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkFollowerCounts(b *testing.B) {
+	cl := redisutils.SetupProdClient()
+	ctx := context.Background()
+
+	DB, err := redisdb.NewDatabaseConnection(ctx, cl)
+	if err != nil {
+		b.Fatalf("NewDatabase(): benchmark failed: %v", err)
+	}
+
+	sizes := []int{100, 1000, 10000, 100000}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("size=%d", size), func(b *testing.B) {
+			nodeIDs := make([]uint32, size)
+			for i := 0; i < size; i++ {
+				nodeIDs[i] = uint32(i)
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := DB.FollowerCounts(ctx, nodeIDs...); err != nil {
+					b.Fatalf("benchmark failed: %v", err)
+				}
+			}
+		})
+	}
+}

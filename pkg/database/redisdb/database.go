@@ -367,6 +367,33 @@ func pipelineSMembers[ID uint32 | int64 | int](
 	return members, nil
 }
 
+func (DB *Database) FollowerCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	pipe := DB.client.Pipeline()
+	cmds := make([]*redis.IntCmd, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		cmds[i] = pipe.SCard(ctx, KeyFollowers(ID))
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, fmt.Errorf("follower counts pipeline exec: %w", err)
+	}
+
+	counts := make([]int, len(nodeIDs))
+	for i, cmd := range cmds {
+		counts[i] = int(cmd.Val())
+	}
+
+	return counts, nil
+}
+
 // NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 // If a pubkey is not found, nil is returned
 func (DB *Database) NodeIDs(ctx context.Context, pubkeys ...string) ([]*uint32, error) {
