@@ -119,6 +119,9 @@ type Database interface {
 	// FollowerCounts of the provided nodeIDs. If a node is not found, it returns the value 0.
 	FollowerCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error)
 
+	// FollowCounts of the provided nodeIDs. If a node is not found, it returns the value 0.
+	FollowCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error)
+
 	// NodeIDs() returns a slice of nodeIDs that correspond with the given slice of pubkeys.
 	// If a pubkey is not found, nil is returned
 	NodeIDs(ctx context.Context, pubkeys ...string) ([]*uint32, error)

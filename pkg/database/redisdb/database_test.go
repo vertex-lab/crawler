@@ -657,8 +657,8 @@ func TestFollowerCounts(t *testing.T) {
 		{
 			name:           "node not found",
 			DBType:         "simple",
-			nodeIDs:        []uint32{69, 1},
-			expectedCounts: []int{0, 1},
+			nodeIDs:        []uint32{1, 69},
+			expectedCounts: []int{1, 0},
 		},
 		{
 			name:           "valid",
@@ -679,6 +679,66 @@ func TestFollowerCounts(t *testing.T) {
 			}
 
 			counts, err := DB.FollowerCounts(context.Background(), test.nodeIDs...)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("expected error %v, got %v", test.expectedError, err)
+			}
+
+			if !reflect.DeepEqual(counts, test.expectedCounts) {
+				t.Errorf("expected counts %v, got %v", test.expectedCounts, counts)
+			}
+		})
+	}
+}
+
+func TestFollowCounts(t *testing.T) {
+	testCases := []struct {
+		name           string
+		DBType         string
+		nodeIDs        []uint32
+		expectedError  error
+		expectedCounts []int
+	}{
+		{
+			name:          "nil DB",
+			DBType:        "nil",
+			nodeIDs:       []uint32{0},
+			expectedError: models.ErrNilDB,
+		},
+		{
+			name:           "empty DB",
+			DBType:         "empty",
+			nodeIDs:        []uint32{0},
+			expectedCounts: []int{0},
+		},
+		{
+			name:   "empty node IDs",
+			DBType: "simple",
+		},
+		{
+			name:           "node not found",
+			DBType:         "simple",
+			nodeIDs:        []uint32{0, 69},
+			expectedCounts: []int{1, 0},
+		},
+		{
+			name:           "valid",
+			DBType:         "simple",
+			nodeIDs:        []uint32{0, 1},
+			expectedCounts: []int{1, 0},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			cl := redisutils.SetupTestClient()
+			defer redisutils.CleanupRedis(cl)
+
+			DB, err := SetupDB(cl, test.DBType)
+			if err != nil {
+				t.Fatalf("SetupDB(): expected nil, got %v", err)
+			}
+
+			counts, err := DB.FollowCounts(context.Background(), test.nodeIDs...)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("expected error %v, got %v", test.expectedError, err)
 			}

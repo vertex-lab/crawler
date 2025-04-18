@@ -20,14 +20,13 @@ type NodeSet mapset.Set[uint32]
 
 // simulates a simple graph database for testing.
 type Database struct {
-
 	// a map that associates each public key with a unique nodeID
 	KeyIndex map[string]uint32
 
 	// a map that associates each nodeID with its node data
 	NodeIndex map[uint32]*models.Node
 
-	// maps that associate each nodeID with the slice of its follows/mutes...
+	// maps that associate each nodeID with the slice of its follows
 	Follow   map[uint32]NodeSet
 	Follower map[uint32]NodeSet
 
@@ -270,10 +269,35 @@ func (DB *Database) FollowerCounts(ctx context.Context, nodeIDs ...uint32) ([]in
 	for i, ID := range nodeIDs {
 		followers, exists := DB.Follower[ID]
 		if !exists {
-			return nil, models.ErrNodeNotFoundDB
+			counts[i] = 0
+			continue
 		}
 
 		counts[i] = followers.Cardinality()
+	}
+
+	return counts, nil
+}
+
+func (DB *Database) FollowCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
+	_ = ctx
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
+	counts := make([]int, len(nodeIDs))
+	for i, ID := range nodeIDs {
+		follows, exists := DB.Follow[ID]
+		if !exists {
+			counts[i] = 0
+			continue
+		}
+
+		counts[i] = follows.Cardinality()
 	}
 
 	return counts, nil
@@ -486,7 +510,6 @@ func SetupDB(DBType string) *Database {
 // generates a random mock database of a specified number of nodes and successors per node
 // the successor of a node won't include itself, and won't have repetitions
 func GenerateDB(nodesNum, successorsPerNode int, rng *rand.Rand) *Database {
-
 	DB := NewDatabase()
 	if successorsPerNode > nodesNum {
 		return nil

@@ -372,6 +372,23 @@ func (DB *Database) FollowerCounts(ctx context.Context, nodeIDs ...uint32) ([]in
 		return nil, err
 	}
 
+	return pipelineSCard(ctx, DB, KeyFollowers, nodeIDs...)
+}
+
+func (DB *Database) FollowCounts(ctx context.Context, nodeIDs ...uint32) ([]int, error) {
+	if err := DB.Validate(); err != nil {
+		return nil, err
+	}
+
+	return pipelineSCard(ctx, DB, KeyFollows, nodeIDs...)
+}
+
+func pipelineSCard(
+	ctx context.Context,
+	DB *Database,
+	KeyFunc func(uint32) string,
+	nodeIDs ...uint32) ([]int, error) {
+
 	if len(nodeIDs) == 0 {
 		return nil, nil
 	}
@@ -379,11 +396,11 @@ func (DB *Database) FollowerCounts(ctx context.Context, nodeIDs ...uint32) ([]in
 	pipe := DB.client.Pipeline()
 	cmds := make([]*redis.IntCmd, len(nodeIDs))
 	for i, ID := range nodeIDs {
-		cmds[i] = pipe.SCard(ctx, KeyFollowers(ID))
+		cmds[i] = pipe.SCard(ctx, KeyFunc(ID))
 	}
 
 	if _, err := pipe.Exec(ctx); err != nil {
-		return nil, fmt.Errorf("follower counts pipeline exec: %w", err)
+		return nil, fmt.Errorf("scard pipeline exec: %w", err)
 	}
 
 	counts := make([]int, len(nodeIDs))
